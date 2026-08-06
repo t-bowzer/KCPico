@@ -1,0 +1,25 @@
+# PlatformIO build artifacts
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*.code-workspace
+
+# Build outputs
+*.o
+*.elf
+*.bin
+*.uf2
+*.hex
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Dependencies (PlatformIO fetches these)
+lib/.pio/

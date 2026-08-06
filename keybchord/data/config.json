@@ -1,0 +1,17 @@
+{
+  "i2c_address": "0x27",
+  "midi": { "din_enabled": true, "clock_enabled": false },
+  "modifiers": { "chord_fn": "ctrl", "strum_fn": "alt", "global_fn": "super" },
+  "chord": { "base_root_midi": 60, "note_range": [48, 84] },
+  "chord_root_order": ["Db","Ab","Eb","Bb","F","C","G","D","A","E","B","F#"],
+  "display": { "revert_timeout_ms": 1500, "prompt_timeout_ms": 5000 },
+  "led": {
+    "bpm_indicator": true,
+    "led": "scroll_lock",
+    "flash_ms": 40,
+    "accent_downbeat": true,
+    "accent_flash_ms": 80,
+    "only_when_rhythm_enabled": true
+  },
+  "startup_preset": "B1:P1"
+}

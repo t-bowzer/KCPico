@@ -52,6 +52,10 @@ bool resolveChord(const std::vector<GridCell>& held, bool backtick, ResolvedChor
 // extensions), offset from the given root MIDI note. Integer only.
 std::vector<uint8_t> chordNotes(const ResolvedChord& chord, int rootMidiNote);
 
+// Unique ascending pitch classes (0..11) of a resolved chord, including enabled
+// extensions. Shared by voicing and strum note-pool derivation.
+std::vector<int> chordPitchClasses(const ResolvedChord& chord);
+
 // Flat-spelling chord name for display/log (spec section 6.5).
 std::string chordName(const ResolvedChord& chord);
 

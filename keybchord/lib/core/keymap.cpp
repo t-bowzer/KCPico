@@ -59,14 +59,35 @@ constexpr ChordKeyEntry kSeventhKeys[12] = {
 
 constexpr uint8_t HID_USAGE_BACKTICK   = 0x35;
 constexpr uint8_t HID_USAGE_F1         = 0x3A;
+constexpr uint8_t HID_USAGE_F2         = 0x3B;
+constexpr uint8_t HID_USAGE_F3         = 0x3C;
+constexpr uint8_t HID_USAGE_F4         = 0x3D;
 constexpr uint8_t HID_USAGE_F5         = 0x3E;
+constexpr uint8_t HID_USAGE_ESC        = 0x29;
 constexpr uint8_t HID_USAGE_LEFT       = 0x50;
 constexpr uint8_t HID_USAGE_DOWN       = 0x51;
 constexpr uint8_t HID_USAGE_RIGHT      = 0x4F;
 constexpr uint8_t HID_USAGE_MINUS      = 0x2D;  // number-row -
 constexpr uint8_t HID_USAGE_EQUALS     = 0x2E;  // number-row =
+constexpr uint8_t HID_USAGE_KP_SLASH   = 0x54;
+constexpr uint8_t HID_USAGE_KP_STAR    = 0x55;
 constexpr uint8_t HID_USAGE_KP_MINUS   = 0x56;
 constexpr uint8_t HID_USAGE_KP_PLUS    = 0x57;
+
+constexpr uint8_t NUMBER_ROW_STRUM_LO  = 0x1E;  // 1
+constexpr uint8_t NUMBER_ROW_STRUM_HI  = 0x27;  // 0
+constexpr uint8_t KEYPAD_STRUM_LO      = 0x59;  // Keypad 1
+constexpr uint8_t KEYPAD_STRUM_HI      = 0x63;  // Keypad .
+
+bool isNumberRowStrum(uint8_t usage) {
+    return usage >= NUMBER_ROW_STRUM_LO && usage <= NUMBER_ROW_STRUM_HI;
+}
+
+bool isKeypadStrum(uint8_t usage) {
+    return (usage >= KEYPAD_STRUM_LO && usage <= KEYPAD_STRUM_HI)
+        || usage == HID_USAGE_KP_SLASH
+        || usage == HID_USAGE_KP_STAR;
+}
 
 bool lookupChordKey(uint8_t usage, GridCell& out) {
     for (const auto& e : kMajorKeys) {
@@ -98,9 +119,12 @@ bool KeymapResolver::isFunctionModifier(uint8_t modifiers) {
     return (modifiers & (CTRL | ALT | SUPER)) != 0;
 }
 
-KeyAction KeymapResolver::resolve(uint8_t hid_usage, uint8_t modifiers) const {
-    (void)modifiers;  // modifier byte reserved for Ctrl/Alt/Super combos (later milestones)
+bool KeymapResolver::isAlt(uint8_t modifiers) {
+    constexpr uint8_t ALT = 0x44;  // LAlt | RAlt
+    return (modifiers & ALT) != 0;
+}
 
+KeyAction KeymapResolver::resolve(uint8_t hid_usage, uint8_t modifiers) const {
     KeyAction a;
 
     GridCell cell;
@@ -110,18 +134,30 @@ KeyAction KeymapResolver::resolve(uint8_t hid_usage, uint8_t modifiers) const {
         return a;
     }
 
+    bool alt = isAlt(modifiers);
+
     switch (hid_usage) {
-        case HID_USAGE_BACKTICK: a.type = ActionType::Backtick;  break;
-        case HID_USAGE_F1:       a.type = ActionType::PlayModeCycle; break;
-        case HID_USAGE_F5:       a.type = ActionType::VoicingToggle; break;
-        case HID_USAGE_LEFT:     a.type = ActionType::ExtToggle9;    break;
-        case HID_USAGE_DOWN:     a.type = ActionType::ExtToggle11;   break;
-        case HID_USAGE_RIGHT:    a.type = ActionType::ExtToggle13;   break;
+        case HID_USAGE_BACKTICK: a.type = ActionType::Backtick;       break;
+        case HID_USAGE_F1:       a.type = ActionType::PlayModeCycle;  break;
+        case HID_USAGE_F2:       a.type = alt ? ActionType::StrumOctave   : ActionType::None; break;
+        case HID_USAGE_F3:       a.type = alt ? ActionType::StrumDuration : ActionType::None; break;
+        case HID_USAGE_F4:       a.type = alt ? ActionType::StrumVelocity : ActionType::None; break;
+        case HID_USAGE_F5:       a.type = alt ? ActionType::LimitedToggle : ActionType::VoicingToggle; break;
+        case HID_USAGE_ESC:      a.type = ActionType::ClearEdit;      break;
+        case HID_USAGE_LEFT:     a.type = ActionType::ExtToggle9;     break;
+        case HID_USAGE_DOWN:     a.type = ActionType::ExtToggle11;    break;
+        case HID_USAGE_RIGHT:    a.type = ActionType::ExtToggle13;    break;
         case HID_USAGE_EQUALS:
-        case HID_USAGE_KP_PLUS:  a.type = ActionType::OctaveUp;      break;
+        case HID_USAGE_KP_PLUS:  a.type = ActionType::OctaveUp;       break;
         case HID_USAGE_MINUS:
-        case HID_USAGE_KP_MINUS: a.type = ActionType::OctaveDown;    break;
-        default:                 a.type = ActionType::None;          break;
+        case HID_USAGE_KP_MINUS: a.type = ActionType::OctaveDown;     break;
+        default:
+            if (isNumberRowStrum(hid_usage) || isKeypadStrum(hid_usage)) {
+                a.type = ActionType::StrumKey;
+            } else {
+                a.type = ActionType::None;
+            }
+            break;
     }
 
     return a;

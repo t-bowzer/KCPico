@@ -189,6 +189,21 @@ std::vector<uint8_t> chordNotes(const ResolvedChord& chord, int rootMidiNote) {
     return out;
 }
 
+std::vector<int> chordPitchClasses(const ResolvedChord& chord) {
+    std::vector<int> tones;
+    int count = chordIntervalCount(chord.type);
+    const uint8_t* iv = chordIntervals(chord.type);
+    for (int i = 0; i < count; i++) {
+        tones.push_back(((chord.rootPc + iv[i]) % 12 + 12) % 12);
+    }
+    if (chord.add9)  tones.push_back(((chord.rootPc + EXT_ADD9)  % 12 + 12) % 12);
+    if (chord.add11) tones.push_back(((chord.rootPc + EXT_ADD11) % 12 + 12) % 12);
+    if (chord.add13) tones.push_back(((chord.rootPc + EXT_ADD13) % 12 + 12) % 12);
+    std::sort(tones.begin(), tones.end());
+    tones.erase(std::unique(tones.begin(), tones.end()), tones.end());
+    return tones;
+}
+
 std::string chordName(const ResolvedChord& chord) {
     std::string root = rootNameForPc(chord.rootPc);
 

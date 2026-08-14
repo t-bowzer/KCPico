@@ -15,6 +15,8 @@ public:
     void allNotesOff(uint8_t channel);
     void allSoundOff(uint8_t channel);
 
+    void flush();
+
     void sendTestNote();
 
 private:

@@ -40,20 +40,6 @@ int nearestPc(int pc, int reference) {
     return reference + (12 - rem);
 }
 
-// Unique sorted pitch classes of the chord.
-std::vector<int> chordPitchClasses(const ResolvedChord& c) {
-    std::vector<int> tones;
-    int count = chordIntervalCount(c.type);
-    const uint8_t* iv = chordIntervals(c.type);
-    for (int i = 0; i < count; i++) tones.push_back(((c.rootPc + iv[i]) % 12 + 12) % 12);
-    if (c.add9)  tones.push_back(((c.rootPc + 14) % 12 + 12) % 12);
-    if (c.add11) tones.push_back(((c.rootPc + 17) % 12 + 12) % 12);
-    if (c.add13) tones.push_back(((c.rootPc + 21) % 12 + 12) % 12);
-    std::sort(tones.begin(), tones.end());
-    tones.erase(std::unique(tones.begin(), tones.end()), tones.end());
-    return tones;
-}
-
 std::vector<uint8_t> clamp127(const std::vector<int>& notes) {
     std::vector<uint8_t> out;
     out.reserve(notes.size());

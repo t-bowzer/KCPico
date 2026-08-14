@@ -75,11 +75,47 @@ TEST(Keymap, ChordControls) {
     EXPECT_EQ(r.resolve(0x56, 0).type, ActionType::OctaveDown);     // Keypad-
 }
 
+TEST(Keymap, StrumKeysResolve) {
+    KeymapResolver r;
+    // Number row 1..0 -> StrumKey.
+    EXPECT_EQ(r.resolve(0x1E, 0).type, ActionType::StrumKey);  // 1
+    EXPECT_EQ(r.resolve(0x27, 0).type, ActionType::StrumKey);  // 0
+    // Keypad digits/decimal -> StrumKey (Num-Lock independent).
+    EXPECT_EQ(r.resolve(0x62, 0).type, ActionType::StrumKey);  // Keypad 0
+    EXPECT_EQ(r.resolve(0x63, 0).type, ActionType::StrumKey);  // Keypad .
+    EXPECT_EQ(r.resolve(0x59, 0).type, ActionType::StrumKey);  // Keypad 1
+    EXPECT_EQ(r.resolve(0x61, 0).type, ActionType::StrumKey);  // Keypad 9
+    // Keypad / and * -> StrumKey (limited layout only, filtered in engine).
+    EXPECT_EQ(r.resolve(0x54, 0).type, ActionType::StrumKey);  // Keypad /
+    EXPECT_EQ(r.resolve(0x55, 0).type, ActionType::StrumKey);  // Keypad *
+}
+
+TEST(Keymap, AltFunctionKeys) {
+    KeymapResolver r;
+    const uint8_t ALT = 0x04;  // LAlt modifier bit
+
+    // Alt+F2/F3/F4 arm strum parameter edits; Alt+F5 toggles limited keys.
+    EXPECT_EQ(r.resolve(0x3B, ALT).type, ActionType::StrumOctave);   // Alt+F2
+    EXPECT_EQ(r.resolve(0x3C, ALT).type, ActionType::StrumDuration); // Alt+F3
+    EXPECT_EQ(r.resolve(0x3D, ALT).type, ActionType::StrumVelocity); // Alt+F4
+    EXPECT_EQ(r.resolve(0x3E, ALT).type, ActionType::LimitedToggle); // Alt+F5
+
+    // Without Alt, F2/F3/F4 are not yet mapped (chord param editing deferred);
+    // F5 remains the voicing toggle.
+    EXPECT_EQ(r.resolve(0x3B, 0).type, ActionType::None);
+    EXPECT_EQ(r.resolve(0x3C, 0).type, ActionType::None);
+    EXPECT_EQ(r.resolve(0x3D, 0).type, ActionType::None);
+    EXPECT_EQ(r.resolve(0x3E, 0).type, ActionType::VoicingToggle);
+}
+
+TEST(Keymap, EscIsClearEdit) {
+    KeymapResolver r;
+    EXPECT_EQ(r.resolve(0x29, 0).type, ActionType::ClearEdit);  // Esc
+}
+
 TEST(Keymap, UnmappedKeysAreNone) {
     KeymapResolver r;
     EXPECT_EQ(r.resolve(0x28, 0).type, ActionType::None);  // Enter
-    EXPECT_EQ(r.resolve(0x29, 0).type, ActionType::None);  // Esc
-    EXPECT_EQ(r.resolve(0x1E, 0).type, ActionType::None);  // 1 (strum, M4)
     EXPECT_EQ(r.resolve(0x53, 0).type, ActionType::None);  // Num Lock
 }
 

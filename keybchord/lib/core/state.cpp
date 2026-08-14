@@ -16,6 +16,9 @@ void StateManager::loadDefaults() {
     currentBank = 0;
     currentSlot = 0;
     dirty = false;
+    selectedChord = ResolvedChord{};
+    selectedChordValid = false;
+    editTarget = EditTarget::None;
 }
 
 void StateManager::snapshotActive() {

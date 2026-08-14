@@ -26,6 +26,12 @@ enum class ActionType : uint8_t {
     ExtToggle13,    // Right arrow
     OctaveUp,       // = / Keypad+
     OctaveDown,     // - / Keypad-
+    StrumKey,       // number-row / keypad strum key (layout applied in engine)
+    StrumOctave,    // Alt+F2
+    StrumDuration,  // Alt+F3
+    StrumVelocity,  // Alt+F4
+    LimitedToggle,  // Alt+F5
+    ClearEdit,      // Esc (cancels current param edit)
     COUNT
 };
 
@@ -39,7 +45,8 @@ class KeymapResolver {
 public:
     // Maps a raw HID usage (plus modifier byte) to a semantic action.
     // Shift is a chord root and is NOT treated as a function modifier;
-    // only Ctrl/Alt/Super act as function modifiers (deferred to later milestones).
+    // only Ctrl/Alt/Super act as function modifiers. Alt is the strum modifier
+    // (Alt+F2..F5), Ctrl the chord/preset modifier, Super the global modifier.
     KeyAction resolve(uint8_t hid_usage, uint8_t modifiers) const;
 
     // True if the usage is one of the 36 chord-grid keys (incl. Tab/Caps/Shift/[ /').
@@ -47,5 +54,8 @@ public:
 
     // True if Ctrl, Alt, or Super is present in the HID modifier byte.
     static bool isFunctionModifier(uint8_t modifiers);
+
+    // True if Alt (either) is present in the HID modifier byte.
+    static bool isAlt(uint8_t modifiers);
 };
 

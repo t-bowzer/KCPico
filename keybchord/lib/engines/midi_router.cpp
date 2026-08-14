@@ -31,6 +31,10 @@ void MidiRouter::allSoundOff(uint8_t channel) {
     cc(channel, midi::CC_ALL_SOUND_OFF, 0);
 }
 
+void MidiRouter::flush() {
+    midiOut_.flush();
+}
+
 void MidiRouter::sendTestNote() {
     const uint8_t channel  = 1;
     const uint8_t note     = 60; // C4

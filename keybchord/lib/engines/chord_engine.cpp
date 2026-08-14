@@ -70,7 +70,7 @@ void ChordEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
             break;
 
         case ActionType::OctaveUp:
-            if (ev.pressed) {
+            if (ev.pressed && state_.editTarget == EditTarget::None) {
                 state_.pendingChord.octave = clamp<int8_t>(
                     state_.pendingChord.octave + 1,
                     param_bounds::CHORD_OCTAVE_MIN,
@@ -78,7 +78,7 @@ void ChordEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
             }
             break;
         case ActionType::OctaveDown:
-            if (ev.pressed) {
+            if (ev.pressed && state_.editTarget == EditTarget::None) {
                 state_.pendingChord.octave = clamp<int8_t>(
                     state_.pendingChord.octave - 1,
                     param_bounds::CHORD_OCTAVE_MIN,
@@ -147,6 +147,12 @@ void ChordEngine::onRelease(uint64_t now_us) {
 void ChordEngine::resolveAndTriggerIfChanged(uint64_t now_us, bool force) {
     ResolvedChord chord;
     if (resolveChord(heldCells_, backtickHeld_, chord)) {
+        // Record the currently selected chord for the strum plate (FR-S4). This
+        // is independent of Held-mode latching and Silent mode, and survives key
+        // release in Held mode.
+        state_.selectedChord = chord;
+        state_.selectedChordValid = true;
+
         // A fresh press always triggers (applies any pending param changes);
         // a release-buffer re-resolution only triggers if the chord changed.
         if (force || chordChanged(chord)) {

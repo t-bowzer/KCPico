@@ -1,0 +1,14 @@
+Pico wiring: 
+
+Pin 1  (GP0)  -> 22ohm resistor -> USB daughter board D+ (pin 3)
+Pin 2  (GP1)  -> 22ohm resistor -> USB daughter board D- (pin 2)
+Pin 6  (GP4)  -> PCF8574 SDA
+Pin 7  (GP5)  -> PCF8574 SCL
+Pin 8  (GND)  -> PCF8574 GND
+Pin 11 (GP8)  -> 10ohm resistor -> DIN socket pin 5
+Pin 13 (GND)  -> DIN socket pin 2
+Pin 36 (3v3)  -> 33ohm resistor -> DIN socket pin 4
+Pin 36 (3v3)  -> PCF8574 VCC
+Pin 38 (GND)  -> USB daughter board GND (pin 4)
+Pin 38 (GND)  -> [negative end of] 100uF capacitor [positive end then connects to] -> Pin 40 (VBUS)
+Pin 40 (VBUS) -> USB daughter board VBUS (pin 1)

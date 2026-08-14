@@ -4,11 +4,13 @@
 #include "config.h"
 #include "state.h"
 #include "midi_router.h"
+#include "chord_engine.h"
 #include "debug_log.h"
 
 static Adapters       g_adapters;
 static StateManager   g_state;
 static MidiRouter*    g_router = nullptr;
+static ChordEngine*   g_chordEngine = nullptr;
 
 void setup() {
     logInit();
@@ -19,6 +21,7 @@ void setup() {
     g_state.config = AppConfig::load(storage);
 
     g_router = new MidiRouter(*g_adapters.midiOut, g_state);
+    g_chordEngine = new ChordEngine(g_state, *g_router);
 
     logInfo("KeybChord Pico ready");
 }
@@ -26,15 +29,15 @@ void setup() {
 void loop() {
     if (!g_adapters.input) return;
 
+    uint64_t now_us = micros();
+
     auto events = g_adapters.input->poll();
     for (const auto& ev : events) {
         logKeyEvent(ev.hid_usage, ev.pressed, ev.modifiers);
-
-        if (ev.pressed) {
-            g_router->sendTestNote();
-            logInfo("Test note sent (C4 on channel 1)");
-        }
+        g_chordEngine->handleKeyEvent(ev, now_us);
     }
+
+    g_chordEngine->update(micros());
 
     delay(10);
 }

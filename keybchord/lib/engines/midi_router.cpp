@@ -1,5 +1,6 @@
 #include "midi_router.h"
 #include "midimsg.h"
+#include "debug_log.h"
 
 
 MidiRouter::MidiRouter(MidiOutAdapter& out, StateManager& state)
@@ -38,6 +39,7 @@ void MidiRouter::sendTestNote() {
 }
 
 void MidiRouter::send(const MidiMessage& msg) {
+    logMidiOut(msg.status, msg.data1, msg.data2);
     midiOut_.send(msg);
 }
 

@@ -24,6 +24,10 @@ void StateManager::snapshotActive() {
     activeRhythm = pendingRhythm;
 }
 
+void StateManager::snapshotChord() {
+    activeChord = pendingChord;
+}
+
 void StateManager::noteOn(uint8_t channel, uint8_t note) {
     removeNote(channel, note);
     activeNotes.push_back({note, channel});

@@ -39,8 +39,9 @@ constexpr uint8_t HID_USAGE_RShift = 0xE6;
 constexpr uint8_t HID_USAGE_RAlt   = 0xE7;
 constexpr uint8_t HID_USAGE_RGui   = 0xE8;
 
+// `channel` is 1-indexed (1..16, per MIDI spec and the Parameter Reference).
 inline constexpr uint8_t channelStatus(uint8_t cmd, uint8_t channel) {
-    return cmd | (channel & 0x0F);
+    return cmd | ((channel - 1) & 0x0F);
 }
 
 inline MidiMessage makeNoteOn(uint8_t channel, uint8_t note, uint8_t velocity) {
@@ -48,7 +49,7 @@ inline MidiMessage makeNoteOn(uint8_t channel, uint8_t note, uint8_t velocity) {
 }
 
 inline MidiMessage makeNoteOff(uint8_t channel, uint8_t note) {
-    return {channelStatus(STATUS_NOTE_ON, channel), note, 0};
+    return {channelStatus(STATUS_NOTE_OFF, channel), note, 0};
 }
 
 inline MidiMessage makeCC(uint8_t channel, uint8_t cc, uint8_t value) {

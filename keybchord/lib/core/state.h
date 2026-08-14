@@ -33,6 +33,7 @@ public:
     StateManager();
 
     void snapshotActive();
+    void snapshotChord();
 
     void noteOn(uint8_t channel, uint8_t note);
     void noteOff(uint8_t channel, uint8_t note);

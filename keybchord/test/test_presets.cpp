@@ -78,3 +78,37 @@ TEST(Presets, LoadPresetOrDefault) {
     PresetSlot p = loadPresetOrDefault(storage, 0, 0);
     EXPECT_EQ(p, PresetSlot::defaults());
 }
+
+TEST(Presets, RhythmPatternNameRoundTrip) {
+    StorageStub storage;
+
+    PresetSlot orig = PresetSlot::defaults();
+    orig.rhythm.pattern = 3;  // "Swing"
+    EXPECT_TRUE(savePreset(storage, 1, 0, orig));
+
+    PresetSlot loaded = loadPreset(storage, 1, 0);
+    EXPECT_EQ(loaded.rhythm.pattern, 3);
+
+    // An unknown pattern name falls back to the default (0).
+    storage.writeFile("/presets/bank1.json",
+        "[{\"rhythm\":{\"pattern\":\"Not A Rhythm\"}}]");
+    PresetSlot fallback = loadPreset(storage, 0, 0);
+    EXPECT_EQ(fallback.rhythm.pattern, 0);
+}
+
+TEST(Presets, RhythmDrumMapRoundTrip) {
+    StorageStub storage;
+
+    PresetSlot orig = PresetSlot::defaults();
+    orig.rhythm.drums.kick = 35;
+    orig.rhythm.drums.snare = 40;
+    orig.rhythm.drums.hihat = 44;
+    orig.rhythm.drums.open_hat = 45;
+    EXPECT_TRUE(savePreset(storage, 2, 1, orig));
+
+    PresetSlot loaded = loadPreset(storage, 2, 1);
+    EXPECT_EQ(loaded.rhythm.drums.kick, 35);
+    EXPECT_EQ(loaded.rhythm.drums.snare, 40);
+    EXPECT_EQ(loaded.rhythm.drums.hihat, 44);
+    EXPECT_EQ(loaded.rhythm.drums.open_hat, 45);
+}

@@ -71,6 +71,32 @@ inline void logStrumEdit(const char* param, int16_t value) {
 #endif
 }
 
+inline void logLed(uint8_t usage, bool on, bool ok) {
+#ifndef KEYBCHORD_NATIVE
+    unsigned long t = millis();
+    Serial.print("[");
+    Serial.print(t);
+    Serial.print("] LED usage=0x");
+    Serial.print(usage, HEX);
+    Serial.print(" on=");
+    Serial.print(on ? 1 : 0);
+    Serial.print(" ok=");
+    Serial.println(ok ? 1 : 0);
+#endif
+}
+
+inline void logLedComplete(uint8_t dev_addr, uint16_t len) {
+#ifndef KEYBCHORD_NATIVE
+    unsigned long t = millis();
+    Serial.print("[");
+    Serial.print(t);
+    Serial.print("] LED COMPLETE dev=");
+    Serial.print(dev_addr);
+    Serial.print(" len=");
+    Serial.println(len);  // 0 = transfer failed/stalled; >0 = success
+#endif
+}
+
 inline void logInfo(const char* msg) {
 #ifndef KEYBCHORD_NATIVE
     Serial.print("[INFO] ");

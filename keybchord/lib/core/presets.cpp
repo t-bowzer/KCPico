@@ -1,5 +1,6 @@
 #include "presets.h"
 #include "base.h"
+#include "rhythm.h"
 #include <ArduinoJson.h>
 #include <cstdio>
 
@@ -34,7 +35,9 @@ bool PresetSlot::operator==(const PresetSlot& other) const {
         && rhythm.tempo   == other.rhythm.tempo
         && rhythm.swing   == other.rhythm.swing
         && rhythm.muted   == other.rhythm.muted
-        && rhythm.channel == other.rhythm.channel;
+        && rhythm.channel == other.rhythm.channel
+        && rhythm.pattern == other.rhythm.pattern
+        && rhythm.drums   == other.rhythm.drums;
 }
 
 bool PresetSlot::operator!=(const PresetSlot& other) const {
@@ -134,11 +137,26 @@ PresetSlot loadPreset(StorageAdapter& storage, int bank, int slot) {
         if (r.containsKey("tempo") && r["tempo"].is<int>())
             p.rhythm.tempo = static_cast<uint16_t>(clamp<int>(r["tempo"].as<int>(), 40, 260));
         if (r.containsKey("swing") && r["swing"].is<int>())
-            p.rhythm.swing = static_cast<uint8_t>(clamp<int>(r["swing"].as<int>(), 0, 75));
+            p.rhythm.swing = static_cast<int8_t>(clamp<int>(r["swing"].as<int>(), -75, 75));
         if (r.containsKey("enabled") && r["enabled"].is<bool>())
             p.rhythm.enabled = r["enabled"].as<bool>();
         if (r.containsKey("muted") && r["muted"].is<bool>())
             p.rhythm.muted = r["muted"].as<bool>();
+        if (r.containsKey("pattern") && r["pattern"].is<const char*>()) {
+            int idx = rhythmIndex(r["pattern"].as<std::string>());
+            if (idx >= 0) p.rhythm.pattern = static_cast<uint8_t>(idx);
+        }
+        if (r.containsKey("drums") && r["drums"].is<JsonObject>()) {
+            auto d = r["drums"];
+            if (d.containsKey("kick") && d["kick"].is<int>())
+                p.rhythm.drums.kick = static_cast<uint8_t>(clamp<int>(d["kick"].as<int>(), 0, 127));
+            if (d.containsKey("snare") && d["snare"].is<int>())
+                p.rhythm.drums.snare = static_cast<uint8_t>(clamp<int>(d["snare"].as<int>(), 0, 127));
+            if (d.containsKey("hihat") && d["hihat"].is<int>())
+                p.rhythm.drums.hihat = static_cast<uint8_t>(clamp<int>(d["hihat"].as<int>(), 0, 127));
+            if (d.containsKey("open_hat") && d["open_hat"].is<int>())
+                p.rhythm.drums.open_hat = static_cast<uint8_t>(clamp<int>(d["open_hat"].as<int>(), 0, 127));
+        }
     }
 
     return p;
@@ -201,6 +219,12 @@ bool savePreset(StorageAdapter& storage, int bank, int slot, const PresetSlot& p
     rhythm["swing"]   = preset.rhythm.swing;
     rhythm["enabled"] = preset.rhythm.enabled;
     rhythm["muted"]   = preset.rhythm.muted;
+    rhythm["pattern"] = rhythmName(preset.rhythm.pattern);
+    auto drums = rhythm["drums"].to<JsonObject>();
+    drums["kick"]     = preset.rhythm.drums.kick;
+    drums["snare"]    = preset.rhythm.drums.snare;
+    drums["hihat"]    = preset.rhythm.drums.hihat;
+    drums["open_hat"] = preset.rhythm.drums.open_hat;
 
     std::string out;
     serializeJson(doc, out);

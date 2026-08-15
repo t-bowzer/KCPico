@@ -32,6 +32,15 @@ enum class ActionType : uint8_t {
     StrumVelocity,  // Alt+F4
     LimitedToggle,  // Alt+F5
     ClearEdit,      // Esc (cancels current param edit)
+    RhythmToggle,   // F7 (Super+F7 -> ClockToggle)
+    RhythmPatternCycle, // F8 (Super+F8 -> LedToggle)
+    RhythmMute,     // F9
+    TempoUp,        // Page Up
+    TempoDown,      // Page Down
+    SwingUp,        // Ctrl+Page Up
+    SwingDown,      // Ctrl+Page Down
+    ClockToggle,    // Super+F7
+    LedToggle,      // Super+F8
     COUNT
 };
 
@@ -57,5 +66,11 @@ public:
 
     // True if Alt (either) is present in the HID modifier byte.
     static bool isAlt(uint8_t modifiers);
+
+    // True if Ctrl (either) is present in the HID modifier byte.
+    static bool isCtrl(uint8_t modifiers);
+
+    // True if Super/Gui (either) is present in the HID modifier byte.
+    static bool isSuper(uint8_t modifiers);
 };
 

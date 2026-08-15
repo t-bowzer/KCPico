@@ -3,6 +3,7 @@
 #include "midimsg.h"
 #include "midi_router.h"
 #include "voicing.h"
+#include "rhythm.h"
 
 
 namespace {
@@ -92,14 +93,29 @@ void ChordEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
 }
 
 void ChordEngine::update(uint64_t now_us) {
-    if (arpActive_ && now_us >= arpNext_us_) {
-        stepArpeggio(now_us);
+    if (arpActive_) {
+        if (followRhythmClock()) {
+            // Advance on each rhythm step edge (FR-R4 / AC-6).
+            if (state_.rhythmClock.running &&
+                state_.rhythmClock.stepAbs != lastRhythmStep_) {
+                lastRhythmStep_ = state_.rhythmClock.stepAbs;
+                stepArpeggio(now_us);
+            }
+        } else if (now_us >= arpNext_us_) {
+            stepArpeggio(now_us);
+        }
     }
 
     if (releaseBufferPending_ && now_us >= releaseBufferDeadlineUs_) {
         releaseBufferPending_ = false;
         resolveAndTriggerIfChanged(now_us, false);
     }
+}
+
+bool ChordEngine::followRhythmClock() const {
+    return state_.pendingRhythm.enabled &&
+           (state_.activeChord.play_mode == PlayMode::Arpeggio ||
+            state_.activeChord.play_mode == PlayMode::Rhythm);
 }
 
 void ChordEngine::allNotesOff() {
@@ -217,18 +233,23 @@ void ChordEngine::triggerChord(const ResolvedChord& chord, uint64_t now_us) {
             break;
 
         case PlayMode::Arpeggio:
+        case PlayMode::Rhythm:
+            // Both step through the voicing at the stored tempo (FR-R4 / AC-6).
+            // With rhythm enabled they phase-lock to the rhythm clock; otherwise
+            // they free-run at the same step interval (stepUs(tempo)) so the
+            // tempo is honored even with drums and clock off.
             sounding_ = true;
             activeNotes_ = notes;
             arpIndex_ = 0;
             arpActive_ = true;
+            lastRhythmStep_ = state_.rhythmClock.stepAbs;
             router_.cc(p.channel, midi::CC_PAN, p.pan);
             router_.noteOn(p.channel, notes[0], p.velocity);
-            arpNext_us_ = now_us + static_cast<uint64_t>(p.note_duration_ms) * 1000ULL;
+            arpNext_us_ = now_us + stepUs(state_.pendingRhythm.tempo);
             break;
 
         case PlayMode::Held:
         case PlayMode::PressToPlay:
-        case PlayMode::Rhythm:  // M3: rhythm behaves as held until M5 clock sync
         default:
             sounding_ = true;
             activeNotes_ = notes;
@@ -255,7 +276,7 @@ void ChordEngine::stepArpeggio(uint64_t now_us) {
     router_.noteOff(p.channel, activeNotes_[arpIndex_]);
     arpIndex_ = (arpIndex_ + 1) % activeNotes_.size();
     router_.noteOn(p.channel, activeNotes_[arpIndex_], p.velocity);
-    arpNext_us_ = now_us + static_cast<uint64_t>(p.note_duration_ms) * 1000ULL;
+    arpNext_us_ = now_us + stepUs(state_.pendingRhythm.tempo);
 }
 
 void ChordEngine::stopSound() {

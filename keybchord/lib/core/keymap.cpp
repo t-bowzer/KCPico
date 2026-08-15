@@ -63,10 +63,15 @@ constexpr uint8_t HID_USAGE_F2         = 0x3B;
 constexpr uint8_t HID_USAGE_F3         = 0x3C;
 constexpr uint8_t HID_USAGE_F4         = 0x3D;
 constexpr uint8_t HID_USAGE_F5         = 0x3E;
+constexpr uint8_t HID_USAGE_F7         = 0x40;
+constexpr uint8_t HID_USAGE_F8         = 0x41;
+constexpr uint8_t HID_USAGE_F9         = 0x42;
 constexpr uint8_t HID_USAGE_ESC        = 0x29;
 constexpr uint8_t HID_USAGE_LEFT       = 0x50;
 constexpr uint8_t HID_USAGE_DOWN       = 0x51;
 constexpr uint8_t HID_USAGE_RIGHT      = 0x4F;
+constexpr uint8_t HID_USAGE_PAGE_UP    = 0x4B;
+constexpr uint8_t HID_USAGE_PAGE_DOWN  = 0x4E;
 constexpr uint8_t HID_USAGE_MINUS      = 0x2D;  // number-row -
 constexpr uint8_t HID_USAGE_EQUALS     = 0x2E;  // number-row =
 constexpr uint8_t HID_USAGE_KP_SLASH   = 0x54;
@@ -124,6 +129,16 @@ bool KeymapResolver::isAlt(uint8_t modifiers) {
     return (modifiers & ALT) != 0;
 }
 
+bool KeymapResolver::isCtrl(uint8_t modifiers) {
+    constexpr uint8_t CTRL = 0x11;  // LCtrl | RCtrl
+    return (modifiers & CTRL) != 0;
+}
+
+bool KeymapResolver::isSuper(uint8_t modifiers) {
+    constexpr uint8_t SUPER = 0x88;  // LGui | RGui
+    return (modifiers & SUPER) != 0;
+}
+
 KeyAction KeymapResolver::resolve(uint8_t hid_usage, uint8_t modifiers) const {
     KeyAction a;
 
@@ -135,6 +150,8 @@ KeyAction KeymapResolver::resolve(uint8_t hid_usage, uint8_t modifiers) const {
     }
 
     bool alt = isAlt(modifiers);
+    bool ctrl = isCtrl(modifiers);
+    bool sup = isSuper(modifiers);
 
     switch (hid_usage) {
         case HID_USAGE_BACKTICK: a.type = ActionType::Backtick;       break;
@@ -143,10 +160,15 @@ KeyAction KeymapResolver::resolve(uint8_t hid_usage, uint8_t modifiers) const {
         case HID_USAGE_F3:       a.type = alt ? ActionType::StrumDuration : ActionType::None; break;
         case HID_USAGE_F4:       a.type = alt ? ActionType::StrumVelocity : ActionType::None; break;
         case HID_USAGE_F5:       a.type = alt ? ActionType::LimitedToggle : ActionType::VoicingToggle; break;
+        case HID_USAGE_F7:       a.type = sup ? ActionType::ClockToggle : ActionType::RhythmToggle; break;
+        case HID_USAGE_F8:       a.type = sup ? ActionType::LedToggle : ActionType::RhythmPatternCycle; break;
+        case HID_USAGE_F9:       a.type = ActionType::RhythmMute;     break;
         case HID_USAGE_ESC:      a.type = ActionType::ClearEdit;      break;
         case HID_USAGE_LEFT:     a.type = ActionType::ExtToggle9;     break;
         case HID_USAGE_DOWN:     a.type = ActionType::ExtToggle11;    break;
         case HID_USAGE_RIGHT:    a.type = ActionType::ExtToggle13;    break;
+        case HID_USAGE_PAGE_UP:   a.type = ctrl ? ActionType::SwingUp   : ActionType::TempoUp;   break;
+        case HID_USAGE_PAGE_DOWN: a.type = ctrl ? ActionType::SwingDown : ActionType::TempoDown; break;
         case HID_USAGE_EQUALS:
         case HID_USAGE_KP_PLUS:  a.type = ActionType::OctaveUp;       break;
         case HID_USAGE_MINUS:

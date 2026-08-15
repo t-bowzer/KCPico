@@ -33,6 +33,8 @@ RhythmParams RhythmParams::defaults() {
     p.swing   = 0;
     p.muted   = false;
     p.channel = 10;
+    p.pattern = 0;
+    p.drums   = DrumMap{};
     return p;
 }
 

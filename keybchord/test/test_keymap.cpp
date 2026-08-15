@@ -113,6 +113,24 @@ TEST(Keymap, EscIsClearEdit) {
     EXPECT_EQ(r.resolve(0x29, 0).type, ActionType::ClearEdit);  // Esc
 }
 
+TEST(Keymap, RhythmControls) {
+    KeymapResolver r;
+    const uint8_t CTRL  = 0x01;  // LCtrl modifier bit
+    const uint8_t SUPER = 0x08;  // LGui modifier bit
+
+    EXPECT_EQ(r.resolve(0x40, 0).type, ActionType::RhythmToggle);       // F7
+    EXPECT_EQ(r.resolve(0x41, 0).type, ActionType::RhythmPatternCycle); // F8
+    EXPECT_EQ(r.resolve(0x42, 0).type, ActionType::RhythmMute);         // F9
+
+    EXPECT_EQ(r.resolve(0x4B, 0).type, ActionType::TempoUp);            // Page Up
+    EXPECT_EQ(r.resolve(0x4E, 0).type, ActionType::TempoDown);          // Page Down
+    EXPECT_EQ(r.resolve(0x4B, CTRL).type, ActionType::SwingUp);         // Ctrl+Page Up
+    EXPECT_EQ(r.resolve(0x4E, CTRL).type, ActionType::SwingDown);       // Ctrl+Page Down
+
+    EXPECT_EQ(r.resolve(0x40, SUPER).type, ActionType::ClockToggle);    // Super+F7
+    EXPECT_EQ(r.resolve(0x41, SUPER).type, ActionType::LedToggle);      // Super+F8
+}
+
 TEST(Keymap, UnmappedKeysAreNone) {
     KeymapResolver r;
     EXPECT_EQ(r.resolve(0x28, 0).type, ActionType::None);  // Enter
@@ -137,4 +155,13 @@ TEST(Keymap, ShiftIsNotFunctionModifier) {
     EXPECT_TRUE(KeymapResolver::isFunctionModifier(0x01));    // LCtrl
     EXPECT_TRUE(KeymapResolver::isFunctionModifier(0x04));    // LAlt
     EXPECT_TRUE(KeymapResolver::isFunctionModifier(0x08));    // LGui/Super
+}
+
+TEST(Keymap, ModifierDetection) {
+    EXPECT_TRUE(KeymapResolver::isCtrl(0x01));     // LCtrl
+    EXPECT_TRUE(KeymapResolver::isCtrl(0x10));     // RCtrl
+    EXPECT_FALSE(KeymapResolver::isCtrl(0x04));    // Alt is not Ctrl
+    EXPECT_TRUE(KeymapResolver::isSuper(0x08));    // LGui
+    EXPECT_TRUE(KeymapResolver::isSuper(0x80));    // RGui
+    EXPECT_FALSE(KeymapResolver::isSuper(0x01));   // Ctrl is not Super
 }

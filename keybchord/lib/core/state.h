@@ -22,6 +22,27 @@ enum class EditTarget : uint8_t {
     StrumVelocity,
 };
 
+// Snapshot of the Core 1 rhythm scheduler, read by Core 0 (chord arp/rhythm
+// sync, FR-R4 / AC-6). Written only by the RhythmEngine; read best-effort.
+// Individual 32-bit accesses are atomic on the RP2040; a torn snapshot only
+// ever shifts one step, which is harmless for a timing hint.
+struct RhythmClock {
+    bool     running = false;
+    uint32_t stepAbs = 0;        // monotonic step counter (increments per step)
+    uint32_t step = 0;           // step index within the bar
+    int      stepsPerBar = 16;
+    uint32_t beat = 0;           // beat index within the bar
+    uint64_t nextStepUs = 0;     // absolute deadline of the next step
+};
+
+// Desired keyboard-LED state (Scroll Lock BPM indicator, FR-R8). Computed on
+// Core 1 by the rhythm scheduler, applied on Core 0 (single-threaded TinyUSB).
+struct LedIndicator {
+    bool     on = false;
+    uint64_t untilUs = 0;        // absolute time the flash should end
+    bool     dirty = false;      // changed since last apply
+};
+
 class StateManager {
 public:
     ChordParams  pendingChord;
@@ -39,6 +60,10 @@ public:
     bool           selectedChordValid = false;
 
     EditTarget editTarget = EditTarget::None;
+
+    // Core 1 rhythm scheduler snapshot + LED indicator (see structs above).
+    RhythmClock  rhythmClock;
+    LedIndicator ledIndicator;
 
     std::vector<ActiveNote> activeNotes;
 

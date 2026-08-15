@@ -6,6 +6,7 @@
 #include "pio_usb.h"
 #include "host/usbh.h"
 #include "class/hid/hid_host.h"
+#include "debug_log.h"
 
 static InputUsbHost* g_inputInstance = nullptr;
 
@@ -31,6 +32,18 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance,
     if (g_inputInstance) {
         g_inputInstance->onReport(dev_addr, instance, report, len);
     }
+}
+
+// Reports the actual result of a keyboard LED SET_REPORT (0xF8-style control
+// transfer). `len` is the report length on success, 0 on failure/stall — this
+// distinguishes "queued" (tuh_hid_set_report returned true) from "delivered".
+void tuh_hid_set_report_complete_cb(uint8_t dev_addr, uint8_t idx,
+                                    uint8_t report_id, uint8_t report_type,
+                                    uint16_t len) {
+    (void)idx;
+    (void)report_id;
+    (void)report_type;
+    logLedComplete(dev_addr, len);
 }
 
 } // extern "C"

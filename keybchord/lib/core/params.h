@@ -43,12 +43,28 @@ struct StrumParams {
     static StrumParams defaults();
 };
 
+// Per-preset GM drum-kit mapping (FR-R3): lets each preset select which drum
+// codes its kick/snare/hats use. Defaults are the standard GM percussion notes.
+struct DrumMap {
+    uint8_t kick     = 36;   // Bass Drum 1
+    uint8_t snare    = 38;   // Acoustic Snare
+    uint8_t hihat    = 42;   // Closed Hi-Hat
+    uint8_t open_hat = 46;   // Open Hi-Hat
+
+    bool operator==(const DrumMap& o) const {
+        return kick == o.kick && snare == o.snare &&
+               hihat == o.hihat && open_hat == o.open_hat;
+    }
+};
+
 struct RhythmParams {
     bool    enabled = false;
     uint16_t tempo  = 120;
-    uint8_t  swing  = 0;
+    int8_t   swing  = 0;    // signed: + = laid-back, - = rushed (-75..+75)
     bool    muted   = false;
     uint8_t channel = 10;
+    uint8_t pattern = 0;   // index into the rhythm list (0..RHYTHM_COUNT-1)
+    DrumMap drums;        // GM drum-code mapping for kick/snare/hats
 
     static RhythmParams defaults();
 };
@@ -93,10 +109,12 @@ constexpr uint8_t STRUM_CHANNEL_MAX = 16;
 
 constexpr uint16_t TEMPO_MIN = 40;
 constexpr uint16_t TEMPO_MAX = 260;
-constexpr uint8_t  SWING_MIN = 0;
-constexpr uint8_t  SWING_MAX = 75;
+constexpr int8_t   SWING_MIN = -75;
+constexpr int8_t   SWING_MAX = 75;
 constexpr uint8_t  RHYTHM_CHANNEL_MIN = 1;
 constexpr uint8_t  RHYTHM_CHANNEL_MAX = 16;
+constexpr uint8_t  RHYTHM_PATTERN_MIN = 0;
+constexpr uint8_t  RHYTHM_PATTERN_MAX = 11;  // RHYTHM_COUNT - 1
 
 constexpr uint8_t MIDI_NOTE_MIN = 0;
 constexpr uint8_t MIDI_NOTE_MAX = 127;

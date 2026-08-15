@@ -35,6 +35,13 @@ void MidiRouter::flush() {
     midiOut_.flush();
 }
 
+void MidiRouter::sendRaw(const MidiMessage& msg) {
+    if (msg.status != midi::SYSTEM_CLOCK) {
+        logMidiOut(msg.status, msg.data1, msg.data2);
+    }
+    midiOut_.send(msg);
+}
+
 void MidiRouter::sendTestNote() {
     const uint8_t channel  = 1;
     const uint8_t note     = 60; // C4

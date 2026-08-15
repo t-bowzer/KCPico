@@ -17,6 +17,11 @@ public:
 
     void flush();
 
+    // Send a raw MIDI message without mutating note state (used for rhythm
+    // events drained from the Core 1 queue). Logs everything except the
+    // high-rate system clock byte.
+    void sendRaw(const MidiMessage& msg);
+
     void sendTestNote();
 
 private:

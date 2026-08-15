@@ -51,7 +51,7 @@ TEST_F(ChordEngineTest, ArpeggioStepsAndLoops) {
     EXPECT_EQ(midi_.noteOnCount(), 1);
     EXPECT_TRUE(state_.isNoteActive(1, 60));
 
-    engine_->update(500000);   // note_duration_ms = 500 -> 500000 us
+    engine_->update(500000);   // well past a step (stepUs(120) = 125000)
     EXPECT_TRUE(state_.isNoteActive(1, 64));
     EXPECT_FALSE(state_.isNoteActive(1, 60));
 
@@ -66,6 +66,24 @@ TEST_F(ChordEngineTest, ArpeggioStepsAndLoops) {
     EXPECT_FALSE(state_.isNoteActive(1, 60));
     EXPECT_FALSE(state_.isNoteActive(1, 64));
     EXPECT_FALSE(state_.isNoteActive(1, 67));
+}
+
+// Arpeggio advances at the stored rhythm tempo (stepUs(tempo)) even when the
+// rhythm and clock are both off — not the chord note_duration_ms.
+TEST_F(ChordEngineTest, ArpeggioUsesStoredTempo) {
+    state_.pendingChord.play_mode = PlayMode::Arpeggio;
+    state_.pendingRhythm.enabled = false;
+    state_.pendingRhythm.tempo = 60;  // stepUs(60) = 250000 us
+
+    engine_->handleKeyEvent(key(0x17, true), 0);  // C major {60,64,67}
+    EXPECT_TRUE(state_.isNoteActive(1, 60));
+
+    engine_->update(200000);  // before one step elapses
+    EXPECT_TRUE(state_.isNoteActive(1, 60));
+
+    engine_->update(250000);  // one step later -> 64
+    EXPECT_TRUE(state_.isNoteActive(1, 64));
+    EXPECT_FALSE(state_.isNoteActive(1, 60));
 }
 
 TEST_F(ChordEngineTest, SilentModeEmitsNoNotes) {
@@ -189,4 +207,54 @@ TEST_F(ChordEngineTest, NoStuckNotesAfterFullCycle) {
     EXPECT_EQ(midi_.noteOnCount(), 3);
     EXPECT_EQ(midi_.noteOffCount(), 3);
     EXPECT_TRUE(state_.activeNotes.empty());
+}
+
+// AC-6: with rhythm enabled, Arpeggio advances on the rhythm clock's step
+// edges instead of its own note-duration timer.
+TEST_F(ChordEngineTest, ArpeggioFollowsRhythmClock) {
+    state_.pendingChord.play_mode = PlayMode::Arpeggio;
+    state_.pendingRhythm.enabled = true;
+
+    engine_->handleKeyEvent(key(0x17, true), 0);  // C major {60,64,67}
+    EXPECT_TRUE(state_.isNoteActive(1, 60));
+
+    // Simulate the Core 1 scheduler firing a step.
+    state_.rhythmClock.running = true;
+    state_.rhythmClock.stepAbs = 1;
+    engine_->update(0);  // no time passes, but a rhythm step edge fires
+    EXPECT_TRUE(state_.isNoteActive(1, 64));
+    EXPECT_FALSE(state_.isNoteActive(1, 60));
+
+    state_.rhythmClock.stepAbs = 2;
+    engine_->update(0);
+    EXPECT_TRUE(state_.isNoteActive(1, 67));
+    EXPECT_FALSE(state_.isNoteActive(1, 64));
+}
+
+// AC-6: Rhythm mode steps through the voicing on rhythm steps when rhythm is
+// enabled; without rhythm it stays a Held equivalent.
+TEST_F(ChordEngineTest, RhythmModeStepsWithRhythmEnabled) {
+    state_.pendingChord.play_mode = PlayMode::Rhythm;
+    state_.pendingRhythm.enabled = true;
+
+    engine_->handleKeyEvent(key(0x17, true), 0);  // C major {60,64,67}
+    EXPECT_TRUE(state_.isNoteActive(1, 60));
+    EXPECT_FALSE(state_.isNoteActive(1, 64));  // stepped, not held
+    EXPECT_FALSE(state_.isNoteActive(1, 67));
+
+    state_.rhythmClock.running = true;
+    state_.rhythmClock.stepAbs = 1;
+    engine_->update(0);
+    EXPECT_TRUE(state_.isNoteActive(1, 64));
+}
+
+TEST_F(ChordEngineTest, RhythmModeWithoutRhythmStepsAtTempo) {
+    state_.pendingChord.play_mode = PlayMode::Rhythm;
+    state_.pendingRhythm.enabled = false;
+
+    engine_->handleKeyEvent(key(0x17, true), 0);  // C major {60,64,67}
+    EXPECT_EQ(midi_.noteOnCount(), 1);  // steps one note at a time
+    EXPECT_TRUE(state_.isNoteActive(1, 60));
+    EXPECT_FALSE(state_.isNoteActive(1, 64));
+    EXPECT_FALSE(state_.isNoteActive(1, 67));
 }

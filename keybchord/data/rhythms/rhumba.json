@@ -1,0 +1,11 @@
+{
+  "name": "Rhumba",
+  "steps_per_bar": 16,
+  "swing": 0,
+  "tracks": [
+    { "note": 36, "name": "kick",     "pattern": [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0] },
+    { "note": 62, "name": "conga_lo", "pattern": [0,0,1,0, 0,1,0,0, 0,0,1,0, 0,1,0,0] },
+    { "note": 63, "name": "conga_hi", "pattern": [0,1,0,0, 0,0,0,1, 0,1,0,0, 0,0,0,1] },
+    { "note": 75, "name": "clave",    "pattern": [1,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0] }
+  ]
+}

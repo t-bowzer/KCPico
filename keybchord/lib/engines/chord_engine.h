@@ -44,6 +44,7 @@ private:
     bool arpActive_ = false;
     size_t arpIndex_ = 0;
     uint64_t arpNext_us_ = 0;
+    uint32_t lastRhythmStep_ = 0;  // last rhythm step we advanced on (FR-R4)
 
     void addCell(const GridCell& cell);
     void removeCell(const GridCell& cell);
@@ -55,6 +56,10 @@ private:
     void releaseChord();
     void stepArpeggio(uint64_t now_us);
     void stopSound();
+
+    // True when the sounding chord should advance on the rhythm clock instead
+    // of its own arpeggio timer (FR-R4 / AC-6).
+    bool followRhythmClock() const;
 
     bool chordChanged(const ResolvedChord& chord) const;
 };

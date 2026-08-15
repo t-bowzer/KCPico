@@ -19,6 +19,8 @@ void StateManager::loadDefaults() {
     selectedChord = ResolvedChord{};
     selectedChordValid = false;
     editTarget = EditTarget::None;
+    rhythmClock = RhythmClock{};
+    ledIndicator = LedIndicator{};
 }
 
 void StateManager::snapshotActive() {

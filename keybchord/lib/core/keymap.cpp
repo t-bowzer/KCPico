@@ -78,6 +78,11 @@ constexpr uint8_t HID_USAGE_KP_SLASH   = 0x54;
 constexpr uint8_t HID_USAGE_KP_STAR    = 0x55;
 constexpr uint8_t HID_USAGE_KP_MINUS   = 0x56;
 constexpr uint8_t HID_USAGE_KP_PLUS    = 0x57;
+constexpr uint8_t HID_USAGE_LCtrl      = 0xE1;
+constexpr uint8_t HID_USAGE_LAlt       = 0xE3;
+constexpr uint8_t HID_USAGE_RCtrl      = 0xE5;
+constexpr uint8_t HID_USAGE_RAlt       = 0xE7;
+constexpr uint8_t HID_USAGE_MENU       = 0x65;  // Application key
 
 constexpr uint8_t NUMBER_ROW_STRUM_LO  = 0x1E;  // 1
 constexpr uint8_t NUMBER_ROW_STRUM_HI  = 0x27;  // 0
@@ -115,31 +120,13 @@ bool KeymapResolver::isChordKey(uint8_t hid_usage) {
     return lookupChordKey(hid_usage, cell);
 }
 
-bool KeymapResolver::isFunctionModifier(uint8_t modifiers) {
-    // Ctrl (bits 0/4), Alt (bits 2/6), Super/Gui (bits 3/7).
-    // Shift (bits 1/5) is a chord root, never a function modifier.
-    constexpr uint8_t CTRL  = 0x11;  // LCtrl | RCtrl
-    constexpr uint8_t ALT   = 0x44;  // LAlt  | RAlt
-    constexpr uint8_t SUPER = 0x88;  // LGui  | RGui
-    return (modifiers & (CTRL | ALT | SUPER)) != 0;
-}
-
-bool KeymapResolver::isAlt(uint8_t modifiers) {
-    constexpr uint8_t ALT = 0x44;  // LAlt | RAlt
-    return (modifiers & ALT) != 0;
-}
-
-bool KeymapResolver::isCtrl(uint8_t modifiers) {
-    constexpr uint8_t CTRL = 0x11;  // LCtrl | RCtrl
-    return (modifiers & CTRL) != 0;
-}
-
 bool KeymapResolver::isSuper(uint8_t modifiers) {
     constexpr uint8_t SUPER = 0x88;  // LGui | RGui
     return (modifiers & SUPER) != 0;
 }
 
 KeyAction KeymapResolver::resolve(uint8_t hid_usage, uint8_t modifiers) const {
+    (void)modifiers;  // Ctrl/Alt are menu toggles now, not function modifiers.
     KeyAction a;
 
     GridCell cell;
@@ -149,30 +136,28 @@ KeyAction KeymapResolver::resolve(uint8_t hid_usage, uint8_t modifiers) const {
         return a;
     }
 
-    bool alt = isAlt(modifiers);
-    bool ctrl = isCtrl(modifiers);
-    bool sup = isSuper(modifiers);
-
     switch (hid_usage) {
         case HID_USAGE_BACKTICK: a.type = ActionType::Backtick;       break;
         case HID_USAGE_F1:       a.type = ActionType::PlayModeCycle;  break;
-        case HID_USAGE_F2:       a.type = alt ? ActionType::StrumOctave   : ActionType::None; break;
-        case HID_USAGE_F3:       a.type = alt ? ActionType::StrumDuration : ActionType::None; break;
-        case HID_USAGE_F4:       a.type = alt ? ActionType::StrumVelocity : ActionType::None; break;
-        case HID_USAGE_F5:       a.type = alt ? ActionType::LimitedToggle : ActionType::VoicingToggle; break;
-        case HID_USAGE_F7:       a.type = sup ? ActionType::ClockToggle : ActionType::RhythmToggle; break;
-        case HID_USAGE_F8:       a.type = sup ? ActionType::LedToggle : ActionType::RhythmPatternCycle; break;
+        case HID_USAGE_F5:       a.type = ActionType::VoicingToggle;  break;
+        case HID_USAGE_F7:       a.type = ActionType::RhythmToggle;   break;
+        case HID_USAGE_F8:       a.type = ActionType::RhythmPatternCycle; break;
         case HID_USAGE_F9:       a.type = ActionType::RhythmMute;     break;
         case HID_USAGE_ESC:      a.type = ActionType::ClearEdit;      break;
         case HID_USAGE_LEFT:     a.type = ActionType::ExtToggle9;     break;
         case HID_USAGE_DOWN:     a.type = ActionType::ExtToggle11;    break;
         case HID_USAGE_RIGHT:    a.type = ActionType::ExtToggle13;    break;
-        case HID_USAGE_PAGE_UP:   a.type = ctrl ? ActionType::SwingUp   : ActionType::TempoUp;   break;
-        case HID_USAGE_PAGE_DOWN: a.type = ctrl ? ActionType::SwingDown : ActionType::TempoDown; break;
-        case HID_USAGE_EQUALS:
-        case HID_USAGE_KP_PLUS:  a.type = ActionType::OctaveUp;       break;
-        case HID_USAGE_MINUS:
-        case HID_USAGE_KP_MINUS: a.type = ActionType::OctaveDown;     break;
+        case HID_USAGE_PAGE_UP:   a.type = ActionType::TempoUp;       break;
+        case HID_USAGE_PAGE_DOWN: a.type = ActionType::TempoDown;     break;
+        case HID_USAGE_EQUALS:   a.type = ActionType::ChordOctaveUp;  break;
+        case HID_USAGE_MINUS:    a.type = ActionType::ChordOctaveDown; break;
+        case HID_USAGE_KP_PLUS:  a.type = ActionType::StrumOctaveUp;  break;
+        case HID_USAGE_KP_MINUS: a.type = ActionType::StrumOctaveDown; break;
+        case HID_USAGE_MENU:     a.type = ActionType::MenuChord;      break;
+        case HID_USAGE_LCtrl:
+        case HID_USAGE_RCtrl:    a.type = ActionType::MenuRhythm;     break;
+        case HID_USAGE_LAlt:
+        case HID_USAGE_RAlt:     a.type = ActionType::MenuStrum;      break;
         default:
             if (isNumberRowStrum(hid_usage) || isKeypadStrum(hid_usage)) {
                 a.type = ActionType::StrumKey;

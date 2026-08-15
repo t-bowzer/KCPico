@@ -22,33 +22,6 @@ void StrumEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
             if (ev.pressed) playStrum(ev.hid_usage, now_us);
             break;
 
-        case ActionType::StrumOctave:
-            if (ev.pressed) state_.editTarget = EditTarget::StrumOctave;
-            break;
-        case ActionType::StrumDuration:
-            if (ev.pressed) state_.editTarget = EditTarget::StrumDuration;
-            break;
-        case ActionType::StrumVelocity:
-            if (ev.pressed) state_.editTarget = EditTarget::StrumVelocity;
-            break;
-
-        case ActionType::LimitedToggle:
-            if (ev.pressed) {
-                state_.pendingStrum.limited_keys = !state_.pendingStrum.limited_keys;
-            }
-            break;
-
-        case ActionType::ClearEdit:
-            if (ev.pressed) state_.editTarget = EditTarget::None;
-            break;
-
-        case ActionType::OctaveUp:
-            if (ev.pressed && state_.editTarget != EditTarget::None) stepEdit(true);
-            break;
-        case ActionType::OctaveDown:
-            if (ev.pressed && state_.editTarget != EditTarget::None) stepEdit(false);
-            break;
-
         default:
             break;
     }
@@ -103,32 +76,6 @@ void StrumEngine::playStrum(uint8_t usage, uint64_t now_us) {
     router_.noteOn(sp.channel, note, sp.velocity);
     addSoundingNote(sp.channel, note,
                     now_us + static_cast<uint64_t>(sp.note_duration_ms) * 1000ULL);
-}
-
-void StrumEngine::stepEdit(bool up) {
-    int8_t delta = up ? 1 : -1;
-    switch (state_.editTarget) {
-        case EditTarget::StrumOctave:
-            state_.pendingStrum.octave = clamp<int8_t>(
-                state_.pendingStrum.octave + delta,
-                param_bounds::STRUM_OCTAVE_MIN, param_bounds::STRUM_OCTAVE_MAX);
-            logStrumEdit("octave", state_.pendingStrum.octave);
-            break;
-        case EditTarget::StrumDuration:
-            state_.pendingStrum.note_duration_ms = clamp<int16_t>(
-                state_.pendingStrum.note_duration_ms + static_cast<int16_t>(delta * 50),
-                param_bounds::STRUM_NOTE_DURATION_MIN, param_bounds::STRUM_NOTE_DURATION_MAX);
-            logStrumEdit("duration", state_.pendingStrum.note_duration_ms);
-            break;
-        case EditTarget::StrumVelocity:
-            state_.pendingStrum.velocity = clamp<uint8_t>(
-                static_cast<int>(state_.pendingStrum.velocity) + delta,
-                param_bounds::STRUM_VELOCITY_MIN, param_bounds::STRUM_VELOCITY_MAX);
-            logStrumEdit("velocity", state_.pendingStrum.velocity);
-            break;
-        default:
-            break;
-    }
 }
 
 void StrumEngine::releaseNote(uint8_t channel, uint8_t note) {

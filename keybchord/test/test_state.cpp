@@ -9,6 +9,8 @@ TEST(StateManager, Defaults) {
     EXPECT_EQ(sm.pendingRhythm.channel, 10);
     EXPECT_EQ(sm.currentBank, 0);
     EXPECT_EQ(sm.currentSlot, 0);
+    EXPECT_EQ(sm.editMenu, EditMenu::None);
+    EXPECT_EQ(sm.editParam, 0);
     EXPECT_FALSE(sm.dirty);
 }
 

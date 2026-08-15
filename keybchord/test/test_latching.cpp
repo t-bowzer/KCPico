@@ -48,7 +48,7 @@ TEST_F(ChordEngineTest, HeldChordLocksOctave) {
     ASSERT_EQ(first, (std::vector<uint8_t>{60, 64, 67}));
 
     // Octave edit (pending only) does not transpose the sounding chord.
-    engine_->handleKeyEvent(key(0x2E, true), 0);   // = (octave up)
+    state_.pendingChord.octave = 1;              // (EditEngine: = on number row)
     EXPECT_EQ(state_.pendingChord.octave, 1);
     EXPECT_EQ(state_.activeChord.octave, 0);
     EXPECT_EQ(midi_.noteOnCount(), 3);  // unchanged
@@ -70,7 +70,7 @@ TEST_F(ChordEngineTest, HeldChordLocksExtension) {
     EXPECT_EQ(noteOnNotes(), (std::vector<uint8_t>{60, 64, 67}));
 
     // Toggle add9 (Left arrow) — pending only, sounding chord unchanged.
-    engine_->handleKeyEvent(key(0x50, true), 0);
+    state_.pendingChord.add9 = true;             // (EditEngine: Left arrow)
     EXPECT_TRUE(state_.pendingChord.add9);
     EXPECT_FALSE(state_.activeChord.add9);
     EXPECT_EQ(midi_.noteOnCount(), 3);

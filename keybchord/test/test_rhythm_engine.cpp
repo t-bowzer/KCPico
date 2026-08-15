@@ -184,72 +184,6 @@ TEST_F(RhythmEngineTest, PublishesClockSnapshot) {
     EXPECT_EQ(state_.rhythmClock.beat, 0u);
 }
 
-TEST_F(RhythmEngineTest, TempoKeysAdjustBpm) {
-    engine_->handleKeyEvent(key(0x4B, true), 0);  // Page Up
-    EXPECT_EQ(state_.pendingRhythm.tempo, 121);
-
-    engine_->handleKeyEvent(key(0x4E, true), 0);  // Page Down
-    EXPECT_EQ(state_.pendingRhythm.tempo, 120);
-
-    // Clamp at minimum.
-    state_.pendingRhythm.tempo = param_bounds::TEMPO_MIN;
-    engine_->handleKeyEvent(key(0x4E, true), 0);
-    EXPECT_EQ(state_.pendingRhythm.tempo, param_bounds::TEMPO_MIN);
-}
-
-TEST_F(RhythmEngineTest, SwingKeysAdjustSwing) {
-    engine_->handleKeyEvent(key(0x4B, true, 0x01), 0);  // Ctrl+Page Up
-    EXPECT_EQ(state_.pendingRhythm.swing, 5);
-
-    engine_->handleKeyEvent(key(0x4E, true, 0x01), 0);  // Ctrl+Page Down
-    EXPECT_EQ(state_.pendingRhythm.swing, 0);
-
-    // Negative swing (rushed) is allowed.
-    engine_->handleKeyEvent(key(0x4E, true, 0x01), 0);
-    EXPECT_EQ(state_.pendingRhythm.swing, -5);
-
-    // Clamp at the -75 minimum.
-    state_.pendingRhythm.swing = -75;
-    engine_->handleKeyEvent(key(0x4E, true, 0x01), 0);
-    EXPECT_EQ(state_.pendingRhythm.swing, -75);
-
-    // Clamp at the +75 maximum.
-    state_.pendingRhythm.swing = 75;
-    engine_->handleKeyEvent(key(0x4B, true, 0x01), 0);
-    EXPECT_EQ(state_.pendingRhythm.swing, 75);
-}
-
-TEST_F(RhythmEngineTest, F7F8F9Toggles) {
-    engine_->handleKeyEvent(key(0x40, true), 0);  // F7 -> enable
-    EXPECT_TRUE(state_.pendingRhythm.enabled);
-    engine_->handleKeyEvent(key(0x40, true), 0);  // F7 -> disable
-    EXPECT_FALSE(state_.pendingRhythm.enabled);
-
-    engine_->handleKeyEvent(key(0x42, true), 0);  // F9 -> mute
-    EXPECT_TRUE(state_.pendingRhythm.muted);
-}
-
-TEST_F(RhythmEngineTest, PatternCycleAdoptsSwing) {
-    engine_->setPatterns({rock1Pattern(), waltzPattern()});
-    state_.pendingRhythm.pattern = 0;
-    state_.pendingRhythm.swing = 0;
-
-    engine_->handleKeyEvent(key(0x41, true), 0);  // F8 -> cycle
-    EXPECT_EQ(state_.pendingRhythm.pattern, 1);
-    EXPECT_EQ(state_.pendingRhythm.swing, waltzPattern().swing);
-}
-
-TEST_F(RhythmEngineTest, ClockAndLedToggles) {
-    EXPECT_FALSE(state_.config.midi_clock_enabled);
-    engine_->handleKeyEvent(key(0x40, true, 0x08), 0);  // Super+F7 -> clock
-    EXPECT_TRUE(state_.config.midi_clock_enabled);
-
-    EXPECT_TRUE(state_.config.bpm_indicator);
-    engine_->handleKeyEvent(key(0x41, true, 0x08), 0);  // Super+F8 -> LED
-    EXPECT_FALSE(state_.config.bpm_indicator);
-}
-
-
 TEST_F(RhythmEngineTest, DrumMapRemapsSnareNote) {
     state_.pendingRhythm.drums.snare = 40;  // Electric Snare
     state_.pendingRhythm.enabled = true;
@@ -261,6 +195,20 @@ TEST_F(RhythmEngineTest, DrumMapRemapsSnareNote) {
     auto msgs = drain();
     EXPECT_EQ(countNoteOn(msgs, 40, 10), 1);
     EXPECT_EQ(countNoteOn(msgs, 38, 10), 0);
+}
+
+
+TEST_F(RhythmEngineTest, OnPatternChangedAdoptsSwing) {
+    RhythmPattern a = rock1Pattern();
+    RhythmPattern b = waltzPattern();
+    b.swing = 5;
+    engine_->setPatterns({a, b});
+
+    state_.pendingRhythm.pattern = 1;
+    state_.pendingRhythm.swing = 0;
+
+    engine_->onPatternChanged();
+    EXPECT_EQ(state_.pendingRhythm.swing, 5);
 }
 
 

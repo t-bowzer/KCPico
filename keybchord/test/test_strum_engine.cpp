@@ -104,58 +104,9 @@ TEST_F(StrumEngineTest, ImmediatePickupOfExtensions) {
     strum_->handleKeyEvent(key(0x63, true), 0);  // Keypad . -> pool[1] = 76
     EXPECT_EQ(lastNoteOnOnChannel(2), 76);
 
-    chord_->handleKeyEvent(key(0x50, true), 0);  // Left arrow -> add9 on
+    state_.pendingChord.add9 = true;             // add9 toggled (via EditEngine)
     strum_->handleKeyEvent(key(0x63, true), 0);  // pool now {0,2,4,7}: pool[1] = 74
     EXPECT_EQ(lastNoteOnOnChannel(2), 74);
-}
-
-// Alt+F5 toggles limited keys.
-TEST_F(StrumEngineTest, AltF5TogglesLimitedKeys) {
-    EXPECT_FALSE(state_.pendingStrum.limited_keys);
-    strum_->handleKeyEvent(key(0x3E, true, 0x04), 0);  // Alt+F5
-    EXPECT_TRUE(state_.pendingStrum.limited_keys);
-    strum_->handleKeyEvent(key(0x3E, true, 0x04), 0);  // Alt+F5
-    EXPECT_FALSE(state_.pendingStrum.limited_keys);
-}
-
-// Alt+F2 arms strum-octave editing; +/- steps it, clamped to [-3, +3].
-TEST_F(StrumEngineTest, EditTargetStepsStrumOctave) {
-    strum_->handleKeyEvent(key(0x3B, true, 0x04), 0);  // Alt+F2 -> arm strum octave
-    EXPECT_EQ(state_.editTarget, EditTarget::StrumOctave);
-
-    strum_->handleKeyEvent(key(0x2E, true), 0);  // + -> octave 1 -> 2
-    EXPECT_EQ(state_.pendingStrum.octave, 2);
-
-    strum_->handleKeyEvent(key(0x2D, true), 0);  // - -> octave 2 -> 1
-    EXPECT_EQ(state_.pendingStrum.octave, 1);
-
-    state_.pendingStrum.octave = 3;
-    strum_->handleKeyEvent(key(0x2E, true), 0);  // clamp at +3
-    EXPECT_EQ(state_.pendingStrum.octave, 3);
-
-    state_.pendingStrum.octave = -3;
-    strum_->handleKeyEvent(key(0x2D, true), 0);  // clamp at -3
-    EXPECT_EQ(state_.pendingStrum.octave, -3);
-}
-
-// Esc clears the edit target; +/- then returns to chord octave.
-TEST_F(StrumEngineTest, EscClearsEditTarget) {
-    strum_->handleKeyEvent(key(0x3B, true, 0x04), 0);  // Alt+F2
-    EXPECT_NE(state_.editTarget, EditTarget::None);
-
-    strum_->handleKeyEvent(key(0x29, true), 0);  // Esc
-    EXPECT_EQ(state_.editTarget, EditTarget::None);
-}
-
-// When a strum edit is armed, +/- must not also change chord octave.
-TEST_F(StrumEngineTest, ChordOctaveUnaffectedWhileStrumEditArmed) {
-    strum_->handleKeyEvent(key(0x3B, true, 0x04), 0);  // Alt+F2 -> arm strum octave
-
-    chord_->handleKeyEvent(key(0x2E, true), 0);  // + (both engines would see it)
-    strum_->handleKeyEvent(key(0x2E, true), 0);
-
-    EXPECT_EQ(state_.pendingChord.octave, 0);       // chord octave untouched
-    EXPECT_EQ(state_.pendingStrum.octave, 2);       // strum octave stepped
 }
 
 // Keypad +/- are not strum keys: they never produce a strum note.
@@ -219,15 +170,13 @@ TEST_F(StrumEngineTest, DurationDecreaseAppliesToRetriggeredNote) {
     EXPECT_FALSE(state_.isNoteActive(2, 79));
 }
 
-// Same but using the actual Alt+F3 / +/- edit mechanism, and re-playing after
-// the original note has fully faded out (free-slot path).
+// Same but using a direct duration edit (the EditEngine's +/- path), and
+// re-playing after the original note has fully faded out (free-slot path).
 TEST_F(StrumEngineTest, DurationEditAppliesToReplayedNoteAfterFadeOut) {
     chord_->handleKeyEvent(key(0x17, true), 0);  // C major
 
-    // Arm strum duration edit and push it up to 1000ms.
-    strum_->handleKeyEvent(key(0x3C, true, 0x04), 0);  // Alt+F3
-    for (int i = 0; i < 14; i++) strum_->handleKeyEvent(key(0x2E, true), 0);  // +
-    EXPECT_EQ(state_.pendingStrum.note_duration_ms, 1000);
+    // Set strum duration to 1000ms.
+    state_.pendingStrum.note_duration_ms = 1000;
 
     // Play numpad 1 (note 79) at t=0, then let it fade out.
     strum_->handleKeyEvent(key(0x59, true), 0);
@@ -236,9 +185,7 @@ TEST_F(StrumEngineTest, DurationEditAppliesToReplayedNoteAfterFadeOut) {
     EXPECT_FALSE(state_.isNoteActive(2, 79));
 
     // Decrease duration back to 300ms.
-    strum_->handleKeyEvent(key(0x3C, true, 0x04), 2000000);  // Alt+F3 (no-op re-arm)
-    for (int i = 0; i < 14; i++) strum_->handleKeyEvent(key(0x2D, true), 2000000);  // -
-    EXPECT_EQ(state_.pendingStrum.note_duration_ms, 300);
+    state_.pendingStrum.note_duration_ms = 300;
 
     // Re-play numpad 1 (note 79) at t=2.5s; it must release 300ms later.
     strum_->handleKeyEvent(key(0x59, true), 2500000);
@@ -272,14 +219,12 @@ TEST_F(StrumEngineTest, RetriggerRearticulatesWithNoteOffFirst) {
 }
 
 // Regression (M4 open bug): numpad 0 and . (the two lowest pool notes) must
-// release after a 50ms duration set through the real Alt+F3 / - edit path.
+// release after a 50ms duration set through the edit path.
 TEST_F(StrumEngineTest, NumpadZeroAndDecimalReleaseAtMinDuration) {
     chord_->handleKeyEvent(key(0x17, true), 0);  // C major
 
-    // Arm duration edit and step 300 -> 50 (five -50 steps).
-    strum_->handleKeyEvent(key(0x3C, true, 0x04), 0);  // Alt+F3
-    for (int i = 0; i < 5; i++) strum_->handleKeyEvent(key(0x2D, true), 0);  // -
-    EXPECT_EQ(state_.pendingStrum.note_duration_ms, 50);
+    // Set duration to 50ms (five -50 steps from the 300 default).
+    state_.pendingStrum.note_duration_ms = 50;
 
     // Numpad 0 -> pool[0] = 72.
     strum_->handleKeyEvent(key(0x62, true), 0);

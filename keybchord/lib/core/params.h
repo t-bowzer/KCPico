@@ -18,6 +18,17 @@ enum class VoicingMode : uint8_t {
     COUNT
 };
 
+// Parameter-edit menu (FR-D2). None = main menu (direct single-key shortcuts);
+// otherwise the user is inside a Chord/Strum/Rhythm edit menu where F-keys
+// select a parameter and +/- change its value.
+enum class EditMenu : uint8_t {
+    None = 0,
+    Chord,
+    Strum,
+    Rhythm,
+    COUNT
+};
+
 struct ChordParams {
     PlayMode    play_mode        = PlayMode::Held;
     int8_t      octave           = 0;

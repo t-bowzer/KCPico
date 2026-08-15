@@ -9,6 +9,8 @@
 #include "chord_engine.h"
 #include "strum_engine.h"
 #include "rhythm_engine.h"
+#include "edit_engine.h"
+#include "display_manager.h"
 #include "debug_log.h"
 
 #if defined(ARDUINO_ARCH_RP2040)
@@ -22,6 +24,8 @@ static ChordEngine*    g_chordEngine = nullptr;
 static StrumEngine*    g_strumEngine = nullptr;
 static MidiEventQueue  g_rhythmQueue;
 static RhythmEngine*   g_rhythmEngine = nullptr;
+static DisplayManager* g_display = nullptr;
+static EditEngine*     g_editEngine = nullptr;
 
 static inline uint64_t nowUs() {
 #if defined(ARDUINO_ARCH_RP2040)
@@ -45,6 +49,13 @@ void setup() {
     g_rhythmEngine = new RhythmEngine(g_state, g_rhythmQueue);
     g_rhythmEngine->setPatterns(loadRhythmPatterns(storage));
 
+    g_display = new DisplayManager(g_state, *g_adapters.lcd);
+    g_display->update(nowUs());
+
+    g_editEngine = new EditEngine(g_state, *g_display);
+    g_editEngine->setModeChangedCallback([]() { g_chordEngine->onModeChanged(); });
+    g_editEngine->setPatternChangedCallback([]() { g_rhythmEngine->onPatternChanged(); });
+
     logInfo("KeybChord Pico ready");
 }
 
@@ -56,13 +67,20 @@ void loop() {
     auto events = g_adapters.input->poll();
     for (const auto& ev : events) {
         logKeyEvent(ev.hid_usage, ev.pressed, ev.modifiers);
-        g_chordEngine->handleKeyEvent(ev, now_us);
-        g_strumEngine->handleKeyEvent(ev, now_us);
-        g_rhythmEngine->handleKeyEvent(ev, now_us);
+        bool consumed = g_editEngine->handleKeyEvent(ev, now_us);
+        if (!consumed) {
+            g_chordEngine->handleKeyEvent(ev, now_us);
+            g_strumEngine->handleKeyEvent(ev, now_us);
+        }
     }
 
     g_chordEngine->update(nowUs());
     g_strumEngine->update(nowUs());
+
+    // Render the LCD idle/edit/prompt frame from the live state.
+    if (g_display) {
+        g_display->update(nowUs());
+    }
 
     // Drain rhythm MIDI events produced on Core 1 (single-threaded UART write).
     MidiMessage msg;

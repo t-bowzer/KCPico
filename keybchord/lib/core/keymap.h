@@ -24,23 +24,20 @@ enum class ActionType : uint8_t {
     ExtToggle9,     // Left arrow
     ExtToggle11,    // Down arrow
     ExtToggle13,    // Right arrow
-    OctaveUp,       // = / Keypad+
-    OctaveDown,     // - / Keypad-
+    ChordOctaveUp,   // = (number row)
+    ChordOctaveDown, // - (number row)
+    StrumOctaveUp,   // Keypad +
+    StrumOctaveDown, // Keypad -
     StrumKey,       // number-row / keypad strum key (layout applied in engine)
-    StrumOctave,    // Alt+F2
-    StrumDuration,  // Alt+F3
-    StrumVelocity,  // Alt+F4
-    LimitedToggle,  // Alt+F5
-    ClearEdit,      // Esc (cancels current param edit)
-    RhythmToggle,   // F7 (Super+F7 -> ClockToggle)
-    RhythmPatternCycle, // F8 (Super+F8 -> LedToggle)
+    ClearEdit,      // Esc (exits the edit menu)
+    RhythmToggle,   // F7
+    RhythmPatternCycle, // F8
     RhythmMute,     // F9
     TempoUp,        // Page Up
     TempoDown,      // Page Down
-    SwingUp,        // Ctrl+Page Up
-    SwingDown,      // Ctrl+Page Down
-    ClockToggle,    // Super+F7
-    LedToggle,      // Super+F8
+    MenuChord,      // Menu key (0x65) -> Chord Edit menu
+    MenuStrum,      // Alt -> Strum Edit menu
+    MenuRhythm,     // Ctrl -> Rhythm Edit menu
     COUNT
 };
 
@@ -61,16 +58,9 @@ public:
     // True if the usage is one of the 36 chord-grid keys (incl. Tab/Caps/Shift/[ /').
     static bool isChordKey(uint8_t hid_usage);
 
-    // True if Ctrl, Alt, or Super is present in the HID modifier byte.
-    static bool isFunctionModifier(uint8_t modifiers);
-
-    // True if Alt (either) is present in the HID modifier byte.
-    static bool isAlt(uint8_t modifiers);
-
-    // True if Ctrl (either) is present in the HID modifier byte.
-    static bool isCtrl(uint8_t modifiers);
-
-    // True if Super/Gui (either) is present in the HID modifier byte.
+    // True if Super/Gui (either) is present in the HID modifier byte. Super is
+    // the global modifier (presets/panic); Ctrl/Alt are menu toggles, not
+    // function modifiers.
     static bool isSuper(uint8_t modifiers);
 };
 

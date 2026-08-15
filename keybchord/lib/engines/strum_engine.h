@@ -37,7 +37,6 @@ private:
 
     StrumLayout activeLayout() const;
     void playStrum(uint8_t usage, uint64_t now_us);
-    void stepEdit(bool up);
     void releaseNote(uint8_t channel, uint8_t note);
     void addSoundingNote(uint8_t channel, uint8_t note, uint64_t deadline_us);
 };

@@ -34,61 +34,17 @@ void ChordEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
             else            onRelease(now_us);
             break;
 
-        case ActionType::PlayModeCycle:
-            if (ev.pressed) {
-                int next = (static_cast<int>(state_.pendingChord.play_mode) + 1)
-                           % static_cast<int>(PlayMode::COUNT);
-                state_.pendingChord.play_mode = static_cast<PlayMode>(next);
-
-                // Leaving a sustaining mode (Held/Rhythm) with no chord key
-                // held releases the latched chord; momentary modes won't keep
-                // it sounding on their own.
-                if (next != static_cast<int>(PlayMode::Held) &&
-                    next != static_cast<int>(PlayMode::Rhythm) &&
-                    heldCells_.empty()) {
-                    releaseChord();
-                }
-            }
-            break;
-
-        case ActionType::VoicingToggle:
-            if (ev.pressed) {
-                state_.pendingChord.voicing_mode =
-                    (state_.pendingChord.voicing_mode == VoicingMode::RootPosition)
-                        ? VoicingMode::Smart
-                        : VoicingMode::RootPosition;
-            }
-            break;
-
-        case ActionType::ExtToggle9:
-            if (ev.pressed) state_.pendingChord.add9 = !state_.pendingChord.add9;
-            break;
-        case ActionType::ExtToggle11:
-            if (ev.pressed) state_.pendingChord.add11 = !state_.pendingChord.add11;
-            break;
-        case ActionType::ExtToggle13:
-            if (ev.pressed) state_.pendingChord.add13 = !state_.pendingChord.add13;
-            break;
-
-        case ActionType::OctaveUp:
-            if (ev.pressed && state_.editTarget == EditTarget::None) {
-                state_.pendingChord.octave = clamp<int8_t>(
-                    state_.pendingChord.octave + 1,
-                    param_bounds::CHORD_OCTAVE_MIN,
-                    param_bounds::CHORD_OCTAVE_MAX);
-            }
-            break;
-        case ActionType::OctaveDown:
-            if (ev.pressed && state_.editTarget == EditTarget::None) {
-                state_.pendingChord.octave = clamp<int8_t>(
-                    state_.pendingChord.octave - 1,
-                    param_bounds::CHORD_OCTAVE_MIN,
-                    param_bounds::CHORD_OCTAVE_MAX);
-            }
-            break;
-
         default:
             break;
+    }
+}
+
+void ChordEngine::onModeChanged() {
+    // Leaving a sustaining mode (Held/Rhythm) with no chord key held releases
+    // the latched chord; momentary modes won't keep it sounding on their own.
+    PlayMode mode = state_.pendingChord.play_mode;
+    if (mode != PlayMode::Held && mode != PlayMode::Rhythm && heldCells_.empty()) {
+        releaseChord();
     }
 }
 

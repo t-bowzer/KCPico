@@ -13,15 +13,6 @@ struct ActiveNote {
     uint8_t channel;
 };
 
-// Which parameter the +/- keys currently edit (context-sensitive). None means
-// +/- acts on chord octave. Cleared by Esc.
-enum class EditTarget : uint8_t {
-    None = 0,
-    StrumOctave,
-    StrumDuration,
-    StrumVelocity,
-};
-
 // Snapshot of the Core 1 rhythm scheduler, read by Core 0 (chord arp/rhythm
 // sync, FR-R4 / AC-6). Written only by the RhythmEngine; read best-effort.
 // Individual 32-bit accesses are atomic on the RP2040; a torn snapshot only
@@ -59,7 +50,8 @@ public:
     ResolvedChord selectedChord;
     bool           selectedChordValid = false;
 
-    EditTarget editTarget = EditTarget::None;
+    EditMenu editMenu  = EditMenu::None;  // active edit menu (None = main)
+    int      editParam = 0;               // selected F-key index within editMenu
 
     // Core 1 rhythm scheduler snapshot + LED indicator (see structs above).
     RhythmClock  rhythmClock;

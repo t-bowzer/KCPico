@@ -18,7 +18,8 @@ void StateManager::loadDefaults() {
     dirty = false;
     selectedChord = ResolvedChord{};
     selectedChordValid = false;
-    editTarget = EditTarget::None;
+    editMenu = EditMenu::None;
+    editParam = 0;
     rhythmClock = RhythmClock{};
     ledIndicator = LedIndicator{};
 }

@@ -19,6 +19,10 @@ public:
     void update(uint64_t now_us);
     void allNotesOff();
 
+    // Called after the play-mode parameter changes (via the EditEngine): a
+    // latched chord is released when leaving Held/Rhythm with no key held.
+    void onModeChanged();
+
 private:
     StateManager& state_;
     MidiRouter&   router_;

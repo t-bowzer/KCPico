@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "base.h"
-#include "keymap.h"
 #include "midi_event_queue.h"
 #include "rhythm.h"
 #include "state.h"
@@ -26,14 +25,16 @@ public:
     void setPatterns(std::vector<RhythmPattern> patterns);
     void setPattern(const RhythmPattern& p, int index);
 
-    void handleKeyEvent(const KeyEvent& ev, uint64_t now_us);
+    // Called after the pattern parameter changes (via the EditEngine): adopts
+    // the new pattern's authored swing default.
+    void onPatternChanged();
+
     void update(uint64_t now_us);
     void allNotesOff();
 
 private:
     StateManager& state_;
     MidiEventQueue& out_;
-    KeymapResolver keymap_;
 
     std::vector<RhythmPattern> patterns_;
 

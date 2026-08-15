@@ -151,7 +151,7 @@ The system is a set of cooperating modules coordinated by a central state manage
   - *Arpeggio:* chord notes played sequentially; when rhythm is enabled, arpeggiation follows rhythm timing.
   - *Rhythm mode:* chord notes triggered in a rhythmic pattern synced to the Rhythm Engine.
   - *Silent (strum-only):* no chord notes sounded directly; chord defines the note pool for the strum plate only.
-- **FR-C4** Adjustable chord parameters via function keys: note duration, velocity, pan (CC10). Values shown on LCD when edited.
+- **FR-C4** Adjustable chord parameters: note duration, velocity, pan (CC10), via the Chord Edit menu (5.4). Values shown on LCD when edited.
 - **FR-C5** Chord octave shift via `+` / `-` keys (Section 5), clamped to a sensible MIDI range.
 - **FR-C6** Voicing mode is a live-toggleable parameter (`root_position` ⇄ `smart` voice-leading), saved per-preset (see Section 6.4).
 - **FR-C7** Chord extensions (add9, add11, add13) are **independently toggleable** on/off flags. Left arrow = add9, Down arrow = add11, Right arrow = add13 (see 5.4). Saved per-preset.
@@ -168,9 +168,9 @@ The system is a set of cooperating modules coordinated by a central state manage
 ### 4.2 Strum Plate
 - **FR-S1** Number keys simulate the strum plate, playing the notes of the currently selected chord spread across octaves.
 - **FR-S2** Two layouts:
-  - *Full:* number row (top-of-keyboard number keys `1 2 3 4 5 6 7 8 9 0`) and/or full numpad. The numpad strum set is the digit/decimal keys only — `0 . 1 2 3 4 5 6 7 8 9`. The numpad `Keypad +` / `Keypad -` keys are **NOT** part of the strum plate; they are reserved for octave/value adjustment (see 5.4).
+  - *Full:* number row (top-of-keyboard number keys `1 2 3 4 5 6 7 8 9 0`) and/or full numpad. The numpad strum set is the digit/decimal keys only — `0 . 1 2 3 4 5 6 7 8 9`. The numpad `Keypad +` / `Keypad -` keys are **NOT** part of the strum plate; they adjust the strum octave (see 5.5).
   - *Limited strum keys* (toggle): numpad center path `0 → . → 2 → 3 → 5 → 6 → 8 → 9 → / → *` for a more realistic feel.
-- **FR-S3** Strum parameters (via `Alt` + function keys): octave, note duration, note velocity, and more. Shown on LCD when edited. (Note length governs how long strummed notes sound; there is no separate sustain parameter.)
+- **FR-S3** Strum parameters (via the Strum Edit menu, 5.5): octave, note duration, note velocity, layout. Shown on LCD when edited. (Note length governs how long strummed notes sound; there is no separate sustain parameter.)
 - **FR-S4** Strum notes are derived from the active chord voicing (including in Silent mode).
 - **FR-S5** Unlike Held-mode chords (FR-C9), the strum plate picks up parameter and chord edits **immediately** — the next strummed note reflects current parameters and the currently-selected chord, with no latching.
 - **FR-S6** Numpad strum keys are identified via their raw HID **keypad usage codes** and behave identically **regardless of the keyboard's Num Lock state** (the firmware interprets keypad usages directly; Num Lock is ignored). The firmware never asserts Num Lock as a precondition.
@@ -180,19 +180,19 @@ The system is a set of cooperating modules coordinated by a central state manage
 - **FR-R2** Percussion output can be muted (rhythm timing continues for sync; drum notes suppressed).
 - **FR-R3** Rhythm emits GM percussion notes on **MIDI channel 10**.
 - **FR-R4** When rhythm is enabled, Chord Engine arpeggio/rhythm modes follow rhythm timing.
-- **FR-R5** Tempo adjust via `Page Up` / `Page Down`; Swing adjust via `Ctrl + Page Up/Down`.
+- **FR-R5** Tempo adjust via `Page Up` / `Page Down`; swing (and other rhythm parameters) adjust in the Rhythm Edit menu (`Ctrl`, see 5.6).
 - **FR-R6** Rhythm patterns are defined as step sequences in JSON on LittleFS (Section 7.2).
-- **FR-R7** MIDI clock transmission (24 PPQN) can be toggled on/off (see 5.6); when on, clock is sent to the DIN output.
+- **FR-R7** MIDI clock transmission (24 PPQN) can be toggled on/off in the Rhythm Edit menu (Clock Out, see 5.6); when on, clock is sent to the DIN output.
 - **FR-R8** **Keyboard-LED BPM indicator:** the keyboard's **Scroll Lock** LED can flash in time with the Rhythm Engine clock as a visual tempo indicator. Default behavior: a short quarter-note flash on every beat, with a longer accented flash on beat 1 of the bar. The LED is driven by sending a **HID Output Report (SET_REPORT)** to the hosted keyboard. It blinks only while the Rhythm Engine is enabled (follows the active clock), and is disabled if `led.bpm_indicator` is off. Scroll Lock is used because it is not mapped to any chord/strum/function key; Caps Lock and Num Lock LEDs are left untouched to avoid confusion (Caps is a chord root; numpad state is irrelevant per FR-S6). This is best-effort visual feedback and must degrade gracefully if the LED is unavailable (missing keyboard, keyboard that rejects the output report, USB write failure) without affecting timing or MIDI output.
 
 ### 4.4 Presets
 - **FR-P1** Presets store chord, rhythm, and strum parameters plus MIDI channel assignments.
 - **FR-P2** 80 slots: 10 banks × 8 presets.
 - **FR-P3** Cycle individual presets: `Home` / `End`.
-- **FR-P4** Cycle banks: `Ctrl + Home/End`.
-- **FR-P5** Load preset in current bank: `Ctrl + <number 1–8>`.
-- **FR-P6** Save preset: `Ctrl + Insert` (prompt: `Enter` to confirm, `Backspace` to cancel).
-- **FR-P7** Clear preset: `Ctrl + Delete` (same confirm/cancel prompt).
+- **FR-P4** Cycle banks: `Super + Home/End`.
+- **FR-P5** Load preset in current bank: `Super + <number 1–8>`.
+- **FR-P6** Save preset: `Super + Insert` (prompt: `Enter` to confirm, `Backspace` to cancel).
+- **FR-P7** Clear preset: `Super + Delete` (same confirm/cancel prompt).
 - **FR-P8** All prompts and current bank/slot reflected on the LCD.
 - **FR-P9** **Default initialization:** every preset slot that has never been saved (or has been cleared) loads factory-default parameters (see Parameter Reference, Section 9). There are no "empty" slots that fail to load.
 - **FR-P10** **Prompt auto-cancel:** save/clear confirmation prompts auto-cancel after **5 seconds** of no key press. Additionally, pressing any chord or strum key immediately cancels the prompt (so the user can keep playing).
@@ -212,19 +212,19 @@ The system is a set of cooperating modules coordinated by a central state manage
   q=120  Rk  >Held
   ```
   (Line 1: active chord + optional `*` dirty marker + bank/preset. Line 2: tempo, rhythm short-code, play mode — final layout **[DRAFT — REVIEW]**.)
-- **FR-D2** When any parameter is modified, the LCD temporarily displays the parameter name and its new value, then reverts to idle after a timeout (`display.revert_timeout_ms`).
+- **FR-D2** Parameters are edited through three **edit menus** (see 5.4–5.6). Inside a menu the LCD shows the menu title on line 1 and the selected parameter name on line 2; `F1`..`F9` select a parameter and `+` / `-` (or `Page Up`/`Page Down`) change its value, showing the full parameter name and value as a transient screen that reverts to the menu after `display.revert_timeout_ms`. Single-key edits from the main menu show the same transient and revert to idle.
 - **FR-D3** Save/clear/confirm prompts are shown on the LCD, including the auto-cancel behavior (FR-P10).
 
 ---
 
 ## 5. Key Map
 
-The chord grid faithfully reproduces the Omnichord's 3×12 button layout (5.1). Because `Shift` is used as a chord root, all function combos use `Ctrl`/`Alt`/`Super` (5.3).
+The chord grid faithfully reproduces the Omnichord's 3×12 button layout (5.1). Because `Shift` is used as a chord root, function access uses dedicated keys and menus rather than modifier combos (5.3).
 
 ### 5.1 Chord Buttons — Authentic Omnichord 3×12 Grid
 The Omnichord exposes 36 chord buttons: three quality rows (Major / Minor / 7th) × twelve roots ordered around the **circle of fifths**. KeybChord reproduces this exactly by treating each of the three main keyboard rows as a quality row and using the row-bounding modifier keys as the outermost columns.
 
-**Raw-HID requirement:** The firmware parses HID keyboard reports directly and owns the keyboard exclusively (there is no OS). This lets us treat `Caps Lock`, `Tab`, and both `Shift` keys as ordinary held keys (present in the report = held; absent = released), independent of any lock-LED semantics. Modifier bytes and key-array usages are read from the report. Consequently, **Shift is a chord root and is NOT used as a function modifier** anywhere in the key map — function combos use `Ctrl`, `Alt`, or the `Windows`/`Super` key instead (see 5.3+).
+**Raw-HID requirement:** The firmware parses HID keyboard reports directly and owns the keyboard exclusively (there is no OS). This lets us treat `Caps Lock`, `Tab`, and both `Shift` keys as ordinary held keys (present in the report = held; absent = released), independent of any lock-LED semantics. Modifier bytes and key-array usages are read from the report. Consequently, **Shift is a chord root and is NOT used as a function modifier** anywhere in the key map — function access uses the dedicated menu keys and `Super` (see 5.3+).
 
 **Row = quality, Column = root (circle of fifths, left→right):**
 | Col | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 |
@@ -245,68 +245,106 @@ The three main letter rows plus their bounding modifiers are fully consumed by t
 | Keys | Function |
 |------|----------|
 | Number row `1 2 3 4 5 6 7 8 9 0` | Strum across chord notes (Full layout) |
-| Numpad digits + decimal `0 . 1 2 3 4 5 6 7 8 9` | Strum (Full layout). `Keypad +`/`Keypad -` are excluded — reserved for octave/value adjust (5.4). |
+| Numpad digits + decimal `0 . 1 2 3 4 5 6 7 8 9` | Strum (Full layout). `Keypad +`/`Keypad -` are excluded — they adjust the strum octave (5.5). |
 | Limited strum path `0 . 2 3 5 6 8 9 / *` | Strum (Limited layout, when enabled) |
 
 ### 5.3 Function Modifier Convention
-Because `Shift` (both keys) is now a chord root, **Shift is never used as a function modifier**. Function combos use:
-- **`Ctrl`** — chord-parameter and preset modifier
-- **`Alt`** — strum-parameter modifier
-- **`Super`** (`Windows` key) — global/system modifier. The target keyboard has no `Fn` key, so the `Windows`/`Super` key is used. (Stored in config as `global_fn: "super"`.)
+Because `Shift` (both keys) is a chord root, **Shift is never used as a function modifier**. Parameter editing uses **no modifier-key combos**: instead, three dedicated keys open a parameter-edit menu (see 5.4), where F-keys select a parameter and `+` / `-` change its value.
 
-### 5.4 Function Keys — Chord Controls
+- **`Ctrl`** — opens the **Rhythm Edit** menu (toggle).
+- **`Alt`** — opens the **Strum Edit** menu (toggle).
+- **`Menu`** (the Application key, to the left of Right-Ctrl) — opens the **Chord Edit** menu (toggle). `F10` is a fallback that enters Chord Edit from the main menu on keyboards without a `Menu` key.
+- **`Super`** (`Windows` key) — global/system modifier, used for preset navigation/save/clear (5.7) and panic (5.8). The target keyboard has no `Fn` key, so the `Windows`/`Super` key is used. (Stored in config as `global_fn: "super"`.)
+- **`Esc`** — returns to the main menu from any edit menu (and cancels prompts).
+
+Inside an edit menu, **chord and strum keys remain live** so a parameter change can be heard immediately without leaving the menu.
+
+### 5.4 Function Keys — Chord Controls & the Chord Edit Menu
+
+Main-menu single-key shortcuts (no menu):
+
 | Key | Action |
 |-----|--------|
 | `F1` | Cycle play mode (Held → Press-to-play → Arpeggio → Rhythm → Silent) |
-| `F2` | Edit note duration |
-| `F3` | Edit velocity |
-| `F4` | Edit pan |
 | `F5` | Toggle voicing mode (Root-position ⇄ Smart voice-leading) |
-| `F6` | Reserved |
-| `+` / `-` | Context-sensitive: adjust the currently-selected editable parameter value if one is being edited; otherwise chord octave up / down. Bound to the **number-row** `=`/`-` keys **and** the numpad `Keypad +`/`Keypad -` keys (the numpad math keys are free because they are excluded from the strum plate, FR-S2). |
 | `Left` arrow | Toggle **add9** on/off (independent) |
 | `Down` arrow | Toggle **add11** on/off (independent) |
 | `Right` arrow | Toggle **add13** on/off (independent) |
-| `Up` arrow | Reserved |
+| `+` / `-` (number row `=` / `-`) | Chord octave up / down |
 
-### 5.5 Function Keys — Strum Controls (with `Alt`)
+**Chord Edit menu** — opened by `Menu` (or `F10` from the main menu). F-keys select a parameter; `+` / `-` change its value:
+
+| F-key | Parameter | Range / cycle |
+|-------|-----------|----------------|
+| `F1` | Octave | −3..+3 (step 1) |
+| `F2` | Mode | Held / Press / Arp / Rhythm / Silent |
+| `F3` | Voicing | Root / Smart |
+| `F4` | Duration | 50..4000 ms (step 50) |
+| `F5` | Velocity | 1..127 |
+| `F6` | Pan | 0..127 |
+| `F7` | Add9 | On / Off |
+| `F8` | Add11 | On / Off |
+| `F9` | Add13 | On / Off |
+
+### 5.5 Function Keys — Strum Controls & the Strum Edit Menu
+
+Main-menu single-key shortcut:
+
 | Key | Action |
 |-----|--------|
-| `Alt+F2` | Strum octave |
-| `Alt+F3` | Strum note duration |
-| `Alt+F4` | Strum velocity |
-| `Alt+F5` | Toggle Limited strum keys |
+| `Keypad +` / `Keypad -` | Strum octave up / down (the numpad math keys are free because they are excluded from the strum plate, FR-S2) |
 
-### 5.6 Rhythm Controls
+**Strum Edit menu** — opened by `Alt`. F-keys select a parameter; `+` / `-` change its value:
+
+| F-key | Parameter | Range / cycle |
+|-------|-----------|----------------|
+| `F1` | Octave | −3..+3 (step 1) |
+| `F2` | Duration | 50..4000 ms (step 50) |
+| `F3` | Velocity | 1..127 |
+| `F4` | Layout | Full / Limited |
+
+### 5.6 Rhythm Controls & the Rhythm Edit Menu
+
+Main-menu single-key shortcuts (no menu):
+
 | Key | Action |
 |-----|--------|
 | `F7` | Enable/disable rhythm |
-| `F8` | Select rhythm mode (cycle) |
+| `F8` | Select rhythm pattern (cycle) |
 | `F9` | Mute/unmute percussion |
 | `Page Up` / `Page Down` | Tempo up / down |
-| `Ctrl + Page Up/Down` | Swing up / down |
-| `Super+F7` | Toggle MIDI clock transmit on/off |
-| `Super+F8` | Toggle keyboard-LED BPM indicator on/off (FR-R8) |
+
+**Rhythm Edit menu** — opened by `Ctrl`. F-keys select a parameter; `+` / `-` change its value:
+
+| F-key | Parameter | Range / cycle |
+|-------|-----------|----------------|
+| `F1` | Tempo | 40..260 BPM (step 1) |
+| `F2` | Swing | −75..+75 (step 5) |
+| `F3` | Pattern | cycle the 12 rhythms |
+| `F4` | Mute | On / Off |
+| `F5` | Enable | On / Off |
+| `F6` | Clock Out | On / Off (MIDI clock transmit, FR-R7) |
+| `F7` | Beat LED | On / Off (Scroll Lock BPM indicator, FR-R8) |
 
 ### 5.7 Preset & Navigation
 | Key | Action |
 |-----|--------|
 | `Home` / `End` | Previous / next preset |
-| `Ctrl + Home/End` | Previous / next bank |
-| `Ctrl + 1..8` | Load preset N in current bank |
-| `Ctrl + Insert` | Save preset (confirm `Enter` / cancel `Backspace`) |
-| `Ctrl + Delete` | Clear preset (confirm `Enter` / cancel `Backspace`) |
+| `Super + Home/End` | Previous / next bank |
+| `Super + 1..8` | Load preset N in current bank |
+| `Super + Insert` | Save preset (confirm `Enter` / cancel `Backspace`) |
+| `Super + Delete` | Clear preset (confirm `Enter` / cancel `Backspace`) |
 
 ### 5.8 Global / MIDI
 | Key | Action |
 |-----|--------|
-| `F10` | MIDI channel assignment menu (chord/rhythm/strum) |
+| `F10` | Enter the Chord Edit menu (fallback for keyboards without a `Menu` key) |
 | `F11` | Reserved |
 | `F12` | Reserved / system menu |
 | `Super + Esc` | **Panic:** All-Sound-Off + All-Notes-Off on all channels/DIN output (FR-C11) |
-| `Esc` | Cancel current edit / prompt |
+| `Esc` | Exit the current edit menu / cancel the current prompt |
 
-> **Note on modifiers:** all modifiers are read from the HID report modifier byte (`LCtrl/LShift/LAlt/LGui/RCtrl/RShift/RAlt/RGui`). `Shift` is a chord root; `Ctrl`/`Alt`/`Super` are functions.
+> **Note on modifiers:** all modifiers are read from the HID report modifier byte (`LCtrl/LShift/LAlt/LGui/RCtrl/RShift/RAlt/RGui`). `Shift` is a chord root. `Ctrl` and `Alt` are menu toggles (not held modifiers); `Super` is the global modifier for presets/panic; the `Menu` key is a normal key-array usage.
 
 ---
 
@@ -404,14 +442,14 @@ Each rhythm is a step sequence stored as a JSON file on LittleFS (one file per p
 ```
 - `pattern` values may be `0` (rest) or `1..127` (velocity; `1` = default velocity).
 - GM percussion note numbers: kick 36, snare 38, closed hat 42, open hat 46, etc.
-- **`swing` is an integer** here (see 7.3): per-pattern swing is stored as an integer percentage 0–75, not a float. (A pattern authored with `"swing": 0` means none; `"swing": 50` means a 50% off-beat delay.) This differs from the original Pi spec, which used a 0.0–0.75 float.
+- **`swing` is an integer** here (see 7.3): per-pattern swing is stored as a signed integer percentage −75..+75, not a float. (A pattern authored with `"swing": 0` means none; `"swing": 50` means a 50% off-beat delay.) This differs from the original Pi spec, which used a 0.0–0.75 float.
 
 ### 7.3 Timing, Tempo & Swing (integer / fixed-point)
 All timing math runs on Core 1 using integer microseconds; the RP2040 has no FPU (Section 1.4), so **no floats are used in the scheduler**.
 - **Tempo:** BPM, adjustable via Page Up/Down (FR-R5). Range e.g. 40–260 BPM. Step interval is computed with integer division, e.g. `step_us = 60000000 / (bpm * steps_per_beat)`.
-- **Swing:** stored as an **integer percentage 0–75** (0 = straight, 75 = maximum), adjustable via `Ctrl` + Page Up/Down in steps of 5. The off-beat delay is applied as fixed-point integer math, e.g. `delay_us = (base_step_us * swing) / 100`, applied to even (off-beat) steps only. (Semantically equivalent to the original 0.0–0.75 float, expressed as 0–75.)
+- **Swing:** stored as a **signed integer percentage −75..+75** (0 = straight; positive = laid-back, negative = rushed), adjustable in the Rhythm Edit menu (`Ctrl` → `F2`) in steps of 5. The off-beat delay is applied as fixed-point integer math, e.g. `delay_us = (base_step_us * swing) / 100`, applied to the off-beat 8th-note step only. (Semantically equivalent to the original 0.0–0.75 float, expressed as a signed −0.75..+0.75.)
 - **Sync:** The Rhythm Engine clock drives chord Arpeggio/Rhythm modes (FR-R4).
-- **MIDI clock:** Transmission of standard MIDI clock (24 PPQN) to the DIN output is toggleable (FR-R7, key `Super+F7`), stored in global config. When enabled, also send Start/Stop/Continue as appropriate.
+- **MIDI clock:** Transmission of standard MIDI clock (24 PPQN) to the DIN output is toggleable in the Rhythm Edit menu (FR-R7, Clock Out), stored in global config. Only the 0xF8 clock byte is streamed (a continuous tempo master); no Start/Stop/Continue.
 - **Mute (FR-R2):** suppresses drum note-ons while the clock/sync continues.
 - **LED BPM indicator (FR-R8):** the beat callback of the Core 1 scheduler drives the Scroll Lock LED flash (quarter-note flash, accented downbeat) by queuing a HID Output Report to the keyboard. It runs off the Core 0 MIDI dispatch path, so it does not affect key-to-MIDI latency (NFR-1) or step jitter (NFR-2). USB HID LED updates have a few ms of round-trip latency, acceptable for a visual beat indicator.
 
@@ -474,7 +512,7 @@ All config/preset/pattern files live on the Pico's **LittleFS** filesystem in on
   }
 }
 ```
-> `rhythm.swing` is an **integer 0–75** (Section 7.3), not a float.
+> `rhythm.swing` is a **signed integer −75..+75** (Section 7.3), not a float.
 
 ### 8.3 Combination, Chord-Type & Root-Order Tables
 The Omnichord combination matrix (6.3), chord interval formulas (6.2), the circle-of-fifths root order (5.1, `chord_root_order`), the keymap, and per-parameter defaults are stored as editable JSON on LittleFS (shipped from repo `data/`) so behavior/layout can be tuned without recompiling. To minimize flash writes and RAM, large static tables may alternatively be compiled into flash as C++ constants with JSON overrides — see the roadmap for the chosen persistence strategy (default: JSON on LittleFS via ArduinoJson).
@@ -503,7 +541,7 @@ All adjustable parameters, with min/max/default/step. On default initialization 
 | limited_keys | strum | bool | off | on | off | toggle | limited numpad path |
 | channel (strum) | strum | int | 1 | 16 | 2 | 1 | MIDI channel |
 | tempo | rhythm | int | 40 | 260 | 120 | 1 | BPM |
-| swing | rhythm | int | 0 | 75 | 0 | 5 | off-beat delay percentage (integer/fixed-point; see 7.3) |
+| swing | rhythm | int | −75 | +75 | 0 | 5 | signed off-beat delay percentage (integer/fixed-point; see 7.3) |
 | enabled | rhythm | bool | off | on | off | toggle | rhythm on/off |
 | muted | rhythm | bool | off | on | off | toggle | suppress drum note-ons |
 | pattern | rhythm | enum | — | — | `Rock 1` | cycle | from rhythm list (7.1) |
@@ -518,7 +556,7 @@ All adjustable parameters, with min/max/default/step. On default initialization 
 | revert_timeout_ms | global | int | 250 | 5000 | 1500 | 250 | LCD param-edit revert |
 | prompt_timeout_ms | global | int | — | — | 5000 | — | save/clear auto-cancel (FR-P10) |
 
-> **Changed from the Pi spec:** `swing` is now an **integer 0–75 with step 5** (was float 0.0–0.75 step 0.05). Semantics are identical (percentage off-beat delay); the representation is integer for the no-FPU RP2040.
+> **Changed from the Pi spec:** `swing` is now a **signed integer −75..+75 with step 5** (was float 0.0–0.75 step 0.05). Semantics are identical (percentage off-beat delay; positive laid-back, negative rushed); the representation is integer for the no-FPU RP2040.
 
 ---
 
@@ -593,14 +631,14 @@ These milestones align with the Build Sequence (Section 1.6); stop for user feed
 - **AC-13** add9/add11/add13 extensions toggle independently via Left/Down/Right arrows and persist in preset.
 - **AC-14** Left-adjacent combos produce sus4 (Major+left-7th) and add9 (Major+left-minor); leftmost column produces these via the `` ` `` key.
 - **AC-15** In Held mode, editing any chord parameter (or loading a preset) while a chord is sounding does not change the currently-held notes; the change applies only when the next chord is triggered (FR-C9 / VR-5).
-- **AC-16** MIDI clock transmit toggle sends/stops 24 PPQN clock (plus Start/Stop) on the DIN output.
+- **AC-16** MIDI clock transmit toggle (Clock Out in the Rhythm Edit menu) sends/stops the 24 PPQN clock stream (0xF8 only; no Start/Stop) on the DIN output.
 - **AC-17** Panic (`Super+Esc`) silences all notes on all channels/DIN and clears active-note state (FR-C11).
 - **AC-18** Numpad strum keys behave identically regardless of the keyboard's Num Lock state (FR-S6).
 - **AC-19** Save/clear prompt auto-cancels after 5 s idle, and any chord/strum key cancels it (FR-P10).
 - **AC-20** Dirty marker (`*`) appears when active state differs from the stored preset and clears on save/load (FR-P11).
 - **AC-21** Uninitialized/cleared preset slots load factory defaults with per-function channels 1/2/10 (FR-P9/FR-P12).
 - **AC-22** Corrupt or missing config/presets on LittleFS are regenerated or fall back to defaults without crashing (NFR-9).
-- **AC-23** When rhythm is enabled and `bpm_indicator` is on, the Scroll Lock LED flashes in time with the clock (accented downbeat); toggling via `Super+F8` enables/disables it; LED unavailability does not affect timing or MIDI (FR-R8).
+- **AC-23** When rhythm is enabled and `bpm_indicator` is on, the Scroll Lock LED flashes in time with the clock (accented downbeat); toggling it via the Rhythm Edit menu (Beat LED, `Ctrl` → `F7`) enables/disables it; LED unavailability does not affect timing or MIDI (FR-R8).
 
 > **Removed vs. the Pi spec:** the USB-MIDI-gadget acceptance clauses are gone (no USB MIDI in v1). AC-9 is reworded from "both USB and DIN" to DIN-only with graceful behavior when unconnected.
 

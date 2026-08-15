@@ -5,6 +5,7 @@
 #include "storage_stub.h"
 #else
 #include "input_usbhost.h"
+#include "lcd_hd44780.h"
 #include "midi_out_uart.h"
 #include "storage_littlefs.h"
 #endif
@@ -37,7 +38,14 @@ Adapters createAdapters() {
         }
     }
 
-    a.lcd = std::make_unique<NullLcdAdapter>();
+    {
+        auto lcd = std::make_unique<LcdHd44780>();
+        if (lcd->begin()) {
+            a.lcd = std::move(lcd);
+        } else {
+            a.lcd = std::make_unique<NullLcdAdapter>();
+        }
+    }
 
     {
         auto storage = std::make_unique<StorageLittleFs>();

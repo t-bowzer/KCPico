@@ -1,0 +1,159 @@
+#include <gtest/gtest.h>
+
+#include "param_edit.h"
+#include "state.h"
+
+
+TEST(ParamEdit, MenuTitles) {
+    EXPECT_STREQ(menuTitle(EditMenu::Chord), "Chord Edit");
+    EXPECT_STREQ(menuTitle(EditMenu::Strum), "Strum Edit");
+    EXPECT_STREQ(menuTitle(EditMenu::Rhythm), "Rhythm Edit");
+    EXPECT_STREQ(menuTitle(EditMenu::None), "");
+}
+
+TEST(ParamEdit, MenuParamLists) {
+    EXPECT_EQ(menuParamCount(EditMenu::Chord), 9);
+    EXPECT_EQ(menuParamCount(EditMenu::Strum), 4);
+    EXPECT_EQ(menuParamCount(EditMenu::Rhythm), 7);
+
+    EXPECT_EQ(menuParamAt(EditMenu::Chord, 0), ParamId::ChordOctave);
+    EXPECT_EQ(menuParamAt(EditMenu::Chord, 1), ParamId::ChordMode);
+    EXPECT_EQ(menuParamAt(EditMenu::Chord, 8), ParamId::ChordAdd13);
+
+    EXPECT_EQ(menuParamAt(EditMenu::Strum, 0), ParamId::StrumOctave);
+    EXPECT_EQ(menuParamAt(EditMenu::Strum, 3), ParamId::StrumLayout);
+
+    EXPECT_EQ(menuParamAt(EditMenu::Rhythm, 0), ParamId::RhythmTempo);
+    EXPECT_EQ(menuParamAt(EditMenu::Rhythm, 2), ParamId::RhythmPattern);
+    EXPECT_EQ(menuParamAt(EditMenu::Rhythm, 6), ParamId::RhythmLed);
+
+    // Out of range -> COUNT.
+    EXPECT_EQ(menuParamAt(EditMenu::Strum, 4), ParamId::COUNT);
+    EXPECT_EQ(menuParamAt(EditMenu::None, 0), ParamId::COUNT);
+}
+
+TEST(ParamEdit, Names) {
+    EXPECT_STREQ(paramShortName(ParamId::ChordOctave), "Octave");
+    EXPECT_STREQ(paramFullName(ParamId::ChordOctave), "Chord Octave");
+    EXPECT_STREQ(paramFullName(ParamId::StrumOctave), "Strum Octave");
+    EXPECT_STREQ(paramFullName(ParamId::RhythmTempo), "Rhythm Tempo");
+    EXPECT_STREQ(paramShortName(ParamId::RhythmMute), "Mute");
+    EXPECT_STREQ(paramFullName(ParamId::RhythmMute), "Rhythm Mute");
+    EXPECT_STREQ(paramFullName(ParamId::StrumLayout), "Strum Layout");
+}
+
+TEST(ParamEdit, ValueStrings) {
+    StateManager s;
+    EXPECT_EQ(paramValueString(s, ParamId::ChordOctave), "0");
+    EXPECT_EQ(paramValueString(s, ParamId::ChordMode), "Held");
+    EXPECT_EQ(paramValueString(s, ParamId::ChordVoicing), "Root");
+    EXPECT_EQ(paramValueString(s, ParamId::ChordDuration), "500");
+    EXPECT_EQ(paramValueString(s, ParamId::ChordVelocity), "100");
+    EXPECT_EQ(paramValueString(s, ParamId::ChordPan), "64");
+    EXPECT_EQ(paramValueString(s, ParamId::ChordAdd9), "Off");
+    EXPECT_EQ(paramValueString(s, ParamId::StrumOctave), "+1");
+    EXPECT_EQ(paramValueString(s, ParamId::StrumDuration), "300");
+    EXPECT_EQ(paramValueString(s, ParamId::StrumLayout), "Full");
+    EXPECT_EQ(paramValueString(s, ParamId::RhythmTempo), "120");
+    EXPECT_EQ(paramValueString(s, ParamId::RhythmSwing), "0");
+    EXPECT_EQ(paramValueString(s, ParamId::RhythmPattern), "Rock 1");
+    EXPECT_EQ(paramValueString(s, ParamId::RhythmMute), "Off");
+    EXPECT_EQ(paramValueString(s, ParamId::RhythmClock), "Off");
+}
+
+TEST(ParamEdit, StepIntClamps) {
+    StateManager s;
+
+    paramStep(s, ParamId::ChordOctave, +1);
+    EXPECT_EQ(s.pendingChord.octave, 1);
+    s.pendingChord.octave = 3;
+    paramStep(s, ParamId::ChordOctave, +1);
+    EXPECT_EQ(s.pendingChord.octave, 3);       // clamp at max
+    paramStep(s, ParamId::ChordOctave, -1);
+    EXPECT_EQ(s.pendingChord.octave, 2);
+
+    paramStep(s, ParamId::RhythmTempo, +1);
+    EXPECT_EQ(s.pendingRhythm.tempo, 121);
+    s.pendingRhythm.tempo = 40;
+    paramStep(s, ParamId::RhythmTempo, -1);
+    EXPECT_EQ(s.pendingRhythm.tempo, 40);      // clamp at min
+
+    paramStep(s, ParamId::RhythmSwing, +1);
+    EXPECT_EQ(s.pendingRhythm.swing, 5);       // step 5
+    paramStep(s, ParamId::RhythmSwing, -1);
+    EXPECT_EQ(s.pendingRhythm.swing, 0);
+
+    paramStep(s, ParamId::ChordDuration, +1);
+    EXPECT_EQ(s.pendingChord.note_duration_ms, 550);  // step 50
+}
+
+TEST(ParamEdit, StepEnumCyclesBySign) {
+    StateManager s;
+
+    // ChordMode: Held(0) -> Press(1) on +1.
+    paramStep(s, ParamId::ChordMode, +1);
+    EXPECT_EQ(s.pendingChord.play_mode, PlayMode::PressToPlay);
+    // -1 wraps back to Held.
+    paramStep(s, ParamId::ChordMode, -1);
+    EXPECT_EQ(s.pendingChord.play_mode, PlayMode::Held);
+
+    // Voicing is set by sign.
+    paramStep(s, ParamId::ChordVoicing, +1);
+    EXPECT_EQ(s.pendingChord.voicing_mode, VoicingMode::Smart);
+    paramStep(s, ParamId::ChordVoicing, -1);
+    EXPECT_EQ(s.pendingChord.voicing_mode, VoicingMode::RootPosition);
+}
+
+TEST(ParamEdit, StepBoolSetBySign) {
+    StateManager s;
+    paramStep(s, ParamId::ChordAdd9, +1);
+    EXPECT_TRUE(s.pendingChord.add9);
+    paramStep(s, ParamId::ChordAdd9, -1);
+    EXPECT_FALSE(s.pendingChord.add9);
+
+    paramStep(s, ParamId::RhythmMute, +1);
+    EXPECT_TRUE(s.pendingRhythm.muted);
+
+    paramStep(s, ParamId::RhythmClock, +1);
+    EXPECT_TRUE(s.config.midi_clock_enabled);
+    paramStep(s, ParamId::RhythmClock, -1);
+    EXPECT_FALSE(s.config.midi_clock_enabled);
+}
+
+TEST(ParamEdit, StepPatternWraps) {
+    StateManager s;
+    s.pendingRhythm.pattern = 11;
+    paramStep(s, ParamId::RhythmPattern, +1);
+    EXPECT_EQ(s.pendingRhythm.pattern, 0);      // wrap to 0
+    paramStep(s, ParamId::RhythmPattern, -1);
+    EXPECT_EQ(s.pendingRhythm.pattern, 11);     // wrap to 11
+}
+
+TEST(ParamEdit, CycleToggles) {
+    StateManager s;
+
+    paramCycle(s, ParamId::ChordMode);
+    EXPECT_EQ(s.pendingChord.play_mode, PlayMode::PressToPlay);
+
+    paramCycle(s, ParamId::ChordVoicing);
+    EXPECT_EQ(s.pendingChord.voicing_mode, VoicingMode::Smart);
+    paramCycle(s, ParamId::ChordVoicing);
+    EXPECT_EQ(s.pendingChord.voicing_mode, VoicingMode::RootPosition);
+
+    paramCycle(s, ParamId::ChordAdd9);
+    EXPECT_TRUE(s.pendingChord.add9);
+
+    paramCycle(s, ParamId::StrumLayout);
+    EXPECT_TRUE(s.pendingStrum.limited_keys);
+
+    paramCycle(s, ParamId::RhythmEnable);
+    EXPECT_TRUE(s.pendingRhythm.enabled);
+    paramCycle(s, ParamId::RhythmEnable);
+    EXPECT_FALSE(s.pendingRhythm.enabled);
+
+    paramCycle(s, ParamId::RhythmPattern);
+    EXPECT_EQ(s.pendingRhythm.pattern, 1);
+
+    paramCycle(s, ParamId::RhythmLed);
+    EXPECT_FALSE(s.config.bpm_indicator);       // default true -> toggled off
+}

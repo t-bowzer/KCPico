@@ -63,16 +63,20 @@ TEST(Keymap, SeventhRowGrid) {
 
 TEST(Keymap, ChordControls) {
     KeymapResolver r;
-    EXPECT_EQ(r.resolve(0x35, 0).type, ActionType::Backtick);       // `
-    EXPECT_EQ(r.resolve(0x3A, 0).type, ActionType::PlayModeCycle);  // F1
-    EXPECT_EQ(r.resolve(0x3E, 0).type, ActionType::VoicingToggle);  // F5
-    EXPECT_EQ(r.resolve(0x50, 0).type, ActionType::ExtToggle9);     // Left
-    EXPECT_EQ(r.resolve(0x51, 0).type, ActionType::ExtToggle11);    // Down
-    EXPECT_EQ(r.resolve(0x4F, 0).type, ActionType::ExtToggle13);    // Right
-    EXPECT_EQ(r.resolve(0x2E, 0).type, ActionType::OctaveUp);       // =
-    EXPECT_EQ(r.resolve(0x57, 0).type, ActionType::OctaveUp);       // Keypad+
-    EXPECT_EQ(r.resolve(0x2D, 0).type, ActionType::OctaveDown);     // -
-    EXPECT_EQ(r.resolve(0x56, 0).type, ActionType::OctaveDown);     // Keypad-
+    EXPECT_EQ(r.resolve(0x35, 0).type, ActionType::Backtick);        // `
+    EXPECT_EQ(r.resolve(0x3A, 0).type, ActionType::PlayModeCycle);   // F1
+    EXPECT_EQ(r.resolve(0x3E, 0).type, ActionType::VoicingToggle);   // F5
+    EXPECT_EQ(r.resolve(0x50, 0).type, ActionType::ExtToggle9);      // Left
+    EXPECT_EQ(r.resolve(0x51, 0).type, ActionType::ExtToggle11);     // Down
+    EXPECT_EQ(r.resolve(0x4F, 0).type, ActionType::ExtToggle13);     // Right
+    EXPECT_EQ(r.resolve(0x2E, 0).type, ActionType::ChordOctaveUp);   // =
+    EXPECT_EQ(r.resolve(0x2D, 0).type, ActionType::ChordOctaveDown); // -
+}
+
+TEST(Keymap, StrumOctaveKeys) {
+    KeymapResolver r;
+    EXPECT_EQ(r.resolve(0x57, 0).type, ActionType::StrumOctaveUp);   // Keypad +
+    EXPECT_EQ(r.resolve(0x56, 0).type, ActionType::StrumOctaveDown); // Keypad -
 }
 
 TEST(Keymap, StrumKeysResolve) {
@@ -90,22 +94,13 @@ TEST(Keymap, StrumKeysResolve) {
     EXPECT_EQ(r.resolve(0x55, 0).type, ActionType::StrumKey);  // Keypad *
 }
 
-TEST(Keymap, AltFunctionKeys) {
+TEST(Keymap, MenuToggleKeys) {
     KeymapResolver r;
-    const uint8_t ALT = 0x04;  // LAlt modifier bit
-
-    // Alt+F2/F3/F4 arm strum parameter edits; Alt+F5 toggles limited keys.
-    EXPECT_EQ(r.resolve(0x3B, ALT).type, ActionType::StrumOctave);   // Alt+F2
-    EXPECT_EQ(r.resolve(0x3C, ALT).type, ActionType::StrumDuration); // Alt+F3
-    EXPECT_EQ(r.resolve(0x3D, ALT).type, ActionType::StrumVelocity); // Alt+F4
-    EXPECT_EQ(r.resolve(0x3E, ALT).type, ActionType::LimitedToggle); // Alt+F5
-
-    // Without Alt, F2/F3/F4 are not yet mapped (chord param editing deferred);
-    // F5 remains the voicing toggle.
-    EXPECT_EQ(r.resolve(0x3B, 0).type, ActionType::None);
-    EXPECT_EQ(r.resolve(0x3C, 0).type, ActionType::None);
-    EXPECT_EQ(r.resolve(0x3D, 0).type, ActionType::None);
-    EXPECT_EQ(r.resolve(0x3E, 0).type, ActionType::VoicingToggle);
+    EXPECT_EQ(r.resolve(0x65, 0).type, ActionType::MenuChord);  // Menu key
+    EXPECT_EQ(r.resolve(0xE1, 0).type, ActionType::MenuRhythm); // LCtrl
+    EXPECT_EQ(r.resolve(0xE5, 0).type, ActionType::MenuRhythm); // RCtrl
+    EXPECT_EQ(r.resolve(0xE3, 0).type, ActionType::MenuStrum);  // LAlt
+    EXPECT_EQ(r.resolve(0xE7, 0).type, ActionType::MenuStrum);  // RAlt
 }
 
 TEST(Keymap, EscIsClearEdit) {
@@ -115,20 +110,11 @@ TEST(Keymap, EscIsClearEdit) {
 
 TEST(Keymap, RhythmControls) {
     KeymapResolver r;
-    const uint8_t CTRL  = 0x01;  // LCtrl modifier bit
-    const uint8_t SUPER = 0x08;  // LGui modifier bit
-
     EXPECT_EQ(r.resolve(0x40, 0).type, ActionType::RhythmToggle);       // F7
     EXPECT_EQ(r.resolve(0x41, 0).type, ActionType::RhythmPatternCycle); // F8
     EXPECT_EQ(r.resolve(0x42, 0).type, ActionType::RhythmMute);         // F9
-
     EXPECT_EQ(r.resolve(0x4B, 0).type, ActionType::TempoUp);            // Page Up
     EXPECT_EQ(r.resolve(0x4E, 0).type, ActionType::TempoDown);          // Page Down
-    EXPECT_EQ(r.resolve(0x4B, CTRL).type, ActionType::SwingUp);         // Ctrl+Page Up
-    EXPECT_EQ(r.resolve(0x4E, CTRL).type, ActionType::SwingDown);       // Ctrl+Page Down
-
-    EXPECT_EQ(r.resolve(0x40, SUPER).type, ActionType::ClockToggle);    // Super+F7
-    EXPECT_EQ(r.resolve(0x41, SUPER).type, ActionType::LedToggle);      // Super+F8
 }
 
 TEST(Keymap, UnmappedKeysAreNone) {
@@ -147,21 +133,9 @@ TEST(Keymap, IsChordKey) {
     EXPECT_FALSE(KeymapResolver::isChordKey(0x3A));  // F1
 }
 
-TEST(Keymap, ShiftIsNotFunctionModifier) {
-    // Shift (bits 1/5 = 0x02/0x20) is a chord root, never a function modifier.
-    EXPECT_FALSE(KeymapResolver::isFunctionModifier(0x02));   // LShift
-    EXPECT_FALSE(KeymapResolver::isFunctionModifier(0x20));   // RShift
-    EXPECT_FALSE(KeymapResolver::isFunctionModifier(0x22));   // both shifts
-    EXPECT_TRUE(KeymapResolver::isFunctionModifier(0x01));    // LCtrl
-    EXPECT_TRUE(KeymapResolver::isFunctionModifier(0x04));    // LAlt
-    EXPECT_TRUE(KeymapResolver::isFunctionModifier(0x08));    // LGui/Super
-}
-
-TEST(Keymap, ModifierDetection) {
-    EXPECT_TRUE(KeymapResolver::isCtrl(0x01));     // LCtrl
-    EXPECT_TRUE(KeymapResolver::isCtrl(0x10));     // RCtrl
-    EXPECT_FALSE(KeymapResolver::isCtrl(0x04));    // Alt is not Ctrl
+TEST(Keymap, SuperModifierDetection) {
     EXPECT_TRUE(KeymapResolver::isSuper(0x08));    // LGui
     EXPECT_TRUE(KeymapResolver::isSuper(0x80));    // RGui
-    EXPECT_FALSE(KeymapResolver::isSuper(0x01));   // Ctrl is not Super
+    EXPECT_FALSE(KeymapResolver::isSuper(0x01));   // LCtrl is not Super
+    EXPECT_FALSE(KeymapResolver::isSuper(0x04));   // LAlt is not Super
 }

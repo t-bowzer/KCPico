@@ -50,74 +50,12 @@ const RhythmPattern* RhythmEngine::currentPattern() const {
     return &patterns_[idx];
 }
 
-void RhythmEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
-    KeyAction a = keymap_.resolve(ev.hid_usage, ev.modifiers);
-
-    switch (a.type) {
-        case ActionType::RhythmToggle:
-            if (ev.pressed) {
-                state_.pendingRhythm.enabled = !state_.pendingRhythm.enabled;
-            }
-            break;
-
-        case ActionType::RhythmPatternCycle:
-            if (ev.pressed && !patterns_.empty()) {
-                int idx = (state_.pendingRhythm.pattern + 1)
-                          % static_cast<int>(patterns_.size());
-                state_.pendingRhythm.pattern = static_cast<uint8_t>(idx);
-                // Adopt the pattern's authored swing default (spec 7.2).
-                state_.pendingRhythm.swing = patterns_[idx].swing;
-                if (running_) start(now_us);
-            }
-            break;
-
-        case ActionType::RhythmMute:
-            if (ev.pressed) state_.pendingRhythm.muted = !state_.pendingRhythm.muted;
-            break;
-
-        case ActionType::TempoUp:
-            if (ev.pressed) {
-                state_.pendingRhythm.tempo = clamp<uint16_t>(
-                    state_.pendingRhythm.tempo + 1,
-                    param_bounds::TEMPO_MIN, param_bounds::TEMPO_MAX);
-            }
-            break;
-        case ActionType::TempoDown:
-            if (ev.pressed) {
-                state_.pendingRhythm.tempo = clamp<uint16_t>(
-                    state_.pendingRhythm.tempo - 1,
-                    param_bounds::TEMPO_MIN, param_bounds::TEMPO_MAX);
-            }
-            break;
-
-        case ActionType::SwingUp:
-            if (ev.pressed) {
-                state_.pendingRhythm.swing = static_cast<int8_t>(
-                    clamp<int>(static_cast<int>(state_.pendingRhythm.swing) + 5,
-                               param_bounds::SWING_MIN, param_bounds::SWING_MAX));
-            }
-            break;
-        case ActionType::SwingDown:
-            if (ev.pressed) {
-                state_.pendingRhythm.swing = static_cast<int8_t>(
-                    clamp<int>(static_cast<int>(state_.pendingRhythm.swing) - 5,
-                               param_bounds::SWING_MIN, param_bounds::SWING_MAX));
-            }
-            break;
-
-        case ActionType::ClockToggle:
-            if (ev.pressed) {
-                state_.config.midi_clock_enabled = !state_.config.midi_clock_enabled;
-            }
-            break;
-        case ActionType::LedToggle:
-            if (ev.pressed) {
-                state_.config.bpm_indicator = !state_.config.bpm_indicator;
-            }
-            break;
-
-        default:
-            break;
+void RhythmEngine::onPatternChanged() {
+    if (patterns_.empty()) return;
+    int idx = state_.pendingRhythm.pattern;
+    if (idx >= 0 && idx < static_cast<int>(patterns_.size())) {
+        // Adopt the pattern's authored swing default (spec 7.2).
+        state_.pendingRhythm.swing = patterns_[idx].swing;
     }
 }
 

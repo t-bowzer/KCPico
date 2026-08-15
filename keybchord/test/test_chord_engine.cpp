@@ -147,53 +147,28 @@ TEST_F(ChordEngineTest, InvalidComboKeepsChordUntilNewPress) {
     EXPECT_TRUE(state_.isNoteActive(1, 67));
 }
 
-TEST_F(ChordEngineTest, ArrowKeysToggleExtensions) {
-    engine_->handleKeyEvent(key(0x17, true), 0);   // C major {60,64,67}
-    midi_.clear();
-
-    engine_->handleKeyEvent(key(0x50, true), 0);   // Left arrow -> add9 on
-    EXPECT_TRUE(state_.pendingChord.add9);
-
-    // Re-trigger (release then press): extension applies on next trigger.
-    engine_->handleKeyEvent(key(0x17, false), 0);
-    engine_->handleKeyEvent(key(0x17, true), 0);   // C major + add9
-    EXPECT_EQ(noteOnNotes(), (std::vector<uint8_t>{60, 64, 67, 74}));
-}
-
-TEST_F(ChordEngineTest, ArrowKeysToggleExtensionsIndependently) {
-    // Down = add11, Right = add13.
-    engine_->handleKeyEvent(key(0x51, true), 0);   // Down -> add11
-    engine_->handleKeyEvent(key(0x4F, true), 0);   // Right -> add13
-    EXPECT_TRUE(state_.pendingChord.add11);
-    EXPECT_TRUE(state_.pendingChord.add13);
-    EXPECT_FALSE(state_.pendingChord.add9);
-
-    engine_->handleKeyEvent(key(0x17, true), 0);   // C major + add11 + add13
-    EXPECT_EQ(noteOnNotes(), (std::vector<uint8_t>{60, 64, 67, 77, 81}));
-}
-
-TEST_F(ChordEngineTest, SwitchingModeReleasesHeldChord) {
+TEST_F(ChordEngineTest, ModeChangeReleasesLatchedChord) {
     engine_->handleKeyEvent(key(0x17, true), 0);   // T = C major (Held)
     engine_->handleKeyEvent(key(0x17, false), 0);  // release: Held sustains
     EXPECT_TRUE(state_.isNoteActive(1, 60));
     EXPECT_EQ(midi_.noteOffCount(), 0);
 
-    // Cycle play mode Held -> PressToPlay (F1). No key held -> release chord.
-    engine_->handleKeyEvent(key(0x3A, true), 0);   // F1
-    EXPECT_EQ(state_.pendingChord.play_mode, PlayMode::PressToPlay);
+    // EditEngine changes the mode and then notifies; no key held -> release.
+    state_.pendingChord.play_mode = PlayMode::PressToPlay;
+    engine_->onModeChanged();
     EXPECT_EQ(midi_.noteOffCount(), 3);
     EXPECT_FALSE(state_.isNoteActive(1, 60));
     EXPECT_FALSE(state_.isNoteActive(1, 64));
     EXPECT_FALSE(state_.isNoteActive(1, 67));
 }
 
-TEST_F(ChordEngineTest, SwitchingModeWithKeyHeldKeepsChord) {
+TEST_F(ChordEngineTest, ModeChangeWithKeyHeldKeepsChord) {
     engine_->handleKeyEvent(key(0x17, true), 0);   // T = C major, held
     EXPECT_TRUE(state_.isNoteActive(1, 60));
 
-    // Cycle to PressToPlay while T is still held -> chord kept.
-    engine_->handleKeyEvent(key(0x3A, true), 0);   // F1
-    EXPECT_EQ(state_.pendingChord.play_mode, PlayMode::PressToPlay);
+    // Change to PressToPlay while T is still held -> chord kept.
+    state_.pendingChord.play_mode = PlayMode::PressToPlay;
+    engine_->onModeChanged();
     EXPECT_TRUE(state_.isNoteActive(1, 60));
     EXPECT_EQ(midi_.noteOffCount(), 0);
 }

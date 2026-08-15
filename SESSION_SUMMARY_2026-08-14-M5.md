@@ -91,6 +91,64 @@ keybchord/test/test_rhythm_engine.cpp # scheduler lifecycle + key handling + loa
 - **Core 0 drain latency:** the loop `delay(10)` means rhythm events can lag up
   to ~10 ms on the wire (audible at 260 BPM). Tighten during M8 / NFR-2.
 
+## Next Steps: M6 — Display Manager (roadmap line 404; spec §4.6, AC-8)
+
+### Deliverables
+
+- **LCD1602 idle screen** (FR-D1): Line 1 = active chord name + `*` dirty marker
+  + `bank:slot`; Line 2 = tempo, rhythm short-code, play mode
+  (`q=120 Rk >Held`). Line-2 layout is the spec's `[DRAFT — REVIEW]` — ship as
+  the draft, data-sourced for post-hardware tuning.
+- **Parameter-edit feedback** (FR-D2): transient `<param> <value>` screen, then
+  revert to idle after `display.revert_timeout_ms` (already in `AppConfig`).
+- **Prompts** (FR-D3): generic confirm/cancel prompt rendering with auto-cancel
+  (wired to the M7 save/clear flow; M6 builds the machinery + a temporary trigger).
+
+### New files
+
+```
+keybchord/lib/core/naming.h/.cpp      # chord name flat spelling (spec §6.5):
+                                        <Root><quality> -> Eb, Ebm, Eb7, Ebmaj7,
+                                        Ebm7, Ebdim, Ebaug, Ebsus4, Ebadd9
+keybchord/lib/engines/display_manager.h/.cpp  # render idle + transient edit +
+                                        prompt screens from StateManager; owns the
+                                        revert timer
+keybchord/lib/hw/lcd_hd44780.h/.cpp    # real LCD1602 over PCF8574 I2C (Wire);
+                                        auto-probe 0x27 then 0x3F, else null
+keybchord/test/test_naming.cpp         # flat spelling across all qualities/roots
+keybchord/test/test_display_manager.cpp# idle + edit-revert + prompt rendering (null LCD)
+```
+
+### Modified files
+
+- `lib/hw/factory.cpp` — construct the real `LcdHd44780` (probe 0x27/0x3F) with
+  null fallback (currently always `NullLcdAdapter`, even on `pico`).
+- `src/main.cpp` — construct + drive `DisplayManager` (observe state, refresh).
+- `platformio.ini` — add `naming.*` + `display_manager.*` to the native filter.
+- `lib/core/state.*` — expose whatever the display needs (selected chord, dirty
+  flag, bank/slot, current params) via a read-only view; `dirty` already exists.
+
+### Key design decisions to confirm
+
+- **Line-2 layout** (draft): `q=<tempo> <rhythm-short> ><mode>`. Rhythm short
+  codes (e.g. `Rk` = Rock 1) sourced from the rhythm list; confirm post-hardware.
+- **Dirty `*`:** render from `state_.dirty`; full active-vs-stored diff completes
+  in M7 (presets) — M6 can stub it to `state_.dirty`.
+- **Prompt/save flow:** the save/clear key bindings (`Ctrl+Insert`/`Ctrl+Delete`)
+  and 80-slot navigation are M7; M6 delivers the prompt *rendering* only.
+
+### Wiring note
+
+LCD1602 + PCF8574 backpack run at **3.3V** (SDA→GP4, SCL→GP5, VCC→3V3, GND→GND)
+so I2C stays 3.3V-safe (spec §2.2). The `hd44780` lib dep is already pinned in
+`platformio.ini`.
+
+### Verification
+
+- Native: `test_naming` + `test_display_manager` green; `pio test -e native`.
+- On-device: `pio run -e pico -t buildunified` -> drag `firmware_with_fs.uf2` ->
+  confirm idle screen, edit-revert, and prompt rendering on the real LCD.
+
 ## Verification approach (unchanged)
 
 - Native: GoogleTest; `pio test -e native` green.
@@ -99,6 +157,7 @@ keybchord/test/test_rhythm_engine.cpp # scheduler lifecycle + key handling + loa
 
 ## Reference
 
-- Roadmap `KeybChord_Pico_Roadmap.md` (M5 at line 399).
-- Spec `KeybChord_Pico_Spec.md` §4.3 / §5.6 / §7 (rhythm), §9 (params).
+- Roadmap `KeybChord_Pico_Roadmap.md` (M5 at line 399; M6 at line 404).
+- Spec `KeybChord_Pico_Spec.md` §4.3 / §5.6 / §7 (rhythm), §4.6 / §6.5 (display +
+  naming), §9 (params).
 - Prior summaries: `SESSION_SUMMARY_2026-08-13-M4.md` (M4).

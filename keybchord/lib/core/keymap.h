@@ -33,17 +33,27 @@ enum class ActionType : uint8_t {
     RhythmToggle,   // F7
     RhythmPatternCycle, // F8
     RhythmMute,     // F9
+    RhythmClockToggle, // F6 (main-menu clock-out toggle, FR-R7)
+    RhythmLedToggle,   // F10 (main-menu beat-LED on/off, FR-R8)
     TempoUp,        // Page Up
     TempoDown,      // Page Down
     MenuChord,      // Menu key (0x65) -> Chord Edit menu
     MenuStrum,      // Alt -> Strum Edit menu
     MenuRhythm,     // Ctrl -> Rhythm Edit menu
+    PresetPrev,     // Home -> cursor previous preset (FR-P3)
+    PresetNext,     // End -> cursor next preset (FR-P3)
+    PresetBankPrev, // Super+Home -> cursor previous bank (FR-P4)
+    PresetBankNext, // Super+End -> cursor next bank (FR-P4)
+    PresetLoad,     // Super+1..8 -> load slot (action.index = 0..7) (FR-P5)
+    PresetSave,     // Super+Insert -> save prompt (FR-P6)
+    PresetClear,    // Super+Delete -> clear prompt (FR-P7)
     COUNT
 };
 
 struct KeyAction {
     ActionType type = ActionType::None;
     GridCell   cell;  // valid when type == ChordKey
+    uint8_t    index = 0;  // valid when type == PresetLoad (0-based slot)
 };
 
 

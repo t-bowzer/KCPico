@@ -16,6 +16,9 @@ void StateManager::loadDefaults() {
     currentBank = 0;
     currentSlot = 0;
     dirty = false;
+    cursorActive = false;
+    cursorBank = 0;
+    cursorSlot = 0;
     selectedChord = ResolvedChord{};
     selectedChordValid = false;
     editMenu = EditMenu::None;

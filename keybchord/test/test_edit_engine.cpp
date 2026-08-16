@@ -74,9 +74,17 @@ TEST_F(EditEngineTest, MenuToggleEnterAndExit) {
     EXPECT_EQ(state_.editMenu, EditMenu::Chord);
 }
 
-TEST_F(EditEngineTest, F10FallsBackToChordEdit) {
-    edit_->handleKeyEvent(key(0x43, true), 0);   // F10 -> enter chord edit
+TEST_F(EditEngineTest, F12FallsBackToChordEdit) {
+    edit_->handleKeyEvent(key(0x45, true), 0);   // F12 -> enter chord edit
     EXPECT_EQ(state_.editMenu, EditMenu::Chord);
+}
+
+TEST_F(EditEngineTest, F10TogglesRhythmLed) {
+    EXPECT_TRUE(state_.config.bpm_indicator);
+    edit_->handleKeyEvent(key(0x43, true), 0);   // F10 -> LED off
+    EXPECT_FALSE(state_.config.bpm_indicator);
+    edit_->handleKeyEvent(key(0x43, true), 0);   // F10 -> LED on
+    EXPECT_TRUE(state_.config.bpm_indicator);
 }
 
 TEST_F(EditEngineTest, MenuTitleAndParamRendered) {
@@ -215,4 +223,74 @@ TEST_F(EditEngineTest, ModeChangeInMenuFiresCallback) {
     edit_->handleKeyEvent(key(0x2E, true), 0);   // + -> next mode
     EXPECT_EQ(state_.pendingChord.play_mode, PlayMode::PressToPlay);
     EXPECT_EQ(modeChanged_, 1);
+}
+
+TEST_F(EditEngineTest, ArrowKeysNavigateParams) {
+    edit_->handleKeyEvent(key(0x65, true), 0);   // Menu -> Chord Edit (F1 = Octave)
+    EXPECT_EQ(state_.editParam, 0);
+
+    edit_->handleKeyEvent(key(0x4F, true), 0);   // Right -> Mode
+    EXPECT_EQ(state_.editParam, 1);
+    edit_->handleKeyEvent(key(0x50, true), 0);   // Left -> Octave
+    EXPECT_EQ(state_.editParam, 0);
+    edit_->handleKeyEvent(key(0x50, true), 0);   // Left wraps to Add13 (last)
+    EXPECT_EQ(state_.editParam, 8);
+    edit_->handleKeyEvent(key(0x4F, true), 0);   // Right wraps to Octave (first)
+    EXPECT_EQ(state_.editParam, 0);
+}
+
+TEST_F(EditEngineTest, UpDownArrowsStepValueInMenu) {
+    edit_->handleKeyEvent(key(0xE1, true), 0);   // Ctrl -> Rhythm (F1 = Tempo)
+    edit_->handleKeyEvent(key(0x52, true), 0);   // Up -> tempo 121
+    EXPECT_EQ(state_.pendingRhythm.tempo, 121);
+    edit_->handleKeyEvent(key(0x51, true), 0);   // Down -> tempo 120
+    EXPECT_EQ(state_.pendingRhythm.tempo, 120);
+}
+
+TEST_F(EditEngineTest, F6TogglesClockOut) {
+    EXPECT_FALSE(state_.config.midi_clock_enabled);
+    edit_->handleKeyEvent(key(0x3F, true), 0);   // F6
+    EXPECT_TRUE(state_.config.midi_clock_enabled);
+    edit_->handleKeyEvent(key(0x3F, true), 0);
+    EXPECT_FALSE(state_.config.midi_clock_enabled);
+}
+
+TEST_F(EditEngineTest, TempoAutoRepeatsWhileHeld) {
+    edit_->handleKeyEvent(key(0x4B, true), 0);   // Page Up -> tempo 121
+    EXPECT_EQ(state_.pendingRhythm.tempo, 121);
+
+    // No repeat before the initial delay (500ms).
+    edit_->update(500000ULL - 1);
+    EXPECT_EQ(state_.pendingRhythm.tempo, 121);
+
+    // Repeats at the interval after the delay.
+    edit_->update(500000ULL);
+    EXPECT_EQ(state_.pendingRhythm.tempo, 122);
+    edit_->update(500000ULL + 80000ULL);
+    EXPECT_EQ(state_.pendingRhythm.tempo, 123);
+
+    // Release stops the repeat.
+    edit_->handleKeyEvent(key(0x4B, false), 0);
+    edit_->update(500000ULL + 80000ULL * 2);
+    EXPECT_EQ(state_.pendingRhythm.tempo, 123);
+}
+
+TEST_F(EditEngineTest, SmallRangeDoesNotAutoRepeat) {
+    edit_->handleKeyEvent(key(0x2E, true), 0);   // = -> chord octave +1
+    EXPECT_EQ(state_.pendingChord.octave, 1);
+
+    edit_->update(500000ULL);
+    edit_->update(500000ULL + 80000ULL);
+    EXPECT_EQ(state_.pendingChord.octave, 1);    // octave does not repeat
+}
+
+TEST_F(EditEngineTest, MenuExitsAfterIdleTimeout) {
+    edit_->handleKeyEvent(key(0x65, true), 1000);   // Menu -> Chord Edit
+    EXPECT_EQ(state_.editMenu, EditMenu::Chord);
+
+    edit_->update(1000 + 10000ULL * 1000 - 1);
+    EXPECT_EQ(state_.editMenu, EditMenu::Chord);    // still open
+
+    edit_->update(1000 + 10000ULL * 1000);
+    EXPECT_EQ(state_.editMenu, EditMenu::None);     // timed out to main screen
 }

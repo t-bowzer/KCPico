@@ -58,3 +58,8 @@ void paramStep(StateManager& state, ParamId id, int delta);
 // Single-key toggle/cycle semantics: bools flip; enums advance one step.
 // Direct main-menu shortcuts (F1/F5/arrows/F7/F8/F9) use this.
 void paramCycle(StateManager& state, ParamId id);
+
+// True for parameters with a large value range that auto-repeat when the
+// +/-/arrow step key is held (tempo, velocity, pan, durations, swing). Small
+// ranges (octave, enums, toggles, pattern) step once per press only.
+bool isAutoRepeatable(ParamId id);

@@ -188,11 +188,11 @@ The system is a set of cooperating modules coordinated by a central state manage
 ### 4.4 Presets
 - **FR-P1** Presets store chord, rhythm, and strum parameters plus MIDI channel assignments.
 - **FR-P2** 80 slots: 10 banks × 8 presets.
-- **FR-P3** Cycle individual presets: `Home` / `End`.
-- **FR-P4** Cycle banks: `Super + Home/End`.
-- **FR-P5** Load preset in current bank: `Super + <number 1–8>`.
-- **FR-P6** Save preset: `Super + Insert` (prompt: `Enter` to confirm, `Backspace` to cancel).
-- **FR-P7** Clear preset: `Super + Delete` (same confirm/cancel prompt).
+- **FR-P3** **Cursor navigation:** `Home` / `End` move a preset **cursor** (wraps across all 80 slots). The cursor auto-resets to the active slot after `display.cursor_timeout_ms` of idleness (default 5 s). `Enter` loads the slot under the cursor.
+- **FR-P4** Move the cursor to the previous/next bank: `Super + Home/End` (wraps; the slot position is preserved).
+- **FR-P5** Load preset in current bank: `Super + <number 1–8>` (loads directly), or move the cursor and press `Enter`.
+- **FR-P6** Save preset: `Insert` (prompt: `Enter` to confirm, `Backspace` to cancel).
+- **FR-P7** Clear preset: `Delete` (same confirm/cancel prompt; resets the live parameters and stores factory defaults).
 - **FR-P8** All prompts and current bank/slot reflected on the LCD.
 - **FR-P9** **Default initialization:** every preset slot that has never been saved (or has been cleared) loads factory-default parameters (see Parameter Reference, Section 9). There are no "empty" slots that fail to load.
 - **FR-P10** **Prompt auto-cancel:** save/clear confirmation prompts auto-cancel after **5 seconds** of no key press. Additionally, pressing any chord or strum key immediately cancels the prompt (so the user can keep playing).
@@ -253,7 +253,7 @@ Because `Shift` (both keys) is a chord root, **Shift is never used as a function
 
 - **`Ctrl`** — opens the **Rhythm Edit** menu (toggle).
 - **`Alt`** — opens the **Strum Edit** menu (toggle).
-- **`Menu`** (the Application key, to the left of Right-Ctrl) — opens the **Chord Edit** menu (toggle). `F10` is a fallback that enters Chord Edit from the main menu on keyboards without a `Menu` key.
+- **`Menu`** (the Application key, to the left of Right-Ctrl) — opens the **Chord Edit** menu (toggle). `F12` is a fallback that enters Chord Edit from the main menu on keyboards without a `Menu` key.
 - **`Super`** (`Windows` key) — global/system modifier, used for preset navigation/save/clear (5.7) and panic (5.8). The target keyboard has no `Fn` key, so the `Windows`/`Super` key is used. (Stored in config as `global_fn: "super"`.)
 - **`Esc`** — returns to the main menu from any edit menu (and cancels prompts).
 
@@ -272,7 +272,7 @@ Main-menu single-key shortcuts (no menu):
 | `Right` arrow | Toggle **add13** on/off (independent) |
 | `+` / `-` (number row `=` / `-`) | Chord octave up / down |
 
-**Chord Edit menu** — opened by `Menu` (or `F10` from the main menu). F-keys select a parameter; `+` / `-` change its value:
+**Chord Edit menu** — opened by `Menu` (or `F12` from the main menu). F-keys select a parameter; `+` / `-` change its value:
 
 | F-key | Parameter | Range / cycle |
 |-------|-----------|----------------|
@@ -309,9 +309,11 @@ Main-menu single-key shortcuts (no menu):
 
 | Key | Action |
 |-----|--------|
+| `F6` | Toggle MIDI clock transmit (Clock Out, FR-R7) |
 | `F7` | Enable/disable rhythm |
 | `F8` | Select rhythm pattern (cycle) |
 | `F9` | Mute/unmute percussion |
+| `F10` | Toggle the beat LED on/off (FR-R8) |
 | `Page Up` / `Page Down` | Tempo up / down |
 
 **Rhythm Edit menu** — opened by `Ctrl`. F-keys select a parameter; `+` / `-` change its value:
@@ -324,23 +326,38 @@ Main-menu single-key shortcuts (no menu):
 | `F4` | Mute | On / Off |
 | `F5` | Enable | On / Off |
 | `F6` | Clock Out | On / Off (MIDI clock transmit, FR-R7) |
-| `F7` | Beat LED | On / Off (Scroll Lock BPM indicator, FR-R8) |
+| `F7` | Beat LED | On / Off (BPM indicator, FR-R8) |
+
+**Inside any edit menu,** `Left`/`Right` arrows step between parameters (wrapping)
+and `Up`/`Down` arrows change the selected value, in addition to `+`/`-`/`Page
+Up`/`Page Down`. Large-range parameters (tempo, velocity, pan, durations, swing)
+auto-repeat while the step key is held (≈500 ms delay, then ≈80 ms interval);
+small-range parameters (octave, enums, toggles) step once per press. A menu
+auto-exits to the idle screen after `display.menu_timeout_ms` of idleness
+(default 10 s).
 
 ### 5.7 Preset & Navigation
 | Key | Action |
 |-----|--------|
-| `Home` / `End` | Previous / next preset |
-| `Super + Home/End` | Previous / next bank |
-| `Super + 1..8` | Load preset N in current bank |
-| `Super + Insert` | Save preset (confirm `Enter` / cancel `Backspace`) |
-| `Super + Delete` | Clear preset (confirm `Enter` / cancel `Backspace`) |
+| `Home` / `End` | Move the preset **cursor** previous/next (wraps across all 80 slots) |
+| `Super + Home/End` | Move the cursor to the previous/next bank (wraps; slot preserved) |
+| `Super + 1..8` | Load preset N in current bank (direct load) |
+| `Enter` | Load the slot under the cursor (while browsing) |
+| `Esc` | Exit cursor navigation (reset the cursor to the active slot) |
+| `Insert` | Save preset (confirm `Enter` / cancel `Backspace`) |
+| `Delete` | Clear preset (confirm `Enter` / cancel `Backspace`) |
+
+While browsing (cursor active), the LCD shows the cursor location with a `>`
+marker instead of the dirty `*`. Any hotkey (e.g. `F1`, `F7`, arrows) cancels
+cursor navigation and is handled normally; chord/strum keys stay live and keep
+the cursor open. The cursor auto-resets after 5 s of idleness.
 
 ### 5.8 Global / MIDI
 | Key | Action |
 |-----|--------|
-| `F10` | Enter the Chord Edit menu (fallback for keyboards without a `Menu` key) |
+| `F10` | Toggle the beat LED on/off (main-menu single-key, FR-R8) |
+| `F12` | Enter the Chord Edit menu (fallback for keyboards without a `Menu` key) |
 | `F11` | Reserved |
-| `F12` | Reserved / system menu |
 | `Super + Esc` | **Panic:** All-Sound-Off + All-Notes-Off on all channels/DIN output (FR-C11) |
 | `Esc` | Exit the current edit menu / cancel the current prompt |
 
@@ -449,9 +466,9 @@ All timing math runs on Core 1 using integer microseconds; the RP2040 has no FPU
 - **Tempo:** BPM, adjustable via Page Up/Down (FR-R5). Range e.g. 40–260 BPM. Step interval is computed with integer division, e.g. `step_us = 60000000 / (bpm * steps_per_beat)`.
 - **Swing:** stored as a **signed integer percentage −75..+75** (0 = straight; positive = laid-back, negative = rushed), adjustable in the Rhythm Edit menu (`Ctrl` → `F2`) in steps of 5. The off-beat delay is applied as fixed-point integer math, e.g. `delay_us = (base_step_us * swing) / 100`, applied to the off-beat 8th-note step only. (Semantically equivalent to the original 0.0–0.75 float, expressed as a signed −0.75..+0.75.)
 - **Sync:** The Rhythm Engine clock drives chord Arpeggio/Rhythm modes (FR-R4).
-- **MIDI clock:** Transmission of standard MIDI clock (24 PPQN) to the DIN output is toggleable in the Rhythm Edit menu (FR-R7, Clock Out), stored in global config. Only the 0xF8 clock byte is streamed (a continuous tempo master); no Start/Stop/Continue.
+- **MIDI clock:** A single **master clock** (24 PPQN) runs continuously in the background from boot — its tick counter and phase never reset, regardless of whether the rhythm or Clock Out is enabled. Clock Out (`F6`, or `Ctrl` → `F6`) only gates whether the `0xF8` byte is emitted. The beat LED and the rhythm scheduler both **slave to this master clock**: the LED flashes on every 24th tick, and the rhythm downbeat aligns to a 24-tick beat boundary with each 16th-note step = exactly 6 ticks. This keeps LED, drums, and clock mutually phase-locked (nothing preempts or resets the clock). Only the `0xF8` byte is streamed; no Start/Stop/Continue.
 - **Mute (FR-R2):** suppresses drum note-ons while the clock/sync continues.
-- **LED BPM indicator (FR-R8):** the beat callback of the Core 1 scheduler drives the Scroll Lock LED flash (quarter-note flash, accented downbeat) by queuing a HID Output Report to the keyboard. It runs off the Core 0 MIDI dispatch path, so it does not affect key-to-MIDI latency (NFR-1) or step jitter (NFR-2). USB HID LED updates have a few ms of round-trip latency, acceptable for a visual beat indicator.
+- **LED BPM indicator (FR-R8):** the beat LED flashes with a **consistent short pulse** (`led.flash_ms`, default 40 ms) on every beat of the master clock, independent of rhythm/clock-out state. The target LED is configurable (`led.led` = `num_lock` default, `caps_lock`, `scroll_lock`, or `all`); Core 0 owns the LED on/off state and retries the HID report until it is queued, so a dropped report cannot leave the LED stuck on.
 
 ---
 
@@ -467,14 +484,11 @@ All config/preset/pattern files live on the Pico's **LittleFS** filesystem in on
   "modifiers": { "chord_fn": "ctrl", "strum_fn": "alt", "global_fn": "super" },
   "chord": { "base_root_midi": 60, "note_range": [48, 84] },
   "chord_root_order": ["Db","Ab","Eb","Bb","F","C","G","D","A","E","B","F#"],
-  "display": { "revert_timeout_ms": 1500, "prompt_timeout_ms": 5000 },
+  "display": { "revert_timeout_ms": 1500, "prompt_timeout_ms": 5000, "cursor_timeout_ms": 5000, "menu_timeout_ms": 10000 },
   "led": {
     "bpm_indicator": true,
-    "led": "scroll_lock",
-    "flash_ms": 40,
-    "accent_downbeat": true,
-    "accent_flash_ms": 80,
-    "only_when_rhythm_enabled": true
+    "led": "num_lock",
+    "flash_ms": 40
   },
   "startup_preset": "B1:P1"
 }
@@ -546,15 +560,14 @@ All adjustable parameters, with min/max/default/step. On default initialization 
 | muted | rhythm | bool | off | on | off | toggle | suppress drum note-ons |
 | pattern | rhythm | enum | — | — | `Rock 1` | cycle | from rhythm list (7.1) |
 | channel (rhythm) | rhythm | int | 1 | 16 | 10 | 1 | GM percussion |
-| clock_enabled | global | bool | off | on | off | toggle | MIDI clock transmit |
+| clock_enabled | global | bool | off | on | off | toggle | MIDI clock transmit (FR-R7) |
 | bpm_indicator | global | bool | off | on | on | toggle | keyboard-LED BPM indicator (FR-R8) |
-| led (indicator) | global | enum | — | — | `scroll_lock` | — | which keyboard LED to flash: scroll_lock / caps_lock / num_lock |
-| flash_ms | global | int | 5 | 500 | 40 | 5 | beat flash duration |
-| accent_downbeat | global | bool | off | on | on | toggle | longer flash on beat 1 |
-| accent_flash_ms | global | int | 5 | 500 | 80 | 5 | downbeat accent flash duration |
-| only_when_rhythm_enabled | global | bool | off | on | on | toggle | blink only while Rhythm Engine is enabled |
+| led (indicator) | global | enum | — | — | `num_lock` | — | which keyboard LED(s) to flash: num_lock / caps_lock / scroll_lock / all |
+| flash_ms | global | int | 5 | 500 | 40 | 5 | beat flash duration (consistent on every beat) |
 | revert_timeout_ms | global | int | 250 | 5000 | 1500 | 250 | LCD param-edit revert |
 | prompt_timeout_ms | global | int | — | — | 5000 | — | save/clear auto-cancel (FR-P10) |
+| cursor_timeout_ms | global | int | 500 | 30000 | 5000 | — | cursor-navigation auto-reset (FR-P3) |
+| menu_timeout_ms | global | int | 500 | 30000 | 10000 | — | edit-menu idle auto-exit |
 
 > **Changed from the Pi spec:** `swing` is now a **signed integer −75..+75 with step 5** (was float 0.0–0.75 step 0.05). Semantics are identical (percentage off-beat delay; positive laid-back, negative rushed); the representation is integer for the no-FPU RP2040.
 
@@ -631,14 +644,14 @@ These milestones align with the Build Sequence (Section 1.6); stop for user feed
 - **AC-13** add9/add11/add13 extensions toggle independently via Left/Down/Right arrows and persist in preset.
 - **AC-14** Left-adjacent combos produce sus4 (Major+left-7th) and add9 (Major+left-minor); leftmost column produces these via the `` ` `` key.
 - **AC-15** In Held mode, editing any chord parameter (or loading a preset) while a chord is sounding does not change the currently-held notes; the change applies only when the next chord is triggered (FR-C9 / VR-5).
-- **AC-16** MIDI clock transmit toggle (Clock Out in the Rhythm Edit menu) sends/stops the 24 PPQN clock stream (0xF8 only; no Start/Stop) on the DIN output.
+- **AC-16** MIDI clock transmit toggle (`F6`, or Clock Out in the Rhythm Edit menu) emits/stops the 24 PPQN clock stream (0xF8 only; no Start/Stop) on the DIN output; the master clock timebase keeps running in the background regardless of the toggle (FR-R7, §7.3).
 - **AC-17** Panic (`Super+Esc`) silences all notes on all channels/DIN and clears active-note state (FR-C11).
 - **AC-18** Numpad strum keys behave identically regardless of the keyboard's Num Lock state (FR-S6).
 - **AC-19** Save/clear prompt auto-cancels after 5 s idle, and any chord/strum key cancels it (FR-P10).
 - **AC-20** Dirty marker (`*`) appears when active state differs from the stored preset and clears on save/load (FR-P11).
 - **AC-21** Uninitialized/cleared preset slots load factory defaults with per-function channels 1/2/10 (FR-P9/FR-P12).
 - **AC-22** Corrupt or missing config/presets on LittleFS are regenerated or fall back to defaults without crashing (NFR-9).
-- **AC-23** When rhythm is enabled and `bpm_indicator` is on, the Scroll Lock LED flashes in time with the clock (accented downbeat); toggling it via the Rhythm Edit menu (Beat LED, `Ctrl` → `F7`) enables/disables it; LED unavailability does not affect timing or MIDI (FR-R8).
+- **AC-23** When `bpm_indicator` is on, the configured LED (default Num Lock) flashes once per beat of the master clock, independent of rhythm/clock-out state; `F10` (or Beat LED, `Ctrl` → `F7`) enables/disables it; LED unavailability does not affect timing or MIDI (FR-R8).
 
 > **Removed vs. the Pi spec:** the USB-MIDI-gadget acceptance clauses are gone (no USB MIDI in v1). AC-9 is reworded from "both USB and DIN" to DIN-only with graceful behavior when unconnected.
 

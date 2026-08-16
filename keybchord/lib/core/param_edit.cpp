@@ -228,3 +228,18 @@ void paramCycle(StateManager& state, ParamId id) {
             break;
     }
 }
+
+bool isAutoRepeatable(ParamId id) {
+    switch (id) {
+        case ParamId::ChordDuration:
+        case ParamId::ChordVelocity:
+        case ParamId::ChordPan:
+        case ParamId::StrumDuration:
+        case ParamId::StrumVelocity:
+        case ParamId::RhythmTempo:
+        case ParamId::RhythmSwing:
+            return true;
+        default:
+            return false;
+    }
+}

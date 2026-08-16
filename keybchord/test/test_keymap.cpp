@@ -139,3 +139,70 @@ TEST(Keymap, SuperModifierDetection) {
     EXPECT_FALSE(KeymapResolver::isSuper(0x01));   // LCtrl is not Super
     EXPECT_FALSE(KeymapResolver::isSuper(0x04));   // LAlt is not Super
 }
+
+TEST(Keymap, PresetNavigationKeys) {
+    KeymapResolver r;
+    EXPECT_EQ(r.resolve(0x4A, 0).type, ActionType::PresetPrev);  // Home
+    EXPECT_EQ(r.resolve(0x4D, 0).type, ActionType::PresetNext);  // End
+}
+
+TEST(Keymap, SuperPresetKeys) {
+    KeymapResolver r;
+    constexpr uint8_t SUPER = 0x08;
+
+    EXPECT_EQ(r.resolve(0x4A, SUPER).type, ActionType::PresetBankPrev);  // Super+Home
+    EXPECT_EQ(r.resolve(0x4D, SUPER).type, ActionType::PresetBankNext);  // Super+End
+}
+
+TEST(Keymap, InsertDeleteAreSaveClear) {
+    KeymapResolver r;
+    EXPECT_EQ(r.resolve(0x49, 0).type, ActionType::PresetSave);   // Insert
+    EXPECT_EQ(r.resolve(0x4C, 0).type, ActionType::PresetClear);  // Delete
+
+    // Super no longer binds Insert/Delete.
+    EXPECT_EQ(r.resolve(0x49, 0x08).type, ActionType::None);
+    EXPECT_EQ(r.resolve(0x4C, 0x08).type, ActionType::None);
+}
+
+TEST(Keymap, F6TogglesClockOut) {
+    KeymapResolver r;
+    EXPECT_EQ(r.resolve(0x3F, 0).type, ActionType::RhythmClockToggle);  // F6
+}
+
+TEST(Keymap, F10TogglesRhythmLed) {
+    KeymapResolver r;
+    EXPECT_EQ(r.resolve(0x43, 0).type, ActionType::RhythmLedToggle);  // F10
+}
+
+TEST(Keymap, SuperNumberRowLoadsPreset) {
+    KeymapResolver r;
+    constexpr uint8_t SUPER = 0x08;
+
+    // Super+1..8 -> PresetLoad with index 0..7.
+    for (int n = 0; n < 8; n++) {
+        KeyAction a = r.resolve(0x1E + n, SUPER);
+        EXPECT_EQ(a.type, ActionType::PresetLoad);
+        EXPECT_EQ(a.index, n);
+    }
+
+    // Super+9 and Super+0 are not valid preset slots -> None.
+    EXPECT_EQ(r.resolve(0x26, SUPER).type, ActionType::None);  // 9
+    EXPECT_EQ(r.resolve(0x27, SUPER).type, ActionType::None);  // 0
+}
+
+TEST(Keymap, SuperPressIsInert) {
+    KeymapResolver r;
+    constexpr uint8_t SUPER = 0x08;
+
+    EXPECT_EQ(r.resolve(0xE4, SUPER).type, ActionType::None);  // LGui press
+    EXPECT_EQ(r.resolve(0xE8, SUPER).type, ActionType::None);  // RGui press
+}
+
+TEST(Keymap, SuperChordKeyIsInert) {
+    KeymapResolver r;
+    constexpr uint8_t SUPER = 0x08;
+
+    // Chord keys are not chord keys while Super is held.
+    EXPECT_EQ(r.resolve(0x14, SUPER).type, ActionType::None);  // Q
+    EXPECT_EQ(r.resolve(0x1E, 0).type, ActionType::StrumKey);  // 1 without Super
+}

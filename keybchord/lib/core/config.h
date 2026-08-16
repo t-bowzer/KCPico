@@ -6,6 +6,16 @@
 
 class StorageAdapter;
 
+// Which keyboard LED(s) the BPM indicator flashes (FR-R8 / spec 9). RGB
+// keyboards often lack a physical Scroll Lock LED, so this is configurable;
+// "All" pulses num/caps/scroll simultaneously.
+enum class LedTarget : uint8_t {
+    All = 0,
+    ScrollLock,
+    CapsLock,
+    NumLock,
+};
+
 struct AppConfig {
     bool     din_enabled             = true;
     bool     midi_clock_enabled      = false;
@@ -14,11 +24,11 @@ struct AppConfig {
     uint8_t  note_range_high         = 84;
     uint16_t display_revert_ms       = 1500;
     uint16_t display_prompt_ms       = 5000;
+    uint16_t cursor_timeout_ms       = 5000;
+    uint16_t menu_timeout_ms         = 10000;
     bool     bpm_indicator           = true;
+    LedTarget led_indicator          = LedTarget::NumLock;
     uint8_t  led_flash_ms            = 40;
-    bool     accent_downbeat         = true;
-    uint8_t  accent_flash_ms         = 80;
-    bool     led_only_when_rhythm    = true;
     std::string startup_preset       = "B1:P1";
 
     static AppConfig defaults();

@@ -71,7 +71,9 @@ protected:
 
 TEST_F(RhythmEngineTest, EnableFiresDownbeat) {
     state_.pendingRhythm.enabled = true;
-    engine_->update(0);
+    engine_->update(0);   // clock arms (tick 0); rhythm slaves to the beat grid
+    // Downbeat (step 0) fires at the first beat boundary, tick #24.
+    engine_->update(24 * clockTickUs(120));
 
     auto msgs = drain();
     EXPECT_EQ(countNoteOn(msgs, 36, 10), 1);  // kick on step 0
@@ -91,9 +93,10 @@ TEST_F(RhythmEngineTest, StepsAdvanceAtDeadlines) {
     engine_->update(0);
     drain();
 
-    uint32_t base = stepUs(120);  // 125000 us
-    // Steps 1..4 fire; step 4 carries the snare backbeat.
-    engine_->update(4 * base);
+    uint32_t tick = clockTickUs(120);
+    uint32_t base = tick * CLOCK_TICKS_PER_STEP;   // one 16th = 6 ticks
+    // Steps 1..4 fire by step 4's deadline (beat 2); step 4 carries the snare.
+    engine_->update(24 * tick + 4 * base);
     auto msgs = drain();
     EXPECT_EQ(countNoteOn(msgs, 38, 10), 1);  // snare fired once
 }
@@ -156,27 +159,76 @@ TEST_F(RhythmEngineTest, ClockStreamsIndependentOfRhythm) {
     }
 }
 
+TEST_F(RhythmEngineTest, RhythmAlignsToClockBeatGrid) {
+    state_.config.midi_clock_enabled = true;
+    uint32_t tick = clockTickUs(120);
+
+    engine_->update(0);         // start the clock (master timebase)
+    drain();
+    engine_->update(7 * tick);  // stream 7 ticks (not a beat boundary)
+    drain();
+
+    state_.pendingRhythm.enabled = true;
+    engine_->update(7 * tick);  // enable rhythm -> downbeat deferred
+    EXPECT_EQ(countNoteOn(drain(), 36, 10), 0);
+
+    // The next 24-tick beat boundary (tick #24) fires at (24+1)*tick.
+    engine_->update(25 * tick);
+    EXPECT_EQ(countNoteOn(drain(), 36, 10), 1);
+}
+
+TEST_F(RhythmEngineTest, ClockPhasePersistsAcrossRhythmToggle) {
+    state_.config.midi_clock_enabled = true;
+    uint32_t tick = clockTickUs(120);
+
+    state_.pendingRhythm.enabled = true;
+    engine_->update(0);      // rhythm downbeat at tick 0 (clock just started)
+    drain();
+
+    engine_->update(10 * tick);  // stream 10 ticks
+    drain();
+
+    // Toggle rhythm off, then back on: the clock keeps its phase, so the next
+    // downbeat still lands on the 24-tick grid (tick #24), not a fresh phase.
+    state_.pendingRhythm.enabled = false;
+    engine_->update(10 * tick);
+    drain();
+
+    state_.pendingRhythm.enabled = true;
+    engine_->update(10 * tick);
+    EXPECT_EQ(countNoteOn(drain(), 36, 10), 0);  // deferred to beat boundary
+
+    engine_->update(25 * tick);
+    EXPECT_EQ(countNoteOn(drain(), 36, 10), 1);
+}
+
 TEST_F(RhythmEngineTest, LedFlashesOnBeat) {
     state_.config.bpm_indicator = true;
     state_.pendingRhythm.enabled = true;
-    engine_->update(0);  // step 0 = downbeat
+    engine_->update(0);  // first beat fires immediately
 
-    EXPECT_TRUE(state_.ledIndicator.on);
-    EXPECT_TRUE(state_.ledIndicator.dirty);
-    EXPECT_EQ(state_.ledIndicator.untilUs,
-              static_cast<uint64_t>(state_.config.accent_flash_ms) * 1000ULL);
+    EXPECT_TRUE(state_.ledIndicator.flash);
+}
+
+TEST_F(RhythmEngineTest, LedFlashesWithoutRhythm) {
+    state_.config.bpm_indicator = true;
+    state_.pendingRhythm.enabled = false;  // rhythm off — LED still pulses
+    engine_->update(0);
+
+    EXPECT_TRUE(state_.ledIndicator.flash);
 }
 
 TEST_F(RhythmEngineTest, LedDisabledWhenIndicatorOff) {
     state_.config.bpm_indicator = false;
     state_.pendingRhythm.enabled = true;
     engine_->update(0);
-    EXPECT_FALSE(state_.ledIndicator.dirty);
+    EXPECT_FALSE(state_.ledIndicator.flash);
 }
 
 TEST_F(RhythmEngineTest, PublishesClockSnapshot) {
     state_.pendingRhythm.enabled = true;
     engine_->update(0);
+    engine_->update(24 * clockTickUs(120));   // step 0 fires at beat boundary
     EXPECT_TRUE(state_.rhythmClock.running);
     EXPECT_EQ(state_.rhythmClock.step, 1u);     // step 0 fired, now on step 1
     EXPECT_EQ(state_.rhythmClock.stepAbs, 1u);
@@ -188,10 +240,12 @@ TEST_F(RhythmEngineTest, DrumMapRemapsSnareNote) {
     state_.pendingRhythm.drums.snare = 40;  // Electric Snare
     state_.pendingRhythm.enabled = true;
     engine_->update(0);
-    drain();  // step 0 = kick + hihat
+    drain();
 
+    uint32_t tick = clockTickUs(120);
+    uint32_t base = tick * CLOCK_TICKS_PER_STEP;
     // Step 4 (beat 2) carries the snare; it must use the mapped code 40.
-    engine_->update(4 * stepUs(120));
+    engine_->update(24 * tick + 4 * base);
     auto msgs = drain();
     EXPECT_EQ(countNoteOn(msgs, 40, 10), 1);
     EXPECT_EQ(countNoteOn(msgs, 38, 10), 0);

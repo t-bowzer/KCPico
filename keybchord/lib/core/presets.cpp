@@ -3,6 +3,7 @@
 #include "rhythm.h"
 #include <ArduinoJson.h>
 #include <cstdio>
+#include <cstdlib>
 
 
 PresetSlot PresetSlot::defaults() {
@@ -15,8 +16,15 @@ PresetSlot PresetSlot::defaults() {
 }
 
 bool PresetSlot::operator==(const PresetSlot& other) const {
-    return name == other.name
-        && chord.play_mode        == other.chord.play_mode
+    return name == other.name && sameParams(other);
+}
+
+bool PresetSlot::operator!=(const PresetSlot& other) const {
+    return !(*this == other);
+}
+
+bool PresetSlot::sameParams(const PresetSlot& other) const {
+    return chord.play_mode        == other.chord.play_mode
         && chord.octave           == other.chord.octave
         && chord.note_duration_ms == other.chord.note_duration_ms
         && chord.velocity         == other.chord.velocity
@@ -40,8 +48,40 @@ bool PresetSlot::operator==(const PresetSlot& other) const {
         && rhythm.drums   == other.rhythm.drums;
 }
 
-bool PresetSlot::operator!=(const PresetSlot& other) const {
-    return !(*this == other);
+PresetSlot makePreset(const ChordParams& chord, const StrumParams& strum,
+                      const RhythmParams& rhythm, const std::string& name) {
+    PresetSlot p;
+    p.name   = name;
+    p.chord  = chord;
+    p.strum  = strum;
+    p.rhythm = rhythm;
+    return p;
+}
+
+bool parsePresetLocation(const std::string& loc, int& bank, int& slot) {
+    // Expected form "B<bank>:P<slot>" (1-based, case-insensitive).
+    size_t b = loc.find_first_of("bB");
+    size_t colon = loc.find(':');
+    size_t p = loc.find_first_of("pP");
+    if (b == std::string::npos || colon == std::string::npos ||
+        p == std::string::npos || b > colon || colon > p) {
+        return false;
+    }
+
+    std::string bankStr = loc.substr(b + 1, colon - b - 1);
+    std::string slotStr = loc.substr(p + 1);
+    if (bankStr.empty() || slotStr.empty()) return false;
+
+    int bv = 0, sv = 0;
+    for (char c : bankStr) if (c < '0' || c > '9') return false;
+    for (char c : slotStr) if (c < '0' || c > '9') return false;
+    bv = std::atoi(bankStr.c_str());
+    sv = std::atoi(slotStr.c_str());
+
+    if (bv < 1 || bv > NUM_BANKS || sv < 1 || sv > NUM_SLOTS) return false;
+    bank = bv - 1;
+    slot = sv - 1;
+    return true;
 }
 
 static std::string bankPath(int bank) {

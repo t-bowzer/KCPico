@@ -73,6 +73,62 @@ TEST(Presets, InvalidBankSlotReturnsDefault) {
     EXPECT_EQ(p, PresetSlot::defaults());
 }
 
+TEST(Presets, SameParamsIgnoresName) {
+    PresetSlot a = PresetSlot::defaults();
+    PresetSlot b = PresetSlot::defaults();
+    b.name = "OtherName";
+    EXPECT_NE(a, b);            // operator== includes name
+    EXPECT_TRUE(a.sameParams(b)); // sameParams does not
+
+    b.chord.channel = 16;
+    EXPECT_FALSE(a.sameParams(b));
+}
+
+TEST(Presets, MakePresetCopiesParams) {
+    ChordParams c = ChordParams::defaults();
+    StrumParams s = StrumParams::defaults();
+    RhythmParams r = RhythmParams::defaults();
+    c.channel = 5;
+    s.channel = 7;
+    r.channel = 12;
+
+    PresetSlot p = makePreset(c, s, r, "Built");
+    EXPECT_EQ(p.name, "Built");
+    EXPECT_EQ(p.chord.channel, 5);
+    EXPECT_EQ(p.strum.channel, 7);
+    EXPECT_EQ(p.rhythm.channel, 12);
+}
+
+TEST(Presets, ParsePresetLocation) {
+    int bank = -1, slot = -1;
+
+    EXPECT_TRUE(parsePresetLocation("B1:P1", bank, slot));
+    EXPECT_EQ(bank, 0);
+    EXPECT_EQ(slot, 0);
+
+    EXPECT_TRUE(parsePresetLocation("B10:P8", bank, slot));
+    EXPECT_EQ(bank, 9);
+    EXPECT_EQ(slot, 7);
+
+    // Case-insensitive.
+    EXPECT_TRUE(parsePresetLocation("b3:p5", bank, slot));
+    EXPECT_EQ(bank, 2);
+    EXPECT_EQ(slot, 4);
+}
+
+TEST(Presets, ParsePresetLocationInvalid) {
+    int bank = 0, slot = 0;
+
+    EXPECT_FALSE(parsePresetLocation("", bank, slot));
+    EXPECT_FALSE(parsePresetLocation("B0:P1", bank, slot));   // bank 0 out of range
+    EXPECT_FALSE(parsePresetLocation("B11:P1", bank, slot));  // bank 11 out of range
+    EXPECT_FALSE(parsePresetLocation("B1:P0", bank, slot));   // slot 0 out of range
+    EXPECT_FALSE(parsePresetLocation("B1:P9", bank, slot));   // slot 9 out of range
+    EXPECT_FALSE(parsePresetLocation("B1P1", bank, slot));    // missing ':'
+    EXPECT_FALSE(parsePresetLocation("1:2", bank, slot));     // missing B/P
+    EXPECT_FALSE(parsePresetLocation("Bx:P1", bank, slot));   // non-numeric
+}
+
 TEST(Presets, LoadPresetOrDefault) {
     StorageStub storage;
     PresetSlot p = loadPresetOrDefault(storage, 0, 0);

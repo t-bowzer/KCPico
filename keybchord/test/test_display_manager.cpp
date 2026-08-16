@@ -66,8 +66,8 @@ TEST_F(DisplayManagerTest, IdleShowsChordDirtyAndLocation) {
     dm.update(0);
 
     ASSERT_EQ(lcd_.frames().size(), 1u);
-    EXPECT_EQ(lcd_.frames()[0].l1, "Ebmaj7" + sp(3) + "*B1:P3");
-    EXPECT_EQ(lcd_.frames()[0].l2, "q=120 Rk >Held");
+    EXPECT_EQ(lcd_.frames()[0].l1, pad("Ebmaj7" + sp(3) + "*B1:P3"));
+    EXPECT_EQ(lcd_.frames()[0].l2, pad("q=120 Rk >Held"));
 }
 
 TEST_F(DisplayManagerTest, IdleWithoutChordShowsPlaceholder) {
@@ -75,7 +75,22 @@ TEST_F(DisplayManagerTest, IdleWithoutChordShowsPlaceholder) {
     dm.update(0);
 
     ASSERT_EQ(lcd_.frames().size(), 1u);
-    EXPECT_EQ(lcd_.frames()[0].l1, "--" + sp(8) + "B1:P1");
+    EXPECT_EQ(lcd_.frames()[0].l1, pad("--" + sp(8) + "B1:P1"));
+}
+
+TEST_F(DisplayManagerTest, IdleShowsCursorLocationWhileBrowsing) {
+    state_.currentBank = 0;
+    state_.currentSlot = 0;
+    state_.cursorActive = true;
+    state_.cursorBank   = 2;
+    state_.cursorSlot   = 4;
+    state_.dirty        = true;   // hidden while browsing
+
+    DisplayManager dm(state_, lcd_);
+    dm.update(0);
+
+    ASSERT_EQ(lcd_.frames().size(), 1u);
+    EXPECT_EQ(lcd_.frames()[0].l1, pad("--" + sp(7) + ">B3:P5"));
 }
 
 TEST_F(DisplayManagerTest, ShowMenuRendersTitleAndParam) {
@@ -137,7 +152,7 @@ TEST_F(DisplayManagerTest, ShowValueRevertsToIdle) {
     lcd_.reset();
     dm.update(1000 + 1500UL * 1000);
     ASSERT_EQ(lcd_.frames().size(), 1u);
-    EXPECT_EQ(lcd_.frames()[0].l1, "--" + sp(8) + "B1:P1");
+    EXPECT_EQ(lcd_.frames()[0].l1, pad("--" + sp(8) + "B1:P1"));
 }
 
 TEST_F(DisplayManagerTest, ShowPromptAndAutoCancel) {
@@ -150,12 +165,12 @@ TEST_F(DisplayManagerTest, ShowPromptAndAutoCancel) {
 
     ASSERT_EQ(lcd_.frames().size(), 1u);
     EXPECT_EQ(lcd_.frames()[0].l1, pad("Save preset?"));
-    EXPECT_EQ(lcd_.frames()[0].l2, "Enter=Yes Bk=No");
+    EXPECT_EQ(lcd_.frames()[0].l2, pad("Enter=Yes Bk=No"));
 
     lcd_.reset();
     dm.update(1000 + 5000UL * 1000);
     ASSERT_EQ(lcd_.frames().size(), 1u);
-    EXPECT_EQ(lcd_.frames()[0].l1, "--" + sp(8) + "B1:P1");
+    EXPECT_EQ(lcd_.frames()[0].l1, pad("--" + sp(8) + "B1:P1"));
 }
 
 TEST_F(DisplayManagerTest, NoRedundantWritesWhenIdleUnchanged) {
@@ -176,7 +191,7 @@ TEST_F(DisplayManagerTest, CancelReturnsToIdle) {
     dm.cancel();
     dm.update(0);
     ASSERT_EQ(lcd_.frames().size(), 1u);
-    EXPECT_EQ(lcd_.frames()[0].l1, "--" + sp(8) + "B1:P1");
+    EXPECT_EQ(lcd_.frames()[0].l1, pad("--" + sp(8) + "B1:P1"));
 }
 
 TEST_F(DisplayManagerTest, NullLcdDoesNotCrash) {

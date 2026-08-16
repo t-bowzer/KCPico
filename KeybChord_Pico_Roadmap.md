@@ -21,7 +21,7 @@
 
 ## 1. Overview & Guiding Principles
 
-KeybChord (Pico Edition) turns a commodity USB keyboard into an Omnichord-style MIDI controller running on a Raspberry Pi Pico (RP2040), written in C++ on the Arduino-Pico core. It hosts the keyboard over a PIO-driven USB port (TinyUSB + Pico-PIO-USB), emits MIDI over DIN (UART), drives an LCD1602 for feedback, and flashes the keyboard's Scroll Lock LED as a BPM indicator. It is a MIDI controller only — no onboard synthesis (spec §1.3).
+KeybChord (Pico Edition) turns a commodity USB keyboard into an Omnichord-style MIDI controller running on a Raspberry Pi Pico (RP2040), written in C++ on the Arduino-Pico core. It hosts the keyboard over a PIO-driven USB port (TinyUSB + Pico-PIO-USB), emits MIDI over DIN (UART), drives an LCD1602 for feedback, and flashes a keyboard LED (Num Lock by default) as a BPM indicator. It is a MIDI controller only — no onboard synthesis (spec §1.3).
 
 The following principles derive from spec §1.4 and drive every design decision in this document:
 
@@ -96,7 +96,7 @@ The system (spec §3) is a set of cooperating modules coordinated by a central S
 | Rhythm Engine | `lib/core/rhythm.*` + `lib/engines/rhythm_engine.*` | Core 1 scheduler/clock; GM drums ch10; arp/rhythm sync; integer tempo/swing; MIDI clock; LED beat callback. |
 | MIDI Router | `lib/engines/midi_router.*` | Emit to DIN/UART; per-function channel routing; graceful behavior when unconnected. |
 | Display Manager | `lib/engines/display_manager.*` | Idle screen + transient param-edit screens + prompts on LCD1602. |
-| LED Indicator | `lib/hw/led_hid.*` (driven by rhythm engine) | Flash Scroll Lock LED via HID SET_REPORT in sync with clock (FR-R8); best-effort. |
+| LED Indicator | `lib/hw/input_usbhost.*` (driven by rhythm engine) | Flash a configurable keyboard LED (Num/Caps/Scroll, default Num Lock) via HID SET_REPORT in sync with the master clock (FR-R8); best-effort. |
 | Preset/Config Store | `lib/core/config.*`, `lib/core/presets.*`, `lib/core/params.*` (+ `lib/hw/storage_littlefs.*`) | Load/save/validate config + 80 presets; parameter bounds & clamping. Storage behind an adapter. |
 | State Manager | `lib/core/state.*` | Own global runtime state; mediate; `pending_params` vs `active_params`. |
 
@@ -114,7 +114,7 @@ A `lib/hw/factory.*` selects real vs null at construction (real on `pico`, null/
 ### 2.4 Cores & timing model (spec §3.2, §7.3, NFR-1/2)
 
 - **Core 0 — real-time input path:** USB-host poll (TinyUSB task) → keymap resolver → engines mutate state → MIDI router dispatch over UART. Non-blocking writes. Target key-to-MIDI latency < 10 ms (NFR-1), bounded mainly by the ~1 ms USB poll interval.
-- **Core 1 — rhythm/clock:** monotonic scheduler (`time_us_64()`/`micros()`) drives drum steps, arp/rhythm chord sync, MIDI clock (24 PPQN + Start/Stop/Continue), and the Scroll Lock LED beat callback. Target step jitter < 2 ms (NFR-2). LED HID writes queued here, off the Core 0 critical path.
+- **Core 1 — rhythm/clock:** a single **master MIDI clock** (24 PPQN) runs continuously in the background from boot; its tick counter and phase never reset, so nothing (rhythm or Clock-Out toggles) can make it drift or fall out of sync. The drum-step scheduler, the arp/rhythm chord sync, and the keyboard-LED beat flash all **slave to this master clock** (`time_us_64()`/`micros()`). Target step jitter < 2 ms (NFR-2). Only the `0xF8` clock byte is streamed (no Start/Stop/Continue). LED HID writes are queued here and applied on Core 0, off the Core 0 critical path.
 - **Cross-core state:** the State Manager mediates shared state; Core 1 reads a consistent snapshot of chord/arp params. Use SDK spin-lock/`mutex`/inter-core FIFO or double-buffered snapshots. Held-mode latching is two structures on the State Manager: `pending_params` (edited live on Core 0) and `active_params` (snapshot on chord trigger), per FR-C9 / VR-5.
 - **No dynamic allocation** in the real-time paths; use static/fixed buffers (NFR-3).
 
@@ -407,14 +407,20 @@ Aligned 1:1 with spec §1.6 / §12. Each milestone ends with a **review stop** f
 **AC:** AC-8.
 
 ### M7 — Presets & banks
-**Deliverables:** JSON load/save on LittleFS; 80-slot navigation (Home/End, Ctrl+Home/End, Ctrl+1..8); save/clear with confirm + 5 s auto-cancel + play-key cancel; per-function channels (chord 1 / strum 2 / rhythm 10); defaults for uninitialized/cleared slots; dirty-state tracking.
+**Deliverables:** JSON load/save on LittleFS; 80-slot **cursor navigation** (Home/End move the cursor across slots, Super+Home/End move banks, Enter loads the cursor, Super+1..8 loads directly); save/clear via `Insert`/`Delete` with confirm + 5 s auto-cancel + play-key cancel; per-function channels (chord 1 / strum 2 / rhythm 10); defaults for uninitialized/cleared slots; dirty-state tracking (`*` marker); cursor auto-reset (5 s) and edit-menu idle auto-exit (10 s).
 **Verify:** presets save/recall/clear correctly; navigation + prompts behave.
 **AC:** AC-7, AC-19, AC-20, AC-21.
+
+> **Note:** M7 also folded in several feedback-driven refinements: F6 = Clock Out hotkey, F10 = beat-LED hotkey, F12 = Chord-Edit fallback (was F10); arrow-key parameter navigation and key-hold auto-repeat in edit menus; a configurable beat-LED target (default Num Lock) with a consistent short pulse and a hardened (non-sticking) LED state machine; and the clock-as-master timing redesign (see §2.4 / spec §7.3).
 
 ### M8 — Polish
 **Deliverables:** panic control (`Super+Esc` → CC120/CC123 all channels + clear state); latency/jitter measurement; robustness/hot-plug (keyboard re-enumeration, LCD, LED, DIN); config validation/fallback hardening; **harden/finalize** the logging/debug mode and MIDI monitor/log mode first introduced in M2 (richer message decoding, runtime toggle, compiled-out release option); full test suite; optional watchdog.
 **Verify:** acceptance criteria (spec §13) pass; NFRs met.
 **AC:** AC-10, AC-17, AC-22 + all NFRs.
+
+### M9 (future) — USB Mass Storage & dev serial build
+**Deliverables (planned, not implemented):** mount the onboard LittleFS as a **USB Mass Storage** drive on the native USB port so `config.json`/presets/rhythms can be drag-drop edited from a PC (replacing `uploadfs`). A companion **dev build** keeps the native USB port as the USB-CDC serial debug log (the current paradigm) for troubleshooting when MSC is active. The keyboard remains on the PIO-USB host port (GP0/GP1), so it never conflicts.
+**Constraint:** MSC and the serial log both want the single native USB port — this is an either/or build-time choice (a `-DKEYBCHORD_MSC` flag + factory/env selection).
 
 ### 6.1 Milestone → Acceptance Criteria coverage matrix
 
@@ -435,14 +441,14 @@ Aligned 1:1 with spec §1.6 / §12. Each milestone ends with a **review stop** f
 | AC-13 Independent extensions + persist | M3 (+ M7 persist) |
 | AC-14 Left-adjacent + leftmost combos | M3 |
 | AC-15 Held-mode latching | M3 |
-| AC-16 MIDI clock toggle | M5 |
+| AC-16 MIDI clock toggle | M5 (clock-as-master in M7) |
 | AC-17 Panic | M8 |
 | AC-18 Num-Lock independence | M4 |
 | AC-19 Prompt auto-cancel | M7 |
 | AC-20 Dirty marker | M6 (display) + M7 (logic) |
 | AC-21 Uninitialized defaults + channels | M1/M7 |
 | AC-22 Corrupt/missing config fallback | M1/M8 |
-| AC-23 Scroll Lock BPM LED | M5 |
+| AC-23 BPM LED (configurable) | M5 (refined M7) |
 
 ---
 

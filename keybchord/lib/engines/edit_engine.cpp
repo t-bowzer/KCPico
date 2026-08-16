@@ -5,7 +5,15 @@
 
 namespace {
 
-constexpr uint8_t HID_USAGE_F10 = 0x43;
+constexpr uint8_t HID_USAGE_F12   = 0x45;
+constexpr uint8_t HID_USAGE_LEFT  = 0x50;
+constexpr uint8_t HID_USAGE_RIGHT = 0x4F;
+constexpr uint8_t HID_USAGE_UP    = 0x52;
+constexpr uint8_t HID_USAGE_DOWN  = 0x51;
+
+// Key-hold auto-repeat timing (large-range parameters only).
+constexpr uint64_t REPEAT_INITIAL_US = 500000;   // 500 ms before first repeat
+constexpr uint64_t REPEAT_INTERVAL_US = 80000;   // 80 ms between repeats
 
 int functionKeyIndex(uint8_t usage) {
     if (usage >= 0x3A && usage <= 0x45) return static_cast<int>(usage - 0x3A);
@@ -38,24 +46,32 @@ void EditEngine::setPatternChangedCallback(std::function<void()> cb) {
     patternChanged_ = std::move(cb);
 }
 
+void EditEngine::setAnyEditCallback(std::function<void()> cb) {
+    anyEdit_ = std::move(cb);
+}
+
 ParamId EditEngine::currentParam() const {
     if (state_.editMenu == EditMenu::None) return ParamId::COUNT;
     return menuParamAt(state_.editMenu, state_.editParam);
 }
 
-void EditEngine::enterOrSwitch(EditMenu menu) {
+void EditEngine::enterOrSwitch(EditMenu menu, uint64_t now_us) {
     if (state_.editMenu == menu) {
         exitMenu();
         return;
     }
     state_.editMenu = menu;
+    state_.cursorActive = false;  // entering an edit menu leaves cursor mode
     if (state_.editParam >= menuParamCount(menu)) state_.editParam = 0;
+    menuDeadlineUs_ = now_us +
+        static_cast<uint64_t>(state_.config.menu_timeout_ms) * 1000ULL;
     display_.showMenu(menuTitle(menu), paramShortName(currentParam()));
 }
 
 void EditEngine::exitMenu() {
     state_.editMenu = EditMenu::None;
     state_.editParam = 0;
+    clearRepeat();
     display_.cancel();
 }
 
@@ -66,17 +82,55 @@ void EditEngine::selectParam(int fIndex) {
     display_.selectParam(paramShortName(currentParam()));
 }
 
-void EditEngine::stepParam(int delta, uint64_t now_us) {
-    ParamId id = currentParam();
+void EditEngine::navigateParam(int delta) {
+    if (state_.editMenu == EditMenu::None) return;
+    int count = menuParamCount(state_.editMenu);
+    if (count <= 0) return;
+    state_.editParam = (state_.editParam + delta + count) % count;
+    display_.selectParam(paramShortName(currentParam()));
+}
+
+void EditEngine::applyParamStep(ParamId id, int delta, bool inMenu, uint64_t now_us) {
     if (id == ParamId::COUNT) return;
     paramStep(state_, id, delta);
     if (id == ParamId::ChordMode && modeChanged_) modeChanged_();
     if (id == ParamId::RhythmPattern && patternChanged_) patternChanged_();
-    display_.showValue(paramFullName(id), paramValueString(state_, id), true, now_us);
+    if (anyEdit_) anyEdit_();
+    display_.showValue(paramFullName(id), paramValueString(state_, id), inMenu, now_us);
 }
 
-void EditEngine::applyDirect(const KeyAction& a, uint64_t now_us) {
+void EditEngine::armRepeat(uint8_t usage, int delta, ParamId id, bool inMenu, uint64_t now_us) {
+    if (delta == 0) return;
+    if (!isAutoRepeatable(id)) return;
+    repeatUsage_ = usage;
+    repeatDelta_ = delta;
+    repeatParam_ = id;
+    repeatInMenu_ = inMenu;
+    repeatDeadlineUs_ = now_us + REPEAT_INITIAL_US;
+}
+
+void EditEngine::clearRepeat() {
+    repeatUsage_ = 0;
+    repeatDelta_ = 0;
+    repeatParam_ = ParamId::COUNT;
+}
+
+void EditEngine::update(uint64_t now_us) {
+    if (repeatDelta_ != 0 && now_us >= repeatDeadlineUs_) {
+        applyParamStep(repeatParam_, repeatDelta_, repeatInMenu_, now_us);
+        repeatDeadlineUs_ = now_us + REPEAT_INTERVAL_US;
+        // An auto-repeating value is user activity: keep the menu open.
+        menuDeadlineUs_ = now_us +
+            static_cast<uint64_t>(state_.config.menu_timeout_ms) * 1000ULL;
+    }
+    if (state_.editMenu != EditMenu::None && now_us >= menuDeadlineUs_) {
+        exitMenu();
+    }
+}
+
+void EditEngine::applyDirect(uint8_t usage, const KeyAction& a, uint64_t now_us) {
     auto show = [&](ParamId id) {
+        if (anyEdit_) anyEdit_();
         display_.showValue(paramFullName(id), paramValueString(state_, id), false, now_us);
     };
 
@@ -121,10 +175,12 @@ void EditEngine::applyDirect(const KeyAction& a, uint64_t now_us) {
         case ActionType::TempoUp:
             paramStep(state_, ParamId::RhythmTempo, +1);
             show(ParamId::RhythmTempo);
+            armRepeat(usage, +1, ParamId::RhythmTempo, false, now_us);
             break;
         case ActionType::TempoDown:
             paramStep(state_, ParamId::RhythmTempo, -1);
             show(ParamId::RhythmTempo);
+            armRepeat(usage, -1, ParamId::RhythmTempo, false, now_us);
             break;
         case ActionType::RhythmToggle:
             paramCycle(state_, ParamId::RhythmEnable);
@@ -139,21 +195,38 @@ void EditEngine::applyDirect(const KeyAction& a, uint64_t now_us) {
             paramCycle(state_, ParamId::RhythmMute);
             show(ParamId::RhythmMute);
             break;
+        case ActionType::RhythmClockToggle:
+            paramCycle(state_, ParamId::RhythmClock);
+            show(ParamId::RhythmClock);
+            break;
+        case ActionType::RhythmLedToggle:
+            paramCycle(state_, ParamId::RhythmLed);
+            show(ParamId::RhythmLed);
+            break;
         default:
             break;
     }
 }
 
 bool EditEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
-    if (!ev.pressed) return false;
+    if (!ev.pressed) {
+        if (ev.hid_usage == repeatUsage_ && repeatDelta_ != 0) clearRepeat();
+        return false;
+    }
 
     KeyAction a = keymap_.resolve(ev.hid_usage, ev.modifiers);
     bool inMenu = state_.editMenu != EditMenu::None;
 
+    // Any key press while a menu is open resets the idle timeout.
+    if (inMenu) {
+        menuDeadlineUs_ = now_us +
+            static_cast<uint64_t>(state_.config.menu_timeout_ms) * 1000ULL;
+    }
+
     switch (a.type) {
-        case ActionType::MenuChord:  enterOrSwitch(EditMenu::Chord);  return true;
-        case ActionType::MenuStrum:  enterOrSwitch(EditMenu::Strum);  return true;
-        case ActionType::MenuRhythm: enterOrSwitch(EditMenu::Rhythm); return true;
+        case ActionType::MenuChord:  enterOrSwitch(EditMenu::Chord, now_us);  return true;
+        case ActionType::MenuStrum:  enterOrSwitch(EditMenu::Strum, now_us);  return true;
+        case ActionType::MenuRhythm: enterOrSwitch(EditMenu::Rhythm, now_us); return true;
         case ActionType::ClearEdit:   // Esc
             if (inMenu) exitMenu();
             return true;
@@ -161,9 +234,9 @@ bool EditEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
             break;
     }
 
-    // F10 is a fallback entry into Chord Edit (for keyboards without a Menu key).
-    if (ev.hid_usage == HID_USAGE_F10 && !inMenu) {
-        enterOrSwitch(EditMenu::Chord);
+    // F12 is a fallback entry into Chord Edit (for keyboards without a Menu key).
+    if (ev.hid_usage == HID_USAGE_F12 && !inMenu) {
+        enterOrSwitch(EditMenu::Chord, now_us);
         return true;
     }
 
@@ -173,9 +246,19 @@ bool EditEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
             selectParam(f);
             return true;
         }
+        // Arrow keys: Left/Right navigate parameters, Up/Down change the value.
+        if (ev.hid_usage == HID_USAGE_LEFT)  { navigateParam(-1); return true; }
+        if (ev.hid_usage == HID_USAGE_RIGHT) { navigateParam(+1); return true; }
+        if (ev.hid_usage == HID_USAGE_UP || ev.hid_usage == HID_USAGE_DOWN) {
+            int dir = (ev.hid_usage == HID_USAGE_UP) ? +1 : -1;
+            applyParamStep(currentParam(), dir, true, now_us);
+            armRepeat(ev.hid_usage, dir, currentParam(), true, now_us);
+            return true;
+        }
         int dir = stepDir(a.type);
         if (dir != 0) {
-            stepParam(dir, now_us);
+            applyParamStep(currentParam(), dir, true, now_us);
+            armRepeat(ev.hid_usage, dir, currentParam(), true, now_us);
             return true;
         }
         // Keep chord/strum keys live so edits give immediate audible feedback;
@@ -197,7 +280,7 @@ bool EditEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
         case ActionType::StrumKey:
             return false;
         default:
-            applyDirect(a, now_us);
+            applyDirect(ev.hid_usage, a, now_us);
             return true;
     }
 }

@@ -37,21 +37,25 @@ private:
     MidiEventQueue& out_;
 
     std::vector<RhythmPattern> patterns_;
-
     bool running_ = false;
     uint32_t step_ = 0;          // step index within the bar
     uint32_t stepAbs_ = 0;       // monotonic step counter
     uint64_t barStartUs_ = 0;    // absolute time of the bar's step 0
     uint64_t stepDeadlineUs_ = 0;
-    uint64_t nextClockUs_ = 0;
-    bool clockOn_ = false;       // clock currently streaming
+
+    // Master MIDI clock (24 PPQN). Always advances from boot; the phase never
+    // resets, so it is a stable timebase that the beat LED and the rhythm both
+    // slave to. midi_clock_enabled only gates whether 0xF8 is emitted.
+    uint64_t nextClockUs_ = 0;    // absolute deadline of the next tick
+    bool     clockArmed_ = false; // phase initialized (once, at first update)
+    uint64_t clockTickIndex_ = 0; // total ticks emitted (monotonic)
 
     const RhythmPattern* currentPattern() const;
 
+    void advanceClock(uint64_t now_us);
     void start(uint64_t now_us);
     void stop();
     void fireStep(uint64_t now_us);
-    void handleClock(uint64_t now_us);
 };
 
 // Loads all shipped rhythm patterns from storage (best-effort); on total

@@ -157,3 +157,26 @@ TEST(ParamEdit, CycleToggles) {
     paramCycle(s, ParamId::RhythmLed);
     EXPECT_FALSE(s.config.bpm_indicator);       // default true -> toggled off
 }
+
+TEST(ParamEdit, AutoRepeatableParams) {
+    EXPECT_TRUE(isAutoRepeatable(ParamId::ChordDuration));
+    EXPECT_TRUE(isAutoRepeatable(ParamId::ChordVelocity));
+    EXPECT_TRUE(isAutoRepeatable(ParamId::ChordPan));
+    EXPECT_TRUE(isAutoRepeatable(ParamId::StrumDuration));
+    EXPECT_TRUE(isAutoRepeatable(ParamId::StrumVelocity));
+    EXPECT_TRUE(isAutoRepeatable(ParamId::RhythmTempo));
+    EXPECT_TRUE(isAutoRepeatable(ParamId::RhythmSwing));
+
+    // Small ranges / enums / toggles do not repeat.
+    EXPECT_FALSE(isAutoRepeatable(ParamId::ChordOctave));
+    EXPECT_FALSE(isAutoRepeatable(ParamId::StrumOctave));
+    EXPECT_FALSE(isAutoRepeatable(ParamId::ChordMode));
+    EXPECT_FALSE(isAutoRepeatable(ParamId::ChordVoicing));
+    EXPECT_FALSE(isAutoRepeatable(ParamId::ChordAdd9));
+    EXPECT_FALSE(isAutoRepeatable(ParamId::StrumLayout));
+    EXPECT_FALSE(isAutoRepeatable(ParamId::RhythmPattern));
+    EXPECT_FALSE(isAutoRepeatable(ParamId::RhythmMute));
+    EXPECT_FALSE(isAutoRepeatable(ParamId::RhythmEnable));
+    EXPECT_FALSE(isAutoRepeatable(ParamId::RhythmClock));
+    EXPECT_FALSE(isAutoRepeatable(ParamId::RhythmLed));
+}

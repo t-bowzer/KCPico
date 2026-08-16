@@ -79,12 +79,61 @@ TEST_F(ConfigTest, SaveAndLoadRoundTrip) {
 }
 
 TEST_F(ConfigTest, LoadWithLedSettings) {
-    const char* json = R"({"led":{"bpm_indicator":false,"flash_ms":50,"accent_downbeat":false,"accent_flash_ms":100,"only_when_rhythm_enabled":false}})";
+    const char* json = R"({"led":{"bpm_indicator":false,"flash_ms":50}})";
     storage_.writeFile("/config.json", json);
     AppConfig cfg = AppConfig::load(storage_);
     EXPECT_FALSE(cfg.bpm_indicator);
     EXPECT_EQ(cfg.led_flash_ms, 50);
-    EXPECT_FALSE(cfg.accent_downbeat);
-    EXPECT_EQ(cfg.accent_flash_ms, 100);
-    EXPECT_FALSE(cfg.led_only_when_rhythm);
+}
+
+TEST_F(ConfigTest, DefaultsForNewFields) {
+    AppConfig cfg = AppConfig::defaults();
+    EXPECT_EQ(cfg.cursor_timeout_ms, 5000);
+    EXPECT_EQ(cfg.menu_timeout_ms, 10000);
+    EXPECT_EQ(cfg.led_indicator, LedTarget::NumLock);
+}
+
+TEST_F(ConfigTest, LoadLedTargetChoice) {
+    const char* json = R"({"led":{"led":"num_lock"}})";
+    storage_.writeFile("/config.json", json);
+    AppConfig cfg = AppConfig::load(storage_);
+    EXPECT_EQ(cfg.led_indicator, LedTarget::NumLock);
+
+    storage_.writeFile("/config.json", R"({"led":{"led":"caps_lock"}})");
+    cfg = AppConfig::load(storage_);
+    EXPECT_EQ(cfg.led_indicator, LedTarget::CapsLock);
+
+    storage_.writeFile("/config.json", R"({"led":{"led":"scroll_lock"}})");
+    cfg = AppConfig::load(storage_);
+    EXPECT_EQ(cfg.led_indicator, LedTarget::ScrollLock);
+
+    storage_.writeFile("/config.json", R"({"led":{"led":"all"}})");
+    cfg = AppConfig::load(storage_);
+    EXPECT_EQ(cfg.led_indicator, LedTarget::All);
+
+    // Unknown value falls back to num lock.
+    storage_.writeFile("/config.json", R"({"led":{"led":"bogus"}})");
+    cfg = AppConfig::load(storage_);
+    EXPECT_EQ(cfg.led_indicator, LedTarget::NumLock);
+}
+
+TEST_F(ConfigTest, LoadMenuTimeout) {
+    const char* json = R"({"display":{"menu_timeout_ms":7000}})";
+    storage_.writeFile("/config.json", json);
+    AppConfig cfg = AppConfig::load(storage_);
+    EXPECT_EQ(cfg.menu_timeout_ms, 7000);
+}
+
+TEST_F(ConfigTest, LedTargetRoundTrip) {
+    AppConfig cfg = AppConfig::defaults();
+    cfg.led_indicator = LedTarget::NumLock;
+    EXPECT_TRUE(cfg.save(storage_));
+
+    AppConfig loaded = AppConfig::load(storage_);
+    EXPECT_EQ(loaded.led_indicator, LedTarget::NumLock);
+
+    cfg.led_indicator = LedTarget::All;
+    EXPECT_TRUE(cfg.save(storage_));
+    loaded = AppConfig::load(storage_);
+    EXPECT_EQ(loaded.led_indicator, LedTarget::All);
 }

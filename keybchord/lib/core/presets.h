@@ -22,6 +22,10 @@ struct PresetSlot {
     static PresetSlot defaults();
     bool operator==(const PresetSlot& other) const;
     bool operator!=(const PresetSlot& other) const;
+
+    // True when every chord/strum/rhythm field matches, ignoring the name
+    // (used for dirty-state tracking, FR-P11 / AC-20).
+    bool sameParams(const PresetSlot& other) const;
 };
 
 class StorageAdapter;
@@ -29,5 +33,14 @@ class StorageAdapter;
 PresetSlot   loadPreset(StorageAdapter& storage, int bank, int slot);
 bool         savePreset(StorageAdapter& storage, int bank, int slot, const PresetSlot& preset);
 PresetSlot   loadPresetOrDefault(StorageAdapter& storage, int bank, int slot);
+
+// Builds a PresetSlot from the live pending parameters (name supplied by the
+// caller; e.g. the stored slot's name when computing dirty state).
+PresetSlot makePreset(const ChordParams& chord, const StrumParams& strum,
+                      const RhythmParams& rhythm, const std::string& name);
+
+// Parses a preset location string like "B3:P7" into 0-based bank/slot.
+// Returns false on malformed input or out-of-range values (1..10 / 1..8).
+bool parsePresetLocation(const std::string& loc, int& bank, int& slot);
 
 

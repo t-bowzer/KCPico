@@ -19,11 +19,11 @@ AppConfig AppConfig::defaults() {
     c.note_range_high      = 84;
     c.display_revert_ms    = 1500;
     c.display_prompt_ms    = 5000;
+    c.cursor_timeout_ms    = 5000;
+    c.menu_timeout_ms      = 10000;
     c.bpm_indicator        = true;
+    c.led_indicator        = LedTarget::NumLock;
     c.led_flash_ms         = 40;
-    c.accent_downbeat      = true;
-    c.accent_flash_ms      = 80;
-    c.led_only_when_rhythm = true;
     c.startup_preset       = "B1:P1";
     return c;
 }
@@ -81,6 +81,14 @@ AppConfig AppConfig::load(StorageAdapter& storage) {
             cfg.display_prompt_ms = static_cast<uint16_t>(clampInt(
                 display["prompt_timeout_ms"].as<int>(), 1000, 30000, cfg.display_prompt_ms));
         }
+        if (display.containsKey("cursor_timeout_ms") && display["cursor_timeout_ms"].is<int>()) {
+            cfg.cursor_timeout_ms = static_cast<uint16_t>(clampInt(
+                display["cursor_timeout_ms"].as<int>(), 500, 30000, cfg.cursor_timeout_ms));
+        }
+        if (display.containsKey("menu_timeout_ms") && display["menu_timeout_ms"].is<int>()) {
+            cfg.menu_timeout_ms = static_cast<uint16_t>(clampInt(
+                display["menu_timeout_ms"].as<int>(), 500, 30000, cfg.menu_timeout_ms));
+        }
     }
 
     if (doc.containsKey("led")) {
@@ -88,20 +96,17 @@ AppConfig AppConfig::load(StorageAdapter& storage) {
         if (led.containsKey("bpm_indicator") && led["bpm_indicator"].is<bool>()) {
             cfg.bpm_indicator = led["bpm_indicator"].as<bool>();
         }
+        if (led.containsKey("led") && led["led"].is<const char*>()) {
+            std::string which = led["led"].as<std::string>();
+            if (which == "caps_lock") cfg.led_indicator = LedTarget::CapsLock;
+            else if (which == "num_lock") cfg.led_indicator = LedTarget::NumLock;
+            else if (which == "scroll_lock") cfg.led_indicator = LedTarget::ScrollLock;
+            else if (which == "all") cfg.led_indicator = LedTarget::All;
+            else cfg.led_indicator = LedTarget::NumLock;
+        }
         if (led.containsKey("flash_ms") && led["flash_ms"].is<int>()) {
             cfg.led_flash_ms = static_cast<uint8_t>(clampInt(
                 led["flash_ms"].as<int>(), 5, 500, cfg.led_flash_ms));
-        }
-        if (led.containsKey("accent_downbeat") && led["accent_downbeat"].is<bool>()) {
-            cfg.accent_downbeat = led["accent_downbeat"].as<bool>();
-        }
-        if (led.containsKey("accent_flash_ms") && led["accent_flash_ms"].is<int>()) {
-            cfg.accent_flash_ms = static_cast<uint8_t>(clampInt(
-                led["accent_flash_ms"].as<int>(), 5, 500, cfg.accent_flash_ms));
-        }
-        if (led.containsKey("only_when_rhythm_enabled") &&
-            led["only_when_rhythm_enabled"].is<bool>()) {
-            cfg.led_only_when_rhythm = led["only_when_rhythm_enabled"].as<bool>();
         }
     }
 
@@ -128,13 +133,19 @@ bool AppConfig::save(StorageAdapter& storage) const {
     auto display = doc["display"].to<JsonObject>();
     display["revert_timeout_ms"] = display_revert_ms;
     display["prompt_timeout_ms"] = display_prompt_ms;
+    display["cursor_timeout_ms"] = cursor_timeout_ms;
+    display["menu_timeout_ms"]   = menu_timeout_ms;
 
     auto led = doc["led"].to<JsonObject>();
     led["bpm_indicator"]          = bpm_indicator;
+    switch (led_indicator) {
+        case LedTarget::CapsLock:  led["led"] = "caps_lock";  break;
+        case LedTarget::NumLock:   led["led"] = "num_lock";   break;
+        case LedTarget::ScrollLock: led["led"] = "scroll_lock"; break;
+        case LedTarget::All:
+        default:                   led["led"] = "all";        break;
+    }
     led["flash_ms"]               = led_flash_ms;
-    led["accent_downbeat"]        = accent_downbeat;
-    led["accent_flash_ms"]        = accent_flash_ms;
-    led["only_when_rhythm_enabled"] = led_only_when_rhythm;
 
     doc["startup_preset"] = startup_preset;
 

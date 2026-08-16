@@ -59,26 +59,56 @@ void RhythmEngine::onPatternChanged() {
     }
 }
 
+// Master MIDI clock (24 PPQN). Runs continuously from boot as a background
+// timebase: the tick counter and phase never reset, so nothing (rhythm toggles,
+// clock-out toggles) can make it drift or fall out of sync. midi_clock_enabled
+// only gates whether the 0xF8 byte is emitted; the beat LED flashes on every
+// 24th tick regardless.
+void RhythmEngine::advanceClock(uint64_t now_us) {
+    uint32_t tick = clockTickUs(state_.pendingRhythm.tempo);
+
+    if (!clockArmed_) {
+        clockArmed_ = true;
+        nextClockUs_ = now_us;   // tick #0 = boot time (the epoch)
+        clockTickIndex_ = 0;
+        // fall through so tick #0 is emitted immediately
+    }
+
+    while (nextClockUs_ <= now_us) {
+        if (state_.config.midi_clock_enabled) {
+            out_.push(midi::makeSystem(midi::SYSTEM_CLOCK));
+        }
+        // Beat boundary every 24 ticks: the beat LED follows the master clock.
+        if (clockTickIndex_ % 24 == 0 && state_.config.bpm_indicator) {
+            state_.ledIndicator.flash = true;
+        }
+        clockTickIndex_++;
+        nextClockUs_ += tick;
+    }
+}
+
 void RhythmEngine::update(uint64_t now_us) {
+    // 1. Master clock first: it is never preempted or skipped.
+    advanceClock(now_us);
+
+    // 2. Rhythm start/stop (slaved to the clock in start()).
     const RhythmParams& rp = state_.pendingRhythm;
     bool wantRun = rp.enabled && !patterns_.empty();
-
     if (wantRun && !running_) {
         start(now_us);
     } else if (!wantRun && running_) {
         stop();
     }
 
-    // MIDI clock streams whenever the clock toggle is on (FR-R7), independent
-    // of whether the drums are running — KeybChord is a continuous tempo master.
-    handleClock(now_us);
-
     if (!running_) return;
 
     const RhythmPattern* pat = currentPattern();
     if (!pat) return;
 
-    uint32_t base = stepUs(rp.tempo);
+    // Steps are exactly CLOCK_TICKS_PER_STEP (=6) clock ticks, so the drums stay
+    // phase-locked to the clock (using stepUs() directly would drift by the
+    // integer-division remainder each step).
+    uint32_t base = clockTickUs(rp.tempo) * CLOCK_TICKS_PER_STEP;
     int spb = pat->steps_per_bar;
 
     // Fire every step whose deadline has passed, then schedule the next.
@@ -103,13 +133,21 @@ void RhythmEngine::start(uint64_t now_us) {
     running_ = true;
     step_ = 0;
     stepAbs_ = 0;
-    barStartUs_ = now_us;
-    stepDeadlineUs_ = now_us;  // fire the downbeat immediately
+
+    // Slave the downbeat to the clock's beat grid (every 24 ticks), so the
+    // drums, the beat LED, and the clock share one timebase. The clock is always
+    // armed by advanceClock() before this is called.
+    uint32_t tick = clockTickUs(state_.pendingRhythm.tempo);
+    uint64_t ticksToBeat = (24 - (clockTickIndex_ % 24)) % 24;
+    uint64_t downbeat = nextClockUs_ + ticksToBeat * tick;
+    barStartUs_ = downbeat;
+    stepDeadlineUs_ = downbeat;
 }
 
 void RhythmEngine::stop() {
     running_ = false;
-    clockOn_ = false;
+    // NOTE: the master clock keeps running (its phase is the master timebase
+    // and must never reset when the rhythm is toggled off).
     state_.rhythmClock.running = false;
     state_.rhythmClock.nextStepUs = 0;
 }
@@ -124,43 +162,6 @@ void RhythmEngine::fireStep(uint64_t now_us) {
         for (const auto& e : events) {
             out_.push(midi::makeNoteOn(rp.channel, mapDrumNote(e.note, rp.drums), e.velocity));
         }
-    }
-
-    // LED BPM indicator (FR-R8): flash on each beat, accented on beat 1.
-    if (step_ % RHYTHM_STEPS_PER_BEAT == 0) {
-        const AppConfig& cfg = state_.config;
-        if (cfg.bpm_indicator) {
-            bool downbeat = (step_ == 0);
-            uint16_t ms = (downbeat && cfg.accent_downbeat)
-                              ? cfg.accent_flash_ms
-                              : cfg.led_flash_ms;
-            state_.ledIndicator.on = true;
-            state_.ledIndicator.untilUs = now_us + static_cast<uint64_t>(ms) * 1000ULL;
-            state_.ledIndicator.dirty = true;
-        }
-    }
-}
-
-// Streams only the 24 PPQN clock byte (0xF8) whenever the clock toggle is on.
-// No Start/Stop/Continue: KeybChord is a pure tempo master (slaves sync their
-// BPM; nothing starts their transport).
-void RhythmEngine::handleClock(uint64_t now_us) {
-    if (!state_.config.midi_clock_enabled) {
-        clockOn_ = false;
-        nextClockUs_ = 0;
-        return;
-    }
-
-    if (!clockOn_) {
-        clockOn_ = true;
-        nextClockUs_ = now_us + clockTickUs(state_.pendingRhythm.tempo);
-        return;
-    }
-
-    uint32_t tick = clockTickUs(state_.pendingRhythm.tempo);
-    while (nextClockUs_ <= now_us) {
-        out_.push(midi::makeSystem(midi::SYSTEM_CLOCK));
-        nextClockUs_ += tick;
     }
 }
 

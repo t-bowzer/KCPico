@@ -26,12 +26,12 @@ struct RhythmClock {
     uint64_t nextStepUs = 0;     // absolute deadline of the next step
 };
 
-// Desired keyboard-LED state (Scroll Lock BPM indicator, FR-R8). Computed on
-// Core 1 by the rhythm scheduler, applied on Core 0 (single-threaded TinyUSB).
+// Beat-flash request (FR-R8) from the Core 1 rhythm scheduler to Core 0. Core 1
+// sets `flash` once per beat; Core 0 owns the actual keyboard-LED on/off state
+// (it turns the LED on for led_flash_ms) so there is no shared deadline and no
+// cross-core torn read that could leave the LED stuck on.
 struct LedIndicator {
-    bool     on = false;
-    uint64_t untilUs = 0;        // absolute time the flash should end
-    bool     dirty = false;      // changed since last apply
+    bool flash = false;
 };
 
 class StateManager {
@@ -62,6 +62,13 @@ public:
     int  currentBank = 0;
     int  currentSlot = 0;
     bool dirty       = false;
+
+    // Cursor-mode navigation (M7): a transient browsing position entered by
+    // Home/End/Super+Home/End. `currentBank`/`currentSlot` remain the active
+    // (last-loaded) slot; the cursor is only meaningful while cursorActive.
+    bool cursorActive = false;
+    int  cursorBank   = 0;
+    int  cursorSlot   = 0;
 
     AppConfig config;
 

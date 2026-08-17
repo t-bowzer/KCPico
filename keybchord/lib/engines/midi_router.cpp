@@ -31,6 +31,14 @@ void MidiRouter::allSoundOff(uint8_t channel) {
     cc(channel, midi::CC_ALL_SOUND_OFF, 0);
 }
 
+void MidiRouter::panic() {
+    for (uint8_t ch = 1; ch <= 16; ch++) {
+        allSoundOff(ch);
+        allNotesOff(ch);
+    }
+    state_.allNotesOff();
+}
+
 void MidiRouter::flush() {
     midiOut_.flush();
 }

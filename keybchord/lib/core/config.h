@@ -30,6 +30,8 @@ struct AppConfig {
     LedTarget led_indicator          = LedTarget::NumLock;
     uint8_t  led_flash_ms            = 40;
     std::string startup_preset       = "B1:P1";
+    bool     debug_log_enabled       = true;   // NFR-8: key/strum/LED debug log
+    bool     midi_monitor_enabled    = true;   // NFR-8: outgoing MIDI decode
 
     static AppConfig defaults();
     static AppConfig load(StorageAdapter& storage);

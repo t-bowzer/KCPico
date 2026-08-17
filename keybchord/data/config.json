@@ -10,5 +10,6 @@
     "led": "num_lock",
     "flash_ms": 40
   },
-  "startup_preset": "B1:P1"
+  "startup_preset": "B1:P1",
+  "logging": { "debug_log": true, "midi_monitor": true }
 }

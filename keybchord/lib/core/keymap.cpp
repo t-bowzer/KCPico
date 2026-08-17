@@ -142,6 +142,7 @@ KeyAction KeymapResolver::resolve(uint8_t hid_usage, uint8_t modifiers) const {
         switch (hid_usage) {
             case HID_USAGE_HOME:   a.type = ActionType::PresetBankPrev; return a;
             case HID_USAGE_END:    a.type = ActionType::PresetBankNext; return a;
+            case HID_USAGE_ESC:    a.type = ActionType::Panic;          return a;
             default:
                 if (isNumberRowStrum(hid_usage)) {
                     int idx = static_cast<int>(hid_usage - NUMBER_ROW_STRUM_LO); // 0..9

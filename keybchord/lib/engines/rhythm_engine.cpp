@@ -75,6 +75,11 @@ void RhythmEngine::advanceClock(uint64_t now_us) {
     }
 
     while (nextClockUs_ <= now_us) {
+        // Record the tick lateness (NFR-2). The clock runs continuously from
+        // boot, so this is measured even when the rhythm is stopped — it is the
+        // timebase the beat LED and drums slave to.
+        jitter_.record(static_cast<uint32_t>(now_us - nextClockUs_));
+
         if (state_.config.midi_clock_enabled) {
             out_.push(midi::makeSystem(midi::SYSTEM_CLOCK));
         }
@@ -167,6 +172,11 @@ void RhythmEngine::fireStep(uint64_t now_us) {
 
 void RhythmEngine::allNotesOff() {
     stop();
+}
+
+void RhythmEngine::jitterStats(PerfStats& out, bool reset) {
+    out = jitter_;
+    if (reset) jitter_.reset();
 }
 
 std::vector<RhythmPattern> loadRhythmPatterns(StorageAdapter& storage) {

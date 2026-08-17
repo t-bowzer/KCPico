@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <vector>
 #include "params.h"
@@ -14,16 +15,16 @@ struct ActiveNote {
 };
 
 // Snapshot of the Core 1 rhythm scheduler, read by Core 0 (chord arp/rhythm
-// sync, FR-R4 / AC-6). Written only by the RhythmEngine; read best-effort.
-// Individual 32-bit accesses are atomic on the RP2040; a torn snapshot only
-// ever shifts one step, which is harmless for a timing hint.
+// sync, FR-R4 / AC-6). Written only by the RhythmEngine (Core 1); read
+// best-effort by Core 0. Fields are std::atomic so a cross-core read never
+// observes a torn value.
 struct RhythmClock {
-    bool     running = false;
-    uint32_t stepAbs = 0;        // monotonic step counter (increments per step)
-    uint32_t step = 0;           // step index within the bar
-    int      stepsPerBar = 16;
-    uint32_t beat = 0;           // beat index within the bar
-    uint64_t nextStepUs = 0;     // absolute deadline of the next step
+    std::atomic<bool>     running{false};
+    std::atomic<uint32_t> stepAbs{0};        // monotonic step counter
+    std::atomic<uint32_t> step{0};           // step index within the bar
+    std::atomic<int32_t>  stepsPerBar{16};
+    std::atomic<uint32_t> beat{0};           // beat index within the bar
+    std::atomic<uint64_t> nextStepUs{0};     // absolute deadline of the next step
 };
 
 // Beat-flash request (FR-R8) from the Core 1 rhythm scheduler to Core 0. Core 1
@@ -31,11 +32,16 @@ struct RhythmClock {
 // (it turns the LED on for led_flash_ms) so there is no shared deadline and no
 // cross-core torn read that could leave the LED stuck on.
 struct LedIndicator {
-    bool flash = false;
+    std::atomic<bool> flash{false};
 };
 
 class StateManager {
 public:
+    // Pending params are edited live on Core 0 (EditEngine/presets); Core 1's
+    // RhythmEngine reads pendingRhythm best-effort. Every field is a scalar of
+    // <= 32 bits, so each individual read is atomic on the RP2040 — a "torn"
+    // snapshot can only shift one field by one edit, which is harmless for a
+    // timing hint. No mutex is used on the Core 1 deadline path (NFR-2).
     ChordParams  pendingChord;
     StrumParams  pendingStrum;
     RhythmParams pendingRhythm;

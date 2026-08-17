@@ -5,6 +5,7 @@
 
 #include "base.h"
 #include "midi_event_queue.h"
+#include "perf.h"
 #include "rhythm.h"
 #include "state.h"
 
@@ -32,6 +33,11 @@ public:
     void update(uint64_t now_us);
     void allNotesOff();
 
+    // Copies the master-clock tick-lateness jitter statistics (NFR-2) to `out`
+    // and, when `reset` is true, clears the accumulator. Called from Core 0 for
+    // logging; a best-effort read is safe since fields are 32-bit aligned.
+    void jitterStats(PerfStats& out, bool reset);
+
 private:
     StateManager& state_;
     MidiEventQueue& out_;
@@ -51,6 +57,8 @@ private:
     uint64_t clockTickIndex_ = 0; // total ticks emitted (monotonic)
 
     const RhythmPattern* currentPattern() const;
+
+    PerfStats jitter_;   // clock tick-lateness stats, written only by Core 1
 
     void advanceClock(uint64_t now_us);
     void start(uint64_t now_us);

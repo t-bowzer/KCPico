@@ -137,3 +137,67 @@ TEST_F(ConfigTest, LedTargetRoundTrip) {
     loaded = AppConfig::load(storage_);
     EXPECT_EQ(loaded.led_indicator, LedTarget::All);
 }
+
+// --- NFR-9 hardening ---
+
+TEST_F(ConfigTest, LoadTopLevelNonObjectReturnsDefaults) {
+    storage_.writeFile("/config.json", "[1,2,3]");
+    AppConfig cfg = AppConfig::load(storage_);
+    EXPECT_TRUE(cfg.din_enabled);
+    EXPECT_EQ(cfg.base_root_midi, 60);
+}
+
+TEST_F(ConfigTest, LoadTopLevelStringReturnsDefaults) {
+    storage_.writeFile("/config.json", "\"hello\"");
+    AppConfig cfg = AppConfig::load(storage_);
+    EXPECT_TRUE(cfg.din_enabled);
+}
+
+TEST_F(ConfigTest, LoadWrongTypesFallBackPerField) {
+    const char* json = R"({
+        "midi":{"din_enabled":"yes","clock_enabled":42},
+        "chord":{"base_root_midi":"high","note_range":[50,"x"]},
+        "display":{"revert_timeout_ms":[]}
+    })";
+    storage_.writeFile("/config.json", json);
+    AppConfig cfg = AppConfig::load(storage_);
+    EXPECT_TRUE(cfg.din_enabled);       // string ignored -> default true
+    EXPECT_FALSE(cfg.midi_clock_enabled);  // 42 is not bool -> default false
+    EXPECT_EQ(cfg.base_root_midi, 60);  // string ignored -> default
+    EXPECT_EQ(cfg.note_range_low, 48);  // "x" not int -> default
+    EXPECT_EQ(cfg.display_revert_ms, 1500);
+}
+
+TEST_F(ConfigTest, LoadInvertedNoteRangeIsSwapped) {
+    const char* json = R"({"chord":{"note_range":[100,20]}})";
+    storage_.writeFile("/config.json", json);
+    AppConfig cfg = AppConfig::load(storage_);
+    EXPECT_LE(cfg.note_range_low, cfg.note_range_high);
+    EXPECT_EQ(cfg.note_range_low, 20);
+    EXPECT_EQ(cfg.note_range_high, 100);
+}
+
+TEST_F(ConfigTest, LoggingFieldsDefaults) {
+    AppConfig cfg = AppConfig::defaults();
+    EXPECT_TRUE(cfg.debug_log_enabled);
+    EXPECT_TRUE(cfg.midi_monitor_enabled);
+}
+
+TEST_F(ConfigTest, LoadLoggingFields) {
+    const char* json = R"({"logging":{"debug_log":false,"midi_monitor":false}})";
+    storage_.writeFile("/config.json", json);
+    AppConfig cfg = AppConfig::load(storage_);
+    EXPECT_FALSE(cfg.debug_log_enabled);
+    EXPECT_FALSE(cfg.midi_monitor_enabled);
+}
+
+TEST_F(ConfigTest, LoggingRoundTrip) {
+    AppConfig cfg = AppConfig::defaults();
+    cfg.debug_log_enabled = false;
+    cfg.midi_monitor_enabled = false;
+    EXPECT_TRUE(cfg.save(storage_));
+
+    AppConfig loaded = AppConfig::load(storage_);
+    EXPECT_FALSE(loaded.debug_log_enabled);
+    EXPECT_FALSE(loaded.midi_monitor_enabled);
+}

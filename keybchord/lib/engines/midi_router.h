@@ -15,6 +15,10 @@ public:
     void allNotesOff(uint8_t channel);
     void allSoundOff(uint8_t channel);
 
+    // Panic (FR-C11): All-Sound-Off (CC120) + All-Notes-Off (CC123) on every
+    // channel, then clears the active-note state.
+    void panic();
+
     void flush();
 
     // Send a raw MIDI message without mutating note state (used for rhythm

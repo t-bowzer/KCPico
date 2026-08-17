@@ -28,6 +28,10 @@ public:
     // Returns true if the event was consumed.
     bool handleKeyEvent(const KeyEvent& ev, uint64_t now_us);
 
+    // True while a save/clear confirmation prompt is active (main.cpp uses this
+    // to distinguish Esc-as-cancel-sound from Esc-as-cancel-prompt).
+    bool promptActive() const { return op_ != PendingOp::None; }
+
     // Auto-cancel the prompt after display_prompt_ms and reset the cursor after
     // cursor_timeout_ms of idleness.
     void update(uint64_t now_us);

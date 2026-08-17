@@ -198,6 +198,17 @@ TEST(Keymap, SuperPressIsInert) {
     EXPECT_EQ(r.resolve(0xE8, SUPER).type, ActionType::None);  // RGui press
 }
 
+TEST(Keymap, SuperEscIsPanic) {
+    KeymapResolver r;
+    constexpr uint8_t SUPER = 0x08;
+
+    EXPECT_EQ(r.resolve(0x29, SUPER).type, ActionType::Panic);  // Super+Esc
+    // Esc alone remains ClearEdit, not panic.
+    EXPECT_EQ(r.resolve(0x29, 0).type, ActionType::ClearEdit);
+    // Super+Esc with RGui also resolves to panic.
+    EXPECT_EQ(r.resolve(0x29, 0x80).type, ActionType::Panic);
+}
+
 TEST(Keymap, SuperChordKeyIsInert) {
     KeymapResolver r;
     constexpr uint8_t SUPER = 0x08;

@@ -6,6 +6,7 @@
 #include "pio_usb.h"
 #include "host/usbh.h"
 #include "class/hid/hid_host.h"
+#include "pico/time.h"
 #include "debug_log.h"
 
 static InputUsbHost* g_inputInstance = nullptr;
@@ -88,12 +89,13 @@ void InputUsbHost::onReport(uint8_t dev_addr, uint8_t instance,
     }
 
     uint8_t modifiers = report[0];
+    uint64_t received_us = time_us_64();
     uint8_t mod_changed = modifiers ^ prev_mods_;
     for (int bit = 0; bit < 8; bit++) {
         if (mod_changed & (1 << bit)) {
             bool pressed = modifiers & (1 << bit);
             uint8_t usage = modifierBitToUsage(bit);
-            pushEvent(usage, pressed, modifiers);
+            pushEvent(usage, pressed, modifiers, received_us);
         }
     }
     prev_mods_ = modifiers;
@@ -109,7 +111,7 @@ void InputUsbHost::onReport(uint8_t dev_addr, uint8_t instance,
         for (size_t j = 0; j < MAX_KEYS; j++) {
             if (prev_keys_[j] == currentKeys[i]) { found = true; break; }
         }
-        if (!found) pushEvent(currentKeys[i], true, modifiers);
+        if (!found) pushEvent(currentKeys[i], true, modifiers, received_us);
     }
 
     for (size_t i = 0; i < MAX_KEYS; i++) {
@@ -118,7 +120,7 @@ void InputUsbHost::onReport(uint8_t dev_addr, uint8_t instance,
         for (size_t j = 0; j < MAX_KEYS; j++) {
             if (currentKeys[j] == prev_keys_[i]) { found = true; break; }
         }
-        if (!found) pushEvent(prev_keys_[i], false, modifiers);
+        if (!found) pushEvent(prev_keys_[i], false, modifiers, received_us);
     }
 
     for (size_t i = 0; i < MAX_KEYS; i++) prev_keys_[i] = currentKeys[i];
@@ -146,8 +148,9 @@ bool InputUsbHost::setLed(uint8_t led_usage, bool on) {
                               HID_REPORT_TYPE_OUTPUT, &led_state_, 1);
 }
 
-void InputUsbHost::pushEvent(uint8_t usage, bool pressed, uint8_t mods) {
-    eventQueue_.push_back({usage, pressed, mods});
+void InputUsbHost::pushEvent(uint8_t usage, bool pressed, uint8_t mods,
+                             uint64_t received_us) {
+    eventQueue_.push_back({usage, pressed, mods, received_us});
 }
 
 uint8_t InputUsbHost::modifierBitToUsage(int bit) {

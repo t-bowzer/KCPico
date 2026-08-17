@@ -47,6 +47,7 @@ enum class ActionType : uint8_t {
     PresetLoad,     // Super+1..8 -> load slot (action.index = 0..7) (FR-P5)
     PresetSave,     // Super+Insert -> save prompt (FR-P6)
     PresetClear,    // Super+Delete -> clear prompt (FR-P7)
+    Panic,          // Super+Esc -> all-sound/notes-off all channels (FR-C11)
     COUNT
 };
 

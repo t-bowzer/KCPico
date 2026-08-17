@@ -23,8 +23,13 @@ void StateManager::loadDefaults() {
     selectedChordValid = false;
     editMenu = EditMenu::None;
     editParam = 0;
-    rhythmClock = RhythmClock{};
-    ledIndicator = LedIndicator{};
+    rhythmClock.running.store(false);
+    rhythmClock.stepAbs.store(0);
+    rhythmClock.step.store(0);
+    rhythmClock.stepsPerBar.store(16);
+    rhythmClock.beat.store(0);
+    rhythmClock.nextStepUs.store(0);
+    ledIndicator.flash.store(false);
 }
 
 void StateManager::snapshotActive() {

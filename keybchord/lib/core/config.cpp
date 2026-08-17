@@ -45,6 +45,9 @@ AppConfig AppConfig::load(StorageAdapter& storage) {
     if (error) {
         return cfg;
     }
+    if (!doc.is<JsonObject>()) {
+        return cfg;
+    }
 
     if (doc.containsKey("midi")) {
         auto midi = doc["midi"];
@@ -63,11 +66,18 @@ AppConfig AppConfig::load(StorageAdapter& storage) {
                 chord["base_root_midi"].as<int>(), 0, 127, cfg.base_root_midi));
         }
         if (chord.containsKey("note_range") && chord["note_range"].is<JsonArray>() &&
-            chord["note_range"].size() >= 2) {
+            chord["note_range"].size() >= 2 &&
+            chord["note_range"][0].is<int>() && chord["note_range"][1].is<int>()) {
             cfg.note_range_low = static_cast<uint8_t>(clampInt(
                 chord["note_range"][0].as<int>(), 0, 127, cfg.note_range_low));
             cfg.note_range_high = static_cast<uint8_t>(clampInt(
                 chord["note_range"][1].as<int>(), 0, 127, cfg.note_range_high));
+            // Never allow an inverted range (NFR-9): swap back to a sane order.
+            if (cfg.note_range_low > cfg.note_range_high) {
+                uint8_t t = cfg.note_range_low;
+                cfg.note_range_low = cfg.note_range_high;
+                cfg.note_range_high = t;
+            }
         }
     }
 
@@ -114,6 +124,16 @@ AppConfig AppConfig::load(StorageAdapter& storage) {
         cfg.startup_preset = doc["startup_preset"].as<std::string>();
     }
 
+    if (doc.containsKey("logging")) {
+        auto logging = doc["logging"];
+        if (logging.containsKey("debug_log") && logging["debug_log"].is<bool>()) {
+            cfg.debug_log_enabled = logging["debug_log"].as<bool>();
+        }
+        if (logging.containsKey("midi_monitor") && logging["midi_monitor"].is<bool>()) {
+            cfg.midi_monitor_enabled = logging["midi_monitor"].as<bool>();
+        }
+    }
+
     return cfg;
 }
 
@@ -148,6 +168,10 @@ bool AppConfig::save(StorageAdapter& storage) const {
     led["flash_ms"]               = led_flash_ms;
 
     doc["startup_preset"] = startup_preset;
+
+    auto logging = doc["logging"].to<JsonObject>();
+    logging["debug_log"]    = debug_log_enabled;
+    logging["midi_monitor"] = midi_monitor_enabled;
 
     std::string out;
     serializeJson(doc, out);

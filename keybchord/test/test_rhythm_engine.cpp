@@ -236,6 +236,23 @@ TEST_F(RhythmEngineTest, PublishesClockSnapshot) {
     EXPECT_EQ(state_.rhythmClock.beat, 0u);
 }
 
+TEST_F(RhythmEngineTest, ClockJitterIsRecordedEvenWithoutRhythm) {
+    // Regression: jitter must come from the always-running master clock, so it
+    // is nonzero even when the rhythm is disabled (previously it read n=0).
+    state_.pendingRhythm.enabled = false;
+    uint32_t tick = clockTickUs(120);
+
+    engine_->update(0);
+    for (int i = 1; i <= 10; i++) {
+        engine_->update(static_cast<uint64_t>(i) * tick + 123);
+    }
+
+    PerfStats stats;
+    engine_->jitterStats(stats, false);
+    EXPECT_GT(stats.count(), 0u);
+    EXPECT_LE(stats.minUs(), stats.maxUs());
+}
+
 TEST_F(RhythmEngineTest, DrumMapRemapsSnareNote) {
     state_.pendingRhythm.drums.snare = 40;  // Electric Snare
     state_.pendingRhythm.enabled = true;

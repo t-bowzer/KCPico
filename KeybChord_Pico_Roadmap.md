@@ -418,6 +418,16 @@ Aligned 1:1 with spec §1.6 / §12. Each milestone ends with a **review stop** f
 **Verify:** acceptance criteria (spec §13) pass; NFRs met.
 **AC:** AC-10, AC-17, AC-22 + all NFRs.
 
+> **M8 completed (2026-08-16).** Decisions: (1) hardware watchdog **enabled**
+> (`rp2040.wdt_begin(1000)`, fed on both cores); (2) debug-log/MIDI-monitor
+> runtime toggle is **config-only** (`logging.debug_log` / `logging.midi_monitor`,
+> no hotkey); (3) panic does a **full engine reset** — releases chord/strum/rhythm
+> state and cancels transient UI *before* the CC120/CC123 flood. Also delivered:
+> a `PerfStats` accumulator + 5 s USB-CDC PERF summaries (Core 0 loop time, Core 1
+> step jitter), `std::atomic` cross-core `RhythmClock`/`LedIndicator`, keyboard
+> hot-plug note-release, and `KEYBCHORD_LOG` as the compile-out release gate.
+> Native suite: 259/259 green.
+
 ### M9 (future) — USB Mass Storage & dev serial build
 **Deliverables (planned, not implemented):** mount the onboard LittleFS as a **USB Mass Storage** drive on the native USB port so `config.json`/presets/rhythms can be drag-drop edited from a PC (replacing `uploadfs`). A companion **dev build** keeps the native USB port as the USB-CDC serial debug log (the current paradigm) for troubleshooting when MSC is active. The keyboard remains on the PIO-USB host port (GP0/GP1), so it never conflicts.
 **Constraint:** MSC and the serial log both want the single native USB port — this is an either/or build-time choice (a `-DKEYBCHORD_MSC` flag + factory/env selection).

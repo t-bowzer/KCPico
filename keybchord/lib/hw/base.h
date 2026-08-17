@@ -9,6 +9,7 @@ struct KeyEvent {
     uint8_t hid_usage;
     bool pressed;
     uint8_t modifiers;   // HID modifier byte
+    uint64_t received_us = 0;  // device timestamp when the report was received
 };
 
 struct MidiMessage {
@@ -23,6 +24,10 @@ public:
     virtual bool begin() = 0;
     virtual std::vector<KeyEvent> poll() = 0;
     virtual bool setLed(uint8_t led_usage, bool on) = 0;
+
+    // Whether the keyboard is currently enumerated (NFR-5). Default true so
+    // null adapters and tests report "connected".
+    virtual bool connected() const { return true; }
 };
 
 class MidiOutAdapter {

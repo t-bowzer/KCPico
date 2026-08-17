@@ -8,6 +8,7 @@ public:
     bool begin() override;
     std::vector<KeyEvent> poll() override;
     bool setLed(uint8_t led_usage, bool on) override;
+    bool connected() const override { return mounted_; }
 
     void onMount(uint8_t dev_addr, uint8_t instance);
     void onUmount(uint8_t dev_addr, uint8_t instance);
@@ -24,7 +25,7 @@ private:
 
     std::vector<KeyEvent> eventQueue_;
 
-    void pushEvent(uint8_t usage, bool pressed, uint8_t mods);
+    void pushEvent(uint8_t usage, bool pressed, uint8_t mods, uint64_t received_us);
     static uint8_t modifierBitToUsage(int bit);
 };
 

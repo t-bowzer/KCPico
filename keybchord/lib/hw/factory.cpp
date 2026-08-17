@@ -7,7 +7,7 @@
 #include "input_usbhost.h"
 #include "lcd_hd44780.h"
 #include "midi_out_uart.h"
-#include "storage_littlefs.h"
+#include "storage_fatfs.h"
 #endif
 
 
@@ -48,7 +48,7 @@ Adapters createAdapters() {
     }
 
     {
-        auto storage = std::make_unique<StorageLittleFs>();
+        auto storage = std::make_unique<StorageFatFs>();
         if (storage->begin()) {
             a.storage = std::move(storage);
         } else {

@@ -267,7 +267,7 @@ bool savePreset(StorageAdapter& storage, int bank, int slot, const PresetSlot& p
     drums["open_hat"] = preset.rhythm.drums.open_hat;
 
     std::string out;
-    serializeJson(doc, out);
+    serializeJsonPretty(doc, out);
 
     return storage.writeFile(path, out);
 }

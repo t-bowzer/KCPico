@@ -428,9 +428,11 @@ Aligned 1:1 with spec §1.6 / §12. Each milestone ends with a **review stop** f
 > hot-plug note-release, and `KEYBCHORD_LOG` as the compile-out release gate.
 > Native suite: 259/259 green.
 
-### M9 (future) — USB Mass Storage & dev serial build
-**Deliverables (planned, not implemented):** mount the onboard LittleFS as a **USB Mass Storage** drive on the native USB port so `config.json`/presets/rhythms can be drag-drop edited from a PC (replacing `uploadfs`). A companion **dev build** keeps the native USB port as the USB-CDC serial debug log (the current paradigm) for troubleshooting when MSC is active. The keyboard remains on the PIO-USB host port (GP0/GP1), so it never conflicts.
-**Constraint:** MSC and the serial log both want the single native USB port — this is an either/or build-time choice (a `-DKEYBCHORD_MSC` flag + factory/env selection).
+### M9 — USB Mass Storage & dev serial build
+**Deliverables:** expose the onboard filesystem as a **USB Mass Storage** drive on the native USB port so `config.json`/presets/rhythms can be drag-drop edited from a PC, while keeping the USB-CDC serial debug log. The keyboard stays on the PIO-USB host port (GP0/GP1), so it never conflicts.
+**Constraint resolved:** a PC cannot mount LittleFS, so the storage backend moved from **LittleFS to FatFS** (arduino-pico `FatFS` on the onboard flash FTL). The drive is exposed with Adafruit TinyUSB's `Adafruit_USBD_MSC` bridged to FatFS's low-level `disk_read`/`disk_write`. `FatFSUSB` was not usable (it forbids Adafruit TinyUSB, which the keyboard host requires).
+
+> **M9 completed (2026-08-16).** Decisions: (1) **boot-key composite** — hold `F11` at power-on to also present the Mass Storage drive; the CDC serial log is present in *both* modes (never lost). A brief USB re-enumeration (`tud_disconnect`/`tud_connect`) follows when the drive is added. (2) **Self-provision in code** — the shipped `data/` LittleFS image is dropped; on first boot FatFS auto-formats and the firmware writes embedded defaults (config + 10×8 presets + 12 rhythms, `lib/core/defaults.*`). Build is now `pio run -e pico` (no `buildfs`/`buildunified`); flash `firmware.uf2`. (3) While the drive is presented, preset save/clear is suppressed to avoid FAT corruption; on eject the FatFS cache is remounted.
 
 ### 6.1 Milestone → Acceptance Criteria coverage matrix
 

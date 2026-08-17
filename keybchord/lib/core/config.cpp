@@ -174,7 +174,7 @@ bool AppConfig::save(StorageAdapter& storage) const {
     logging["midi_monitor"] = midi_monitor_enabled;
 
     std::string out;
-    serializeJson(doc, out);
+    serializeJsonPretty(doc, out);
 
     return storage.writeFile(CONFIG_PATH, out);
 }

@@ -3,7 +3,7 @@
 #include "base.h"
 
 
-class StorageLittleFs : public StorageAdapter {
+class StorageFatFs : public StorageAdapter {
 public:
     bool begin() override;
     bool exists(const std::string& path) override;
@@ -11,5 +11,3 @@ public:
     bool writeFile(const std::string& path, const std::string& data) override;
     bool mkdir(const std::string& path) override;
 };
-
-

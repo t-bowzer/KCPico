@@ -15,6 +15,11 @@
 #include "preset_engine.h"
 #include "perf.h"
 #include "debug_log.h"
+#include "msc_fatfs.h"
+
+#if defined(ARDUINO_ARCH_RP2040)
+#include "device/usbd.h"
+#endif
 
 #if defined(ARDUINO_ARCH_RP2040)
 #include "pico/time.h"  // time_us_64() (64-bit monotonic; micros() wraps at ~71 min)
@@ -31,6 +36,7 @@ static RhythmEngine*   g_rhythmEngine = nullptr;
 static DisplayManager* g_display = nullptr;
 static EditEngine*     g_editEngine = nullptr;
 static PresetEngine*   g_presetEngine = nullptr;
+static MscFatFs*       g_msc = nullptr;
 
 static inline uint64_t nowUs() {
 #if defined(ARDUINO_ARCH_RP2040)
@@ -115,6 +121,32 @@ static void handlePanic() {
     logInfo("Panic: all-sound-off + all-notes-off (16ch)");
 }
 
+// Polls the keyboard for a short window at boot looking for a held F11. When
+// held, the native USB port also presents the FatFS Mass Storage drive so the
+// user can drag-drop edit config.json/presets/rhythms (M9). Returns true if the
+// drive should be enabled.
+static bool detectBootKey() {
+    constexpr uint8_t HID_USAGE_F11 = 0x44;
+    uint64_t deadline = nowUs() + 2000000ULL;  // hard cap (no keyboard present)
+    bool connectedSeen = false;
+
+    while (nowUs() < deadline) {
+        bool connected = g_adapters.input->connected();
+        auto events = g_adapters.input->poll();
+        for (const auto& ev : events) {
+            if (ev.pressed && ev.hid_usage == HID_USAGE_F11) {
+                return true;
+            }
+        }
+        // Once the keyboard has enumerated and its initial report has been read
+        // without F11, the boot key was not held — stop waiting.
+        if (connected && connectedSeen) break;
+        if (connected) connectedSeen = true;
+        delay(10);
+    }
+    return false;
+}
+
 void setup() {
     logInit();
 
@@ -148,6 +180,25 @@ void setup() {
     g_display->update(nowUs());
 
     logInfo("KeybChord Pico ready");
+
+    // M9: if F11 was held at boot, also present the FatFS Mass Storage drive on
+    // the native USB port (the serial debug log stays available).
+    if (detectBootKey()) {
+        g_msc = new MscFatFs();
+        if (g_msc->begin()) {
+            g_msc->setDriveEnabled(true);
+#if defined(ARDUINO_ARCH_RP2040)
+            // The MSC interface was added after the host enumerated the CDC-only
+            // device: re-enumerate so the composite descriptor is picked up.
+            tud_disconnect();
+            delay(20);
+            tud_connect();
+#endif
+        } else {
+            delete g_msc;
+            g_msc = nullptr;
+        }
+    }
 
     // NFR-5: enable the hardware watchdog to recover from a wedged USB stack.
     // Fed on both cores; a 1 s timeout is generous enough for boot/littlefs.
@@ -196,6 +247,17 @@ void loop() {
                 !g_presetEngine->promptActive()) {
                 cancelChordStrum();
                 logInfo("Esc: chord/strum cancelled");
+                continue;
+            }
+            // While the Mass Storage drive is presented the host owns the
+            // filesystem: suppress preset save/clear to avoid FAT corruption.
+            if (g_msc && g_msc->driveEnabled() &&
+                (t == ActionType::PresetSave || t == ActionType::PresetClear)) {
+                logWarn("Preset save/clear disabled while MSC drive is active");
+                if (g_display) {
+                    g_display->showValue("USB drive active", "Save/Clear off",
+                                         false, now_us);
+                }
                 continue;
             }
         }

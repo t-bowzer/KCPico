@@ -69,6 +69,11 @@ constexpr uint8_t HID_USAGE_F7         = 0x40;
 constexpr uint8_t HID_USAGE_F8         = 0x41;
 constexpr uint8_t HID_USAGE_F9         = 0x42;
 constexpr uint8_t HID_USAGE_F10        = 0x43;
+constexpr uint8_t HID_USAGE_F11        = 0x44;
+constexpr uint8_t HID_USAGE_F12        = 0x45;
+constexpr uint8_t HID_USAGE_PRTSC      = 0x46;  // Print Screen
+constexpr uint8_t HID_USAGE_SCLK       = 0x47;  // Scroll Lock
+constexpr uint8_t HID_USAGE_PAUSE      = 0x48;  // Pause
 constexpr uint8_t HID_USAGE_ESC        = 0x29;
 constexpr uint8_t HID_USAGE_LEFT       = 0x50;
 constexpr uint8_t HID_USAGE_DOWN       = 0x51;
@@ -81,11 +86,6 @@ constexpr uint8_t HID_USAGE_KP_SLASH   = 0x54;
 constexpr uint8_t HID_USAGE_KP_STAR    = 0x55;
 constexpr uint8_t HID_USAGE_KP_MINUS   = 0x56;
 constexpr uint8_t HID_USAGE_KP_PLUS    = 0x57;
-constexpr uint8_t HID_USAGE_LCtrl      = 0xE1;
-constexpr uint8_t HID_USAGE_LAlt       = 0xE3;
-constexpr uint8_t HID_USAGE_RCtrl      = 0xE5;
-constexpr uint8_t HID_USAGE_RAlt       = 0xE7;
-constexpr uint8_t HID_USAGE_MENU       = 0x65;  // Application key
 constexpr uint8_t HID_USAGE_HOME       = 0x4A;
 constexpr uint8_t HID_USAGE_END        = 0x4D;
 constexpr uint8_t HID_USAGE_INSERT     = 0x49;
@@ -136,8 +136,7 @@ KeyAction KeymapResolver::resolve(uint8_t hid_usage, uint8_t modifiers) const {
     KeyAction a;
 
     // Super is the global preset/panic modifier (spec 5.7/5.8). While Super is
-    // held only preset bindings resolve; everything else is inert (Super+Esc
-    // panic is M8). Ctrl/Alt are menu toggles, not held modifiers.
+    // held only preset bindings resolve; everything else is inert.
     if (isSuper(modifiers)) {
         switch (hid_usage) {
             case HID_USAGE_HOME:   a.type = ActionType::PresetBankPrev; return a;
@@ -164,33 +163,36 @@ KeyAction KeymapResolver::resolve(uint8_t hid_usage, uint8_t modifiers) const {
     }
 
     switch (hid_usage) {
-        case HID_USAGE_BACKTICK: a.type = ActionType::Backtick;       break;
-        case HID_USAGE_F1:       a.type = ActionType::PlayModeCycle;  break;
-        case HID_USAGE_F5:       a.type = ActionType::VoicingToggle;  break;
+        case HID_USAGE_BACKTICK: a.type = ActionType::Backtick;         break;
+        case HID_USAGE_F1:       a.type = ActionType::PlayModeCycle;    break;
+        case HID_USAGE_F2:       a.type = ActionType::VoicingToggle;    break;
+        case HID_USAGE_F3:       a.type = ActionType::BassToggle;       break;
+        case HID_USAGE_F4:       a.type = ActionType::RhythmLedToggle;  break;
+        case HID_USAGE_F5:       a.type = ActionType::RhythmToggle;     break;
         case HID_USAGE_F6:       a.type = ActionType::RhythmClockToggle; break;
-        case HID_USAGE_F7:       a.type = ActionType::RhythmToggle;   break;
-        case HID_USAGE_F8:       a.type = ActionType::RhythmPatternCycle; break;
-        case HID_USAGE_F9:       a.type = ActionType::RhythmMute;     break;
-        case HID_USAGE_F10:      a.type = ActionType::RhythmLedToggle; break;
-        case HID_USAGE_ESC:      a.type = ActionType::ClearEdit;      break;
-        case HID_USAGE_LEFT:     a.type = ActionType::ExtToggle9;     break;
-        case HID_USAGE_DOWN:     a.type = ActionType::ExtToggle11;    break;
-        case HID_USAGE_RIGHT:    a.type = ActionType::ExtToggle13;    break;
-        case HID_USAGE_PAGE_UP:   a.type = ActionType::TempoUp;       break;
-        case HID_USAGE_PAGE_DOWN: a.type = ActionType::TempoDown;     break;
-        case HID_USAGE_EQUALS:   a.type = ActionType::ChordOctaveUp;  break;
-        case HID_USAGE_MINUS:    a.type = ActionType::ChordOctaveDown; break;
-        case HID_USAGE_KP_PLUS:  a.type = ActionType::StrumOctaveUp;  break;
-        case HID_USAGE_KP_MINUS: a.type = ActionType::StrumOctaveDown; break;
-        case HID_USAGE_MENU:     a.type = ActionType::MenuChord;      break;
-        case HID_USAGE_LCtrl:
-        case HID_USAGE_RCtrl:    a.type = ActionType::MenuRhythm;     break;
-        case HID_USAGE_LAlt:
-        case HID_USAGE_RAlt:     a.type = ActionType::MenuStrum;      break;
-        case HID_USAGE_HOME:     a.type = ActionType::PresetPrev;     break;
-        case HID_USAGE_END:      a.type = ActionType::PresetNext;     break;
-        case HID_USAGE_INSERT:   a.type = ActionType::PresetSave;     break;
-        case HID_USAGE_DELETE:   a.type = ActionType::PresetClear;    break;
+        case HID_USAGE_F7:       a.type = ActionType::RhythmPatternCycle; break;
+        case HID_USAGE_F8:       a.type = ActionType::RhythmMute;       break;
+        case HID_USAGE_F9:       a.type = ActionType::MenuChord;        break;
+        case HID_USAGE_F10:      a.type = ActionType::MenuStrum;        break;
+        case HID_USAGE_F11:      a.type = ActionType::MenuRhythm;       break;
+        case HID_USAGE_F12:      a.type = ActionType::MenuBass;         break;
+        case HID_USAGE_LEFT:     a.type = ActionType::Ext9;             break;
+        case HID_USAGE_DOWN:     a.type = ActionType::Ext11;            break;
+        case HID_USAGE_RIGHT:    a.type = ActionType::Ext13;            break;
+        case HID_USAGE_PRTSC:    a.type = ActionType::Inversion1;       break;
+        case HID_USAGE_SCLK:     a.type = ActionType::Inversion2;       break;
+        case HID_USAGE_PAUSE:    a.type = ActionType::Inversion3;       break;
+        case HID_USAGE_ESC:      a.type = ActionType::ClearEdit;        break;
+        case HID_USAGE_PAGE_UP:   a.type = ActionType::TempoUp;         break;
+        case HID_USAGE_PAGE_DOWN: a.type = ActionType::TempoDown;       break;
+        case HID_USAGE_EQUALS:   a.type = ActionType::ChordOctaveUp;    break;
+        case HID_USAGE_MINUS:    a.type = ActionType::ChordOctaveDown;  break;
+        case HID_USAGE_KP_PLUS:  a.type = ActionType::StrumOctaveUp;    break;
+        case HID_USAGE_KP_MINUS: a.type = ActionType::StrumOctaveDown;  break;
+        case HID_USAGE_HOME:     a.type = ActionType::PresetPrev;       break;
+        case HID_USAGE_END:      a.type = ActionType::PresetNext;       break;
+        case HID_USAGE_INSERT:   a.type = ActionType::PresetSave;       break;
+        case HID_USAGE_DELETE:   a.type = ActionType::PresetClear;      break;
         default:
             if (isNumberRowStrum(hid_usage) || isKeypadStrum(hid_usage)) {
                 a.type = ActionType::StrumKey;
@@ -202,4 +204,3 @@ KeyAction KeymapResolver::resolve(uint8_t hid_usage, uint8_t modifiers) const {
 
     return a;
 }
-

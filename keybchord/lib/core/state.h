@@ -45,10 +45,12 @@ public:
     ChordParams  pendingChord;
     StrumParams  pendingStrum;
     RhythmParams pendingRhythm;
+    BassParams   pendingBass;
 
     ChordParams  activeChord;
     StrumParams  activeStrum;
     RhythmParams activeRhythm;
+    BassParams   activeBass;
 
     // Currently selected chord (root/type/extensions from the latest resolve),
     // independent of Held-mode latching. This is what the strum plate derives

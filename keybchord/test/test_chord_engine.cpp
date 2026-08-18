@@ -206,30 +206,30 @@ TEST_F(ChordEngineTest, ArpeggioFollowsRhythmClock) {
     EXPECT_FALSE(state_.isNoteActive(1, 64));
 }
 
-// AC-6: Rhythm mode steps through the voicing on rhythm steps when rhythm is
-// enabled; without rhythm it stays a Held equivalent.
-TEST_F(ChordEngineTest, RhythmModeStepsWithRhythmEnabled) {
-    state_.pendingChord.play_mode = PlayMode::Rhythm;
-    state_.pendingRhythm.enabled = true;
+// Held extension (FR-C7): pressing Left while a chord sounds adds add9 to the
+// currently-sounding chord (latching onto it), even after the chord key is
+// released.
+TEST_F(ChordEngineTest, HeldExtensionAddsToSoundingChord) {
+    engine_->handleKeyEvent(key(0x17, true), 0);   // T = C major {60,64,67}
+    EXPECT_EQ(noteOnNotes(), (std::vector<uint8_t>{60, 64, 67}));
+    engine_->handleKeyEvent(key(0x17, false), 0);  // release: Held sustains
+    midi_.clear();
 
-    engine_->handleKeyEvent(key(0x17, true), 0);  // C major {60,64,67}
-    EXPECT_TRUE(state_.isNoteActive(1, 60));
-    EXPECT_FALSE(state_.isNoteActive(1, 64));  // stepped, not held
-    EXPECT_FALSE(state_.isNoteActive(1, 67));
+    engine_->handleKeyEvent(key(0x50, true), 0);   // Left arrow held -> add9
+    auto notes = noteOnNotes();
+    EXPECT_EQ(notes, (std::vector<uint8_t>{60, 64, 67, 74}));
 
-    state_.rhythmClock.running = true;
-    state_.rhythmClock.stepAbs = 1;
-    engine_->update(0);
-    EXPECT_TRUE(state_.isNoteActive(1, 64));
+    // Releasing Left removes add9 and re-triggers the base chord.
+    midi_.clear();
+    engine_->handleKeyEvent(key(0x50, false), 0);
+    EXPECT_EQ(noteOnNotes(), (std::vector<uint8_t>{60, 64, 67}));
 }
 
-TEST_F(ChordEngineTest, RhythmModeWithoutRhythmStepsAtTempo) {
-    state_.pendingChord.play_mode = PlayMode::Rhythm;
-    state_.pendingRhythm.enabled = false;
-
-    engine_->handleKeyEvent(key(0x17, true), 0);  // C major {60,64,67}
-    EXPECT_EQ(midi_.noteOnCount(), 1);  // steps one note at a time
-    EXPECT_TRUE(state_.isNoteActive(1, 60));
-    EXPECT_FALSE(state_.isNoteActive(1, 64));
-    EXPECT_FALSE(state_.isNoteActive(1, 67));
+// Manual inversion (VR-8): PrtSc selects 1st inversion — the 3rd becomes the
+// lowest note.
+TEST_F(ChordEngineTest, ManualInversionFirst) {
+    state_.pendingChord.inversion = InversionMode::First;
+    engine_->handleKeyEvent(key(0x17, true), 0);   // C major, 1st inversion
+    // Root-position {60,64,67}; 1st inversion rotates the root up an octave.
+    EXPECT_EQ(noteOnNotes(), (std::vector<uint8_t>{64, 67, 72}));
 }

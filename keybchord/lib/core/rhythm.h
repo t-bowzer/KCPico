@@ -67,6 +67,11 @@ std::vector<StepEvent> stepEvents(const RhythmPattern& p, int step);
 // Standard GM codes (kick/snare/hats) are translated; all others pass through.
 uint8_t mapDrumNote(uint8_t note, const DrumMap& drums);
 
+// Velocity override for a standard GM drum code (Upgrade-Plan "velocity per drum
+// piece"). A piece whose override is 0 follows the pattern's authored step
+// velocity; 1..127 forces a fixed velocity. Non-mapped codes pass through.
+uint8_t mapDrumVelocity(uint8_t note, const DrumMap& drums, uint8_t patternVelocity);
+
 // Rhythm list (spec 7.1): index <-> name lookups.
 const char* rhythmName(int index);
 int rhythmIndex(const std::string& name);

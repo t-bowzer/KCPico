@@ -10,6 +10,7 @@ void StateManager::loadDefaults() {
     pendingChord  = ChordParams::defaults();
     pendingStrum  = StrumParams::defaults();
     pendingRhythm = RhythmParams::defaults();
+    pendingBass   = BassParams::defaults();
     snapshotActive();
     config = AppConfig::defaults();
     activeNotes.clear();
@@ -36,6 +37,7 @@ void StateManager::snapshotActive() {
     activeChord  = pendingChord;
     activeStrum  = pendingStrum;
     activeRhythm = pendingRhythm;
+    activeBass   = pendingBass;
 }
 
 void StateManager::snapshotChord() {

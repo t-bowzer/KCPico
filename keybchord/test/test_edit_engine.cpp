@@ -63,32 +63,39 @@ protected:
 TEST_F(EditEngineTest, MenuToggleEnterAndExit) {
     EXPECT_EQ(state_.editMenu, EditMenu::None);
 
-    edit_->handleKeyEvent(key(0xE1, true), 0);   // Ctrl -> Rhythm
+    edit_->handleKeyEvent(key(0x44, true), 0);   // F11 -> Rhythm
     EXPECT_EQ(state_.editMenu, EditMenu::Rhythm);
-    edit_->handleKeyEvent(key(0xE1, true), 0);   // Ctrl again -> exit
+    edit_->handleKeyEvent(key(0x44, true), 0);   // F11 again -> exit
     EXPECT_EQ(state_.editMenu, EditMenu::None);
 
-    edit_->handleKeyEvent(key(0xE3, true), 0);   // Alt -> Strum
+    edit_->handleKeyEvent(key(0x43, true), 0);   // F10 -> Strum
     EXPECT_EQ(state_.editMenu, EditMenu::Strum);
-    edit_->handleKeyEvent(key(0x65, true), 0);   // Menu -> switch to Chord
+    edit_->handleKeyEvent(key(0x42, true), 0);   // F9 -> switch to Chord
     EXPECT_EQ(state_.editMenu, EditMenu::Chord);
 }
 
-TEST_F(EditEngineTest, F12FallsBackToChordEdit) {
-    edit_->handleKeyEvent(key(0x45, true), 0);   // F12 -> enter chord edit
-    EXPECT_EQ(state_.editMenu, EditMenu::Chord);
+TEST_F(EditEngineTest, BassMenuViaF12) {
+    edit_->handleKeyEvent(key(0x45, true), 0);   // F12 -> Bass edit
+    EXPECT_EQ(state_.editMenu, EditMenu::Bass);
 }
 
-TEST_F(EditEngineTest, F10TogglesRhythmLed) {
+TEST_F(EditEngineTest, DrumSubMenuFromRhythmF8) {
+    edit_->handleKeyEvent(key(0x44, true), 0);   // F11 -> Rhythm
+    EXPECT_EQ(state_.editMenu, EditMenu::Rhythm);
+    edit_->handleKeyEvent(key(0x41, true), 0);   // F8 -> Drum sub-menu
+    EXPECT_EQ(state_.editMenu, EditMenu::Drum);
+}
+
+TEST_F(EditEngineTest, F4TogglesRhythmLed) {
     EXPECT_TRUE(state_.config.bpm_indicator);
-    edit_->handleKeyEvent(key(0x43, true), 0);   // F10 -> LED off
+    edit_->handleKeyEvent(key(0x3D, true), 0);   // F4 -> LED off
     EXPECT_FALSE(state_.config.bpm_indicator);
-    edit_->handleKeyEvent(key(0x43, true), 0);   // F10 -> LED on
+    edit_->handleKeyEvent(key(0x3D, true), 0);   // F4 -> LED on
     EXPECT_TRUE(state_.config.bpm_indicator);
 }
 
 TEST_F(EditEngineTest, MenuTitleAndParamRendered) {
-    edit_->handleKeyEvent(key(0xE3, true), 0);   // Alt -> Strum Edit
+    edit_->handleKeyEvent(key(0x43, true), 0);   // F10 -> Strum Edit
     display_->update(0);
 
     ASSERT_EQ(lcd_.frames().size(), 1u);
@@ -97,7 +104,7 @@ TEST_F(EditEngineTest, MenuTitleAndParamRendered) {
 }
 
 TEST_F(EditEngineTest, FKeysSelectParam) {
-    edit_->handleKeyEvent(key(0xE3, true), 0);   // Alt -> Strum
+    edit_->handleKeyEvent(key(0x43, true), 0);   // F10 -> Strum
     EXPECT_EQ(state_.editParam, 0);              // F1 = Octave
 
     edit_->handleKeyEvent(key(0x3B, true), 0);   // F2 -> Duration
@@ -106,13 +113,13 @@ TEST_F(EditEngineTest, FKeysSelectParam) {
     edit_->handleKeyEvent(key(0x3D, true), 0);   // F4 -> Layout
     EXPECT_EQ(state_.editParam, 3);
 
-    // Out-of-range F-key is ignored (Strum has 4 params).
-    edit_->handleKeyEvent(key(0x40, true), 0);   // F7 -> index 6, ignored
+    // Out-of-range F-key is ignored (Strum has 7 params; F8 = index 7).
+    edit_->handleKeyEvent(key(0x41, true), 0);   // F8 -> index 7, ignored
     EXPECT_EQ(state_.editParam, 3);
 }
 
 TEST_F(EditEngineTest, PlusMinusStepsSelectedParam) {
-    edit_->handleKeyEvent(key(0xE1, true), 0);   // Ctrl -> Rhythm (F1 = Tempo)
+    edit_->handleKeyEvent(key(0x44, true), 0);   // F11 -> Rhythm (F1 = Tempo)
     edit_->handleKeyEvent(key(0x2E, true), 0);   // + -> tempo 121
     EXPECT_EQ(state_.pendingRhythm.tempo, 121);
     edit_->handleKeyEvent(key(0x2D, true), 0);   // - -> tempo 120
@@ -124,7 +131,7 @@ TEST_F(EditEngineTest, PlusMinusStepsSelectedParam) {
 }
 
 TEST_F(EditEngineTest, PageUpDownStepsInMenu) {
-    edit_->handleKeyEvent(key(0xE1, true), 0);   // Ctrl -> Rhythm (F1 = Tempo)
+    edit_->handleKeyEvent(key(0x44, true), 0);   // F11 -> Rhythm (F1 = Tempo)
     edit_->handleKeyEvent(key(0x4B, true), 0);   // Page Up -> tempo 121
     EXPECT_EQ(state_.pendingRhythm.tempo, 121);
     edit_->handleKeyEvent(key(0x4E, true), 0);   // Page Down -> 120
@@ -132,14 +139,14 @@ TEST_F(EditEngineTest, PageUpDownStepsInMenu) {
 }
 
 TEST_F(EditEngineTest, EscExitsMenu) {
-    edit_->handleKeyEvent(key(0x65, true), 0);   // Menu -> Chord
+    edit_->handleKeyEvent(key(0x42, true), 0);   // F9 -> Chord
     EXPECT_EQ(state_.editMenu, EditMenu::Chord);
     edit_->handleKeyEvent(key(0x29, true), 0);   // Esc -> exit
     EXPECT_EQ(state_.editMenu, EditMenu::None);
 }
 
 TEST_F(EditEngineTest, ValueShownThenRevertsToMenu) {
-    edit_->handleKeyEvent(key(0xE1, true), 0);   // Ctrl -> Rhythm
+    edit_->handleKeyEvent(key(0x44, true), 0);   // F11 -> Rhythm
     display_->update(0);
     lcd_.reset();
 
@@ -149,7 +156,6 @@ TEST_F(EditEngineTest, ValueShownThenRevertsToMenu) {
     EXPECT_EQ(lcd_.frames()[0].l1, std::string("Rhythm Tempo") + std::string(4, ' '));
     EXPECT_EQ(lcd_.frames()[0].l2, std::string("121") + std::string(13, ' '));
 
-    // Reverts to the menu screen after the revert timeout (1500ms).
     lcd_.reset();
     display_->update(1000 + 1500UL * 1000);
     ASSERT_EQ(lcd_.frames().size(), 1u);
@@ -164,17 +170,21 @@ TEST_F(EditEngineTest, DirectModeCycleFiresCallback) {
 }
 
 TEST_F(EditEngineTest, DirectShortcuts) {
-    // F5 voicing.
-    edit_->handleKeyEvent(key(0x3E, true), 0);
+    // F2 voicing.
+    edit_->handleKeyEvent(key(0x3B, true), 0);
     EXPECT_EQ(state_.pendingChord.voicing_mode, VoicingMode::Smart);
 
-    // Arrows -> extensions.
-    edit_->handleKeyEvent(key(0x50, true), 0);
-    edit_->handleKeyEvent(key(0x51, true), 0);
-    edit_->handleKeyEvent(key(0x4F, true), 0);
-    EXPECT_TRUE(state_.pendingChord.add9);
-    EXPECT_TRUE(state_.pendingChord.add11);
-    EXPECT_TRUE(state_.pendingChord.add13);
+    // F3 bass toggle.
+    edit_->handleKeyEvent(key(0x3C, true), 0);
+    EXPECT_TRUE(state_.pendingBass.enabled);
+
+    // Inversions (PrtSc/ScLk/Pause).
+    edit_->handleKeyEvent(key(0x46, true), 0);
+    EXPECT_EQ(state_.pendingChord.inversion, InversionMode::First);
+    edit_->handleKeyEvent(key(0x47, true), 0);
+    EXPECT_EQ(state_.pendingChord.inversion, InversionMode::Second);
+    edit_->handleKeyEvent(key(0x48, true), 0);
+    EXPECT_EQ(state_.pendingChord.inversion, InversionMode::Third);
 
     // Number-row = / - -> chord octave.
     edit_->handleKeyEvent(key(0x2E, true), 0);
@@ -192,23 +202,24 @@ TEST_F(EditEngineTest, DirectShortcuts) {
     edit_->handleKeyEvent(key(0x4B, true), 0);
     EXPECT_EQ(state_.pendingRhythm.tempo, 121);
 
-    // F7/F8/F9 -> rhythm toggles.
-    edit_->handleKeyEvent(key(0x40, true), 0);
+    // F5/F7/F8 -> rhythm toggles.
+    edit_->handleKeyEvent(key(0x3E, true), 0);
     EXPECT_TRUE(state_.pendingRhythm.enabled);
-    edit_->handleKeyEvent(key(0x41, true), 0);
+    edit_->handleKeyEvent(key(0x40, true), 0);
     EXPECT_EQ(state_.pendingRhythm.pattern, 1);
     EXPECT_EQ(patternChanged_, 1);
-    edit_->handleKeyEvent(key(0x42, true), 0);
+    edit_->handleKeyEvent(key(0x41, true), 0);
     EXPECT_TRUE(state_.pendingRhythm.muted);
 }
 
 TEST_F(EditEngineTest, ChordAndStrumKeysAreForwarded) {
     EXPECT_FALSE(edit_->handleKeyEvent(key(0x17, true), 0));  // T (chord key)
     EXPECT_FALSE(edit_->handleKeyEvent(key(0x1E, true), 0));  // 1 (strum key)
+    EXPECT_FALSE(edit_->handleKeyEvent(key(0x50, true), 0));  // Left (held ext)
 }
 
 TEST_F(EditEngineTest, ChordAndStrumKeysForwardedInMenu) {
-    edit_->handleKeyEvent(key(0x65, true), 0);   // Menu -> Chord Edit
+    edit_->handleKeyEvent(key(0x42, true), 0);   // F9 -> Chord Edit
     EXPECT_FALSE(edit_->handleKeyEvent(key(0x17, true), 0));  // T (chord) forwarded
     EXPECT_FALSE(edit_->handleKeyEvent(key(0x1E, true), 0));  // 1 (strum) forwarded
     EXPECT_FALSE(edit_->handleKeyEvent(key(0x35, true), 0));  // ` (backtick) forwarded
@@ -218,7 +229,7 @@ TEST_F(EditEngineTest, ChordAndStrumKeysForwardedInMenu) {
 }
 
 TEST_F(EditEngineTest, ModeChangeInMenuFiresCallback) {
-    edit_->handleKeyEvent(key(0x65, true), 0);   // Chord Edit
+    edit_->handleKeyEvent(key(0x42, true), 0);   // Chord Edit
     edit_->handleKeyEvent(key(0x3B, true), 0);   // F2 -> Mode
     edit_->handleKeyEvent(key(0x2E, true), 0);   // + -> next mode
     EXPECT_EQ(state_.pendingChord.play_mode, PlayMode::PressToPlay);
@@ -226,21 +237,21 @@ TEST_F(EditEngineTest, ModeChangeInMenuFiresCallback) {
 }
 
 TEST_F(EditEngineTest, ArrowKeysNavigateParams) {
-    edit_->handleKeyEvent(key(0x65, true), 0);   // Menu -> Chord Edit (F1 = Octave)
+    edit_->handleKeyEvent(key(0x42, true), 0);   // F9 -> Chord Edit (F1 = Octave)
     EXPECT_EQ(state_.editParam, 0);
 
     edit_->handleKeyEvent(key(0x4F, true), 0);   // Right -> Mode
     EXPECT_EQ(state_.editParam, 1);
     edit_->handleKeyEvent(key(0x50, true), 0);   // Left -> Octave
     EXPECT_EQ(state_.editParam, 0);
-    edit_->handleKeyEvent(key(0x50, true), 0);   // Left wraps to Add13 (last)
-    EXPECT_EQ(state_.editParam, 8);
+    edit_->handleKeyEvent(key(0x50, true), 0);   // Left wraps to ArpMode (last)
+    EXPECT_EQ(state_.editParam, 10);
     edit_->handleKeyEvent(key(0x4F, true), 0);   // Right wraps to Octave (first)
     EXPECT_EQ(state_.editParam, 0);
 }
 
 TEST_F(EditEngineTest, UpDownArrowsStepValueInMenu) {
-    edit_->handleKeyEvent(key(0xE1, true), 0);   // Ctrl -> Rhythm (F1 = Tempo)
+    edit_->handleKeyEvent(key(0x44, true), 0);   // F11 -> Rhythm (F1 = Tempo)
     edit_->handleKeyEvent(key(0x52, true), 0);   // Up -> tempo 121
     EXPECT_EQ(state_.pendingRhythm.tempo, 121);
     edit_->handleKeyEvent(key(0x51, true), 0);   // Down -> tempo 120
@@ -255,21 +266,36 @@ TEST_F(EditEngineTest, F6TogglesClockOut) {
     EXPECT_FALSE(state_.config.midi_clock_enabled);
 }
 
+TEST_F(EditEngineTest, DrumNoteChangeAuditions) {
+    int auditioned = -1;
+    edit_->setDrumAuditionCallback([&](uint8_t note) { auditioned = note; });
+
+    edit_->handleKeyEvent(key(0x44, true), 0);   // F11 -> Rhythm
+    edit_->handleKeyEvent(key(0x41, true), 0);   // F8 -> Drum menu (F1 = Kick)
+    edit_->handleKeyEvent(key(0x2E, true), 0);   // + -> kick note 37
+    EXPECT_EQ(state_.pendingRhythm.drums.kick, 37);
+    EXPECT_EQ(auditioned, 37);
+
+    // Velocity changes do not audition.
+    auditioned = -1;
+    edit_->handleKeyEvent(key(0x3B, true), 0);   // F2 -> Kick Vel
+    edit_->handleKeyEvent(key(0x2E, true), 0);   // + -> kick vel 1
+    EXPECT_EQ(state_.pendingRhythm.drums.kick_vel, 1);
+    EXPECT_EQ(auditioned, -1);
+}
+
 TEST_F(EditEngineTest, TempoAutoRepeatsWhileHeld) {
     edit_->handleKeyEvent(key(0x4B, true), 0);   // Page Up -> tempo 121
     EXPECT_EQ(state_.pendingRhythm.tempo, 121);
 
-    // No repeat before the initial delay (500ms).
     edit_->update(500000ULL - 1);
     EXPECT_EQ(state_.pendingRhythm.tempo, 121);
 
-    // Repeats at the interval after the delay.
     edit_->update(500000ULL);
     EXPECT_EQ(state_.pendingRhythm.tempo, 122);
     edit_->update(500000ULL + 80000ULL);
     EXPECT_EQ(state_.pendingRhythm.tempo, 123);
 
-    // Release stops the repeat.
     edit_->handleKeyEvent(key(0x4B, false), 0);
     edit_->update(500000ULL + 80000ULL * 2);
     EXPECT_EQ(state_.pendingRhythm.tempo, 123);
@@ -285,7 +311,7 @@ TEST_F(EditEngineTest, SmallRangeDoesNotAutoRepeat) {
 }
 
 TEST_F(EditEngineTest, MenuExitsAfterIdleTimeout) {
-    edit_->handleKeyEvent(key(0x65, true), 1000);   // Menu -> Chord Edit
+    edit_->handleKeyEvent(key(0x42, true), 1000);   // F9 -> Chord Edit
     EXPECT_EQ(state_.editMenu, EditMenu::Chord);
 
     edit_->update(1000 + 10000ULL * 1000 - 1);

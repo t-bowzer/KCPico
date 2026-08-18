@@ -7,7 +7,6 @@ TEST(Naming, PlayModeShortNames) {
     EXPECT_STREQ(playModeShort(PlayMode::Held), "Held");
     EXPECT_STREQ(playModeShort(PlayMode::PressToPlay), "Press");
     EXPECT_STREQ(playModeShort(PlayMode::Arpeggio), "Arp");
-    EXPECT_STREQ(playModeShort(PlayMode::Rhythm), "Rhythm");
     EXPECT_STREQ(playModeShort(PlayMode::Silent), "Silent");
 }
 

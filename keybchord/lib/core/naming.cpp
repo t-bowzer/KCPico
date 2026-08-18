@@ -10,7 +10,6 @@ const char* playModeShort(PlayMode mode) {
         case PlayMode::Held:        return "Held";
         case PlayMode::PressToPlay: return "Press";
         case PlayMode::Arpeggio:    return "Arp";
-        case PlayMode::Rhythm:      return "Rhythm";
         case PlayMode::Silent:      return "Silent";
         default:                    return "Held";
     }

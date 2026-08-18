@@ -9,9 +9,11 @@ ChordParams ChordParams::defaults() {
     p.velocity         = 100;
     p.pan              = 64;
     p.voicing_mode     = VoicingMode::RootPosition;
-    p.add9             = false;
-    p.add11            = false;
-    p.add13            = false;
+    p.chord_roll_ms    = 0;
+    p.min_notes        = 3;
+    p.min_interval     = 0;
+    p.inversion        = InversionMode::Root;
+    p.arp_mode         = ArpMode::Up;
     p.channel          = 1;
     return p;
 }
@@ -22,6 +24,9 @@ StrumParams StrumParams::defaults() {
     p.note_duration_ms = 300;
     p.velocity         = 90;
     p.limited_keys     = false;
+    p.mode             = StrumMode::FollowChord;
+    p.root_pc          = 0;
+    p.scale_type       = ScaleType::Ionian;
     p.channel          = 2;
     return p;
 }
@@ -35,6 +40,16 @@ RhythmParams RhythmParams::defaults() {
     p.channel = 10;
     p.pattern = 0;
     p.drums   = DrumMap{};
+    return p;
+}
+
+BassParams BassParams::defaults() {
+    BassParams p;
+    p.enabled          = false;
+    p.octave           = -1;
+    p.note_duration_ms = 150;
+    p.velocity         = 90;
+    p.channel          = 3;
     return p;
 }
 
@@ -53,5 +68,3 @@ GlobalParams GlobalParams::defaults() {
     p.midi_clock_enabled   = false;
     return p;
 }
-
-

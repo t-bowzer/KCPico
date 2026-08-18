@@ -1,0 +1,29 @@
+The Suzuki Omnichord implements its walking bass pattern through a rigid hardware-based step sequencer rather than dynamic, real-time musical improvisation. Because the instrument operates on a fixed matrix, its "walking" effect is achieved via pre-programmed lookup tables hardwired into its central processing microchip. [1, 2] 
+The internal execution operates through a series of specific electronic steps: [3] 
+## 1. The Input Handshake (Chord Matrix + Rhythm)
+The Omnichord's brain (a microprocessor like those found in the vintage OM-84 or modern [Suzuki OM-108](https://www.suzuki-music.co.jp/special/omnichord_om-108/en/index.html)) constantly scans the key matrix of the chord buttons. [4] 
+
+* To trigger the walking bass, you must select a specific rhythm preset that utilizes a 4/4 walking pattern—such as Swing or Foxtrot.
+* When a chord button is pressed, the chip cross-references the selected rhythm style with the specific chord type (Major, Minor, or 7th). [1, 5, 6, 7] 
+
+## 2. Solving the "Next Chord" Problem
+In true jazz music, a human bass player chooses a trailing note on Beat 4 that smoothly transitions into whatever chord is coming next. Because the Omnichord cannot predict which button you will press next, it bypasses this limitation by using self-contained, looping interval paths. [8, 9, 10] 
+
+* The walking pattern is programmed as a repeatable 4-step or 8-step cycle.
+* The loop is designed to sound harmonically pleasant even if it abruptly breaks mid-sequence when you jump to a completely different chord button. [11] 
+
+## 3. The Fixed Interval Blueprint
+Instead of calculating music theory on the fly, the microchip pulls a fixed sequence of numerical step intervals from its internal ROM. For a standard Major chord walking pattern, the internal step-sequencer is hardcoded to fire the following scale degrees on a repeating loop:
+
+| Beat | Musical Interval | Example in C Major | Technical Action |
+|---|---|---|---|
+| Beat 1 | Root Note | C | Microchip triggers the base frequency divider for the fundamental note. |
+| Beat 2 | Major 3rd | E | Sequence steps up to outline the chord's character. |
+| Beat 3 | Perfect 5th | G | Sequence continues upward to the dominant anchor point. |
+| Beat 4 | Major 6th / 7th | A or Bb | Steps up to create melodic movement before looping back to the root. |
+
+## 4. Voice Generation and Pitch Scaling
+Once the microchip determines which note in the sequence to play, it translates that data into physical sound: [2] 
+
+* Pitch Selection: On vintage models, the chip directs a top-octave generator or resistor-ladder network to shift the clock frequency, instantly changing the pitch of the bass oscillator.
+* The Bass Voice: This pitch data triggers a dedicated analog or digital sub-oscillator voice. The Omnichord routes this through a low-pass filter with a sharp attack and a rapid decay envelope. This specifically mimics the percussive, acoustic "thump" of a plucked double bass. [1, 12, 13] 

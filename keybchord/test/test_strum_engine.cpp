@@ -49,15 +49,33 @@ TEST_F(StrumEngineTest, LimitedLayoutOrdering) {
     EXPECT_EQ(lastNoteOnOnChannel(2), -1);
 }
 
-// Strummed notes release after note_duration_ms.
+// A tap (press then release) sounds for the minimum duration.
 TEST_F(StrumEngineTest, NoteOffAfterDuration) {
     chord_->handleKeyEvent(key(0x17, true), 0);  // C major
 
-    strum_->handleKeyEvent(key(0x62, true), 0);  // Keypad 0
+    strum_->handleKeyEvent(key(0x62, true), 0);   // Keypad 0 press
+    strum_->handleKeyEvent(key(0x62, false), 0);  // release (tap)
     EXPECT_EQ(lastNoteOnOnChannel(2), 72);
     EXPECT_EQ(noteOffCountOnChannel(2), 0);
 
     strum_->update(300000);  // note_duration_ms = 300 -> 300000 us
+    EXPECT_EQ(noteOffCountOnChannel(2), 1);
+    EXPECT_FALSE(state_.isNoteActive(2, 72));
+}
+
+// Duration is a minimum: a held key sustains past the duration.
+TEST_F(StrumEngineTest, HeldKeySustainsPastDuration) {
+    state_.pendingStrum.note_duration_ms = 300;
+    chord_->handleKeyEvent(key(0x17, true), 0);  // C major
+
+    strum_->handleKeyEvent(key(0x62, true), 0);  // press, held
+    EXPECT_TRUE(state_.isNoteActive(2, 72));
+
+    strum_->update(400000);  // past the 300ms duration, still held
+    EXPECT_TRUE(state_.isNoteActive(2, 72));
+    EXPECT_EQ(noteOffCountOnChannel(2), 0);
+
+    strum_->handleKeyEvent(key(0x62, false), 400000);  // release after deadline
     EXPECT_EQ(noteOffCountOnChannel(2), 1);
     EXPECT_FALSE(state_.isNoteActive(2, 72));
 }
@@ -98,15 +116,47 @@ TEST_F(StrumEngineTest, NoChordNoStrum) {
     EXPECT_EQ(lastNoteOnOnChannel(2), -1);
 }
 
-// FR-S5: extension toggles are picked up immediately by the strum pool.
+// Held extensions (FR-C7) are picked up immediately by the strum pool via the
+// chord engine's merged selected chord.
 TEST_F(StrumEngineTest, ImmediatePickupOfExtensions) {
     chord_->handleKeyEvent(key(0x17, true), 0);  // C major {0,4,7}
     strum_->handleKeyEvent(key(0x63, true), 0);  // Keypad . -> pool[1] = 76
     EXPECT_EQ(lastNoteOnOnChannel(2), 76);
 
-    state_.pendingChord.add9 = true;             // add9 toggled (via EditEngine)
-    strum_->handleKeyEvent(key(0x63, true), 0);  // pool now {0,2,4,7}: pool[1] = 74
+    chord_->handleKeyEvent(key(0x50, true), 0);  // Left arrow -> add9 held
+    strum_->handleKeyEvent(key(0x63, true), 0);  // pool {0,2,4,7}: pool[1] = 74
     EXPECT_EQ(lastNoteOnOnChannel(2), 74);
+}
+
+// Scale mode: a selectable root + scale/mode drives the pool instead of the
+// chord's pitch classes.
+TEST_F(StrumEngineTest, ScaleModePool) {
+    state_.pendingStrum.mode = StrumMode::Scale;
+    state_.pendingStrum.scale_type = ScaleType::Ionian;
+    state_.pendingStrum.root_pc = 0;   // C
+    state_.pendingStrum.octave = 1;    // anchor 72
+
+    strum_->handleKeyEvent(key(0x62, true), 0);  // pool[0] = 72 (C)
+    EXPECT_EQ(lastNoteOnOnChannel(2), 72);
+
+    strum_->handleKeyEvent(key(0x63, true), 0);  // pool[1] = 74 (D)
+    EXPECT_EQ(lastNoteOnOnChannel(2), 74);
+
+    strum_->handleKeyEvent(key(0x59, true), 0);  // pool[2] = 76 (E)
+    EXPECT_EQ(lastNoteOnOnChannel(2), 76);
+}
+
+// Piano mode: chromatic — each strum key is one semitone higher.
+TEST_F(StrumEngineTest, PianoModePool) {
+    state_.pendingStrum.mode = StrumMode::Piano;
+    state_.pendingStrum.root_pc = 0;
+    state_.pendingStrum.octave = 1;    // anchor 72
+
+    strum_->handleKeyEvent(key(0x62, true), 0);  // pool[0] = 72
+    EXPECT_EQ(lastNoteOnOnChannel(2), 72);
+
+    strum_->handleKeyEvent(key(0x63, true), 0);  // pool[1] = 73
+    EXPECT_EQ(lastNoteOnOnChannel(2), 73);
 }
 
 // Keypad +/- are not strum keys: they never produce a strum note.
@@ -123,24 +173,21 @@ TEST_F(StrumEngineTest, NumpadPlusMinusNotStrum) {
 TEST_F(StrumEngineTest, NoStuckNotesWhenBufferOverflows) {
     state_.pendingStrum.note_duration_ms = 4000;
 
-    const uint8_t fullNumpad[11] = {0x62, 0x63, 0x59, 0x5A, 0x5B, 0x5C,
-                                    0x5D, 0x5E, 0x5F, 0x60, 0x61};
-
     ResolvedChord c;
     c.type = ChordType::Major;
-
-    // C major pool (11 distinct notes) then Db major pool (11 disjoint notes):
-    // 22 concurrent notes exceed the 16-slot buffer.
     c.rootPc = 0;
     state_.selectedChord = c;
     state_.selectedChordValid = true;
-    for (uint8_t u : fullNumpad) strum_->handleKeyEvent(key(u, true), 0);
 
-    c.rootPc = 1;
-    state_.selectedChord = c;
-    for (uint8_t u : fullNumpad) strum_->handleKeyEvent(key(u, true), 0);
+    // 21 distinct strum usages (number row 1..0 + numpad 0 . 1..9), all held:
+    // exceeds the 16-slot buffer, forcing eviction.
+    const uint8_t usages[21] = {
+        0x1E,0x1F,0x20,0x21,0x22,0x23,0x24,0x25,0x26,0x27,  // number row
+        0x62,0x63,0x59,0x5A,0x5B,0x5C,0x5D,0x5E,0x5F,0x60,0x61,  // numpad
+    };
+    for (uint8_t u : usages) strum_->handleKeyEvent(key(u, true), 0);
 
-    strum_->update(5000000);  // advance well past all deadlines
+    strum_->allNotesOff();  // release everything
 
     int on = 0, off = 0;
     for (const auto& m : midi_.messages()) {
@@ -149,50 +196,9 @@ TEST_F(StrumEngineTest, NoStuckNotesWhenBufferOverflows) {
             if ((m.status & 0xF0) == midi::STATUS_NOTE_OFF) off++;
         }
     }
-    EXPECT_EQ(on, 22);
-    EXPECT_EQ(off, 22);  // no stuck notes
-}
-
-// Duration decrease must apply to a note re-triggered while still sounding.
-TEST_F(StrumEngineTest, DurationDecreaseAppliesToRetriggeredNote) {
-    state_.pendingStrum.note_duration_ms = 4000;  // long
-    chord_->handleKeyEvent(key(0x17, true), 0);   // C major
-
-    strum_->handleKeyEvent(key(0x59, true), 0);   // numpad 1 -> note 79
-    EXPECT_TRUE(state_.isNoteActive(2, 79));
-
-    state_.pendingStrum.note_duration_ms = 300;   // decrease while sounding
-
-    strum_->handleKeyEvent(key(0x59, true), 1000000);  // re-play at t=1s
-
-    // 300ms after the re-press (t=1.3s) the note must be off.
-    strum_->update(1300000);
-    EXPECT_FALSE(state_.isNoteActive(2, 79));
-}
-
-// Same but using a direct duration edit (the EditEngine's +/- path), and
-// re-playing after the original note has fully faded out (free-slot path).
-TEST_F(StrumEngineTest, DurationEditAppliesToReplayedNoteAfterFadeOut) {
-    chord_->handleKeyEvent(key(0x17, true), 0);  // C major
-
-    // Set strum duration to 1000ms.
-    state_.pendingStrum.note_duration_ms = 1000;
-
-    // Play numpad 1 (note 79) at t=0, then let it fade out.
-    strum_->handleKeyEvent(key(0x59, true), 0);
-    EXPECT_TRUE(state_.isNoteActive(2, 79));
-    strum_->update(1000000);  // t=1s >= 1000ms -> note-off
-    EXPECT_FALSE(state_.isNoteActive(2, 79));
-
-    // Decrease duration back to 300ms.
-    state_.pendingStrum.note_duration_ms = 300;
-
-    // Re-play numpad 1 (note 79) at t=2.5s; it must release 300ms later.
-    strum_->handleKeyEvent(key(0x59, true), 2500000);
-    EXPECT_TRUE(state_.isNoteActive(2, 79));
-
-    strum_->update(2800000);  // t=2.8s
-    EXPECT_FALSE(state_.isNoteActive(2, 79));
+    EXPECT_EQ(on, 21);
+    EXPECT_EQ(off, 21);  // every note-on paired with a note-off
+    EXPECT_TRUE(state_.activeNotes.empty());
 }
 
 // Re-strumming a still-sounding note must re-articulate: note-off precedes the
@@ -204,7 +210,6 @@ TEST_F(StrumEngineTest, RetriggerRearticulatesWithNoteOffFirst) {
     midi_.clear();
     strum_->handleKeyEvent(key(0x59, true), 1000000);  // re-strum
 
-    // Channel-2 messages for note 79, in order.
     std::vector<std::pair<bool, bool>> ops;  // (isNoteOn, isNote79)
     for (const auto& m : midi_.messages()) {
         if ((m.status & 0x0F) != 1) continue;  // channel 2
@@ -217,29 +222,3 @@ TEST_F(StrumEngineTest, RetriggerRearticulatesWithNoteOffFirst) {
     EXPECT_TRUE(ops[1].second);   // then note 79 ...
     EXPECT_TRUE(ops[1].first);    // ... a note-on
 }
-
-// Regression (M4 open bug): numpad 0 and . (the two lowest pool notes) must
-// release after a 50ms duration set through the edit path.
-TEST_F(StrumEngineTest, NumpadZeroAndDecimalReleaseAtMinDuration) {
-    chord_->handleKeyEvent(key(0x17, true), 0);  // C major
-
-    // Set duration to 50ms (five -50 steps from the 300 default).
-    state_.pendingStrum.note_duration_ms = 50;
-
-    // Numpad 0 -> pool[0] = 72.
-    strum_->handleKeyEvent(key(0x62, true), 0);
-    EXPECT_EQ(lastNoteOnOnChannel(2), 72);
-    EXPECT_TRUE(state_.isNoteActive(2, 72));
-
-    // Numpad . -> pool[1] = 76.
-    strum_->handleKeyEvent(key(0x63, true), 0);
-    EXPECT_EQ(lastNoteOnOnChannel(2), 76);
-    EXPECT_TRUE(state_.isNoteActive(2, 76));
-
-    // 50ms later both must be off.
-    strum_->update(50000);
-    EXPECT_FALSE(state_.isNoteActive(2, 72));
-    EXPECT_FALSE(state_.isNoteActive(2, 76));
-}
-
-

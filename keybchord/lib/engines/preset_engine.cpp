@@ -30,7 +30,7 @@ void PresetEngine::recomputeDirty() {
     PresetSlot stored = loadPresetOrDefault(storage_, state_.currentBank,
                                             state_.currentSlot);
     PresetSlot cur = makePreset(state_.pendingChord, state_.pendingStrum,
-                                state_.pendingRhythm, stored.name);
+                                state_.pendingBass, state_.pendingRhythm, stored.name);
     state_.dirty = !cur.sameParams(stored);
 }
 
@@ -77,6 +77,7 @@ void PresetEngine::loadCursor(uint64_t now_us) {
 
     state_.pendingChord  = stored.chord;
     state_.pendingStrum  = stored.strum;
+    state_.pendingBass   = stored.bass;
     state_.pendingRhythm = stored.rhythm;
 
     state_.currentBank  = bank;
@@ -121,7 +122,8 @@ void PresetEngine::confirmPrompt(uint64_t now_us) {
     if (op == PendingOp::Save) {
         PresetSlot existing = loadPresetOrDefault(storage_, bank, slot);
         PresetSlot out = makePreset(state_.pendingChord, state_.pendingStrum,
-                                    state_.pendingRhythm, existing.name);
+                                    state_.pendingBass, state_.pendingRhythm,
+                                    existing.name);
         savePreset(storage_, bank, slot, out);
         state_.dirty = false;
         display_.showValue("Saved", locationString(bank, slot), false, now_us);
@@ -129,6 +131,7 @@ void PresetEngine::confirmPrompt(uint64_t now_us) {
         PlayMode oldMode = state_.pendingChord.play_mode;
         state_.pendingChord  = ChordParams::defaults();
         state_.pendingStrum  = StrumParams::defaults();
+        state_.pendingBass   = BassParams::defaults();
         state_.pendingRhythm = RhythmParams::defaults();
         savePreset(storage_, bank, slot, PresetSlot::defaults());
         state_.dirty = false;
@@ -157,6 +160,7 @@ void PresetEngine::loadStartupPreset() {
     PresetSlot stored = loadPresetOrDefault(storage_, bank, slot);
     state_.pendingChord  = stored.chord;
     state_.pendingStrum  = stored.strum;
+    state_.pendingBass   = stored.bass;
     state_.pendingRhythm = stored.rhythm;
     state_.dirty = false;
 }
@@ -200,6 +204,7 @@ bool PresetEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
             case ActionType::MenuChord:
             case ActionType::MenuStrum:
             case ActionType::MenuRhythm:
+            case ActionType::MenuBass:
                 return false;   // switch to an edit menu (EditEngine clears cursor)
             default:
                 break;

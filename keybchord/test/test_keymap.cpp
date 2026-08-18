@@ -64,13 +64,18 @@ TEST(Keymap, SeventhRowGrid) {
 TEST(Keymap, ChordControls) {
     KeymapResolver r;
     EXPECT_EQ(r.resolve(0x35, 0).type, ActionType::Backtick);        // `
-    EXPECT_EQ(r.resolve(0x3A, 0).type, ActionType::PlayModeCycle);   // F1
-    EXPECT_EQ(r.resolve(0x3E, 0).type, ActionType::VoicingToggle);   // F5
-    EXPECT_EQ(r.resolve(0x50, 0).type, ActionType::ExtToggle9);      // Left
-    EXPECT_EQ(r.resolve(0x51, 0).type, ActionType::ExtToggle11);     // Down
-    EXPECT_EQ(r.resolve(0x4F, 0).type, ActionType::ExtToggle13);     // Right
+    EXPECT_EQ(r.resolve(0x50, 0).type, ActionType::Ext9);            // Left
+    EXPECT_EQ(r.resolve(0x51, 0).type, ActionType::Ext11);           // Down
+    EXPECT_EQ(r.resolve(0x4F, 0).type, ActionType::Ext13);           // Right
     EXPECT_EQ(r.resolve(0x2E, 0).type, ActionType::ChordOctaveUp);   // =
     EXPECT_EQ(r.resolve(0x2D, 0).type, ActionType::ChordOctaveDown); // -
+}
+
+TEST(Keymap, InversionKeys) {
+    KeymapResolver r;
+    EXPECT_EQ(r.resolve(0x46, 0).type, ActionType::Inversion1);  // PrtSc
+    EXPECT_EQ(r.resolve(0x47, 0).type, ActionType::Inversion2);  // ScLk
+    EXPECT_EQ(r.resolve(0x48, 0).type, ActionType::Inversion3);  // Pause
 }
 
 TEST(Keymap, StrumOctaveKeys) {
@@ -81,26 +86,31 @@ TEST(Keymap, StrumOctaveKeys) {
 
 TEST(Keymap, StrumKeysResolve) {
     KeymapResolver r;
-    // Number row 1..0 -> StrumKey.
     EXPECT_EQ(r.resolve(0x1E, 0).type, ActionType::StrumKey);  // 1
     EXPECT_EQ(r.resolve(0x27, 0).type, ActionType::StrumKey);  // 0
-    // Keypad digits/decimal -> StrumKey (Num-Lock independent).
     EXPECT_EQ(r.resolve(0x62, 0).type, ActionType::StrumKey);  // Keypad 0
     EXPECT_EQ(r.resolve(0x63, 0).type, ActionType::StrumKey);  // Keypad .
     EXPECT_EQ(r.resolve(0x59, 0).type, ActionType::StrumKey);  // Keypad 1
     EXPECT_EQ(r.resolve(0x61, 0).type, ActionType::StrumKey);  // Keypad 9
-    // Keypad / and * -> StrumKey (limited layout only, filtered in engine).
     EXPECT_EQ(r.resolve(0x54, 0).type, ActionType::StrumKey);  // Keypad /
     EXPECT_EQ(r.resolve(0x55, 0).type, ActionType::StrumKey);  // Keypad *
 }
 
-TEST(Keymap, MenuToggleKeys) {
+TEST(Keymap, MenuKeysF9ToF12) {
     KeymapResolver r;
-    EXPECT_EQ(r.resolve(0x65, 0).type, ActionType::MenuChord);  // Menu key
-    EXPECT_EQ(r.resolve(0xE1, 0).type, ActionType::MenuRhythm); // LCtrl
-    EXPECT_EQ(r.resolve(0xE5, 0).type, ActionType::MenuRhythm); // RCtrl
-    EXPECT_EQ(r.resolve(0xE3, 0).type, ActionType::MenuStrum);  // LAlt
-    EXPECT_EQ(r.resolve(0xE7, 0).type, ActionType::MenuStrum);  // RAlt
+    EXPECT_EQ(r.resolve(0x42, 0).type, ActionType::MenuChord);  // F9
+    EXPECT_EQ(r.resolve(0x43, 0).type, ActionType::MenuStrum);  // F10
+    EXPECT_EQ(r.resolve(0x44, 0).type, ActionType::MenuRhythm); // F11
+    EXPECT_EQ(r.resolve(0x45, 0).type, ActionType::MenuBass);   // F12
+}
+
+TEST(Keymap, MenuModifierKeysAreInert) {
+    KeymapResolver r;
+    EXPECT_EQ(r.resolve(0x65, 0).type, ActionType::None);  // Menu key
+    EXPECT_EQ(r.resolve(0xE1, 0).type, ActionType::None);  // LCtrl
+    EXPECT_EQ(r.resolve(0xE5, 0).type, ActionType::None);  // RCtrl
+    EXPECT_EQ(r.resolve(0xE3, 0).type, ActionType::None);  // LAlt
+    EXPECT_EQ(r.resolve(0xE7, 0).type, ActionType::None);  // RAlt
 }
 
 TEST(Keymap, EscIsClearEdit) {
@@ -108,13 +118,22 @@ TEST(Keymap, EscIsClearEdit) {
     EXPECT_EQ(r.resolve(0x29, 0).type, ActionType::ClearEdit);  // Esc
 }
 
-TEST(Keymap, RhythmControls) {
+TEST(Keymap, HotkeysF1ToF8) {
     KeymapResolver r;
-    EXPECT_EQ(r.resolve(0x40, 0).type, ActionType::RhythmToggle);       // F7
-    EXPECT_EQ(r.resolve(0x41, 0).type, ActionType::RhythmPatternCycle); // F8
-    EXPECT_EQ(r.resolve(0x42, 0).type, ActionType::RhythmMute);         // F9
-    EXPECT_EQ(r.resolve(0x4B, 0).type, ActionType::TempoUp);            // Page Up
-    EXPECT_EQ(r.resolve(0x4E, 0).type, ActionType::TempoDown);          // Page Down
+    EXPECT_EQ(r.resolve(0x3A, 0).type, ActionType::PlayModeCycle);      // F1
+    EXPECT_EQ(r.resolve(0x3B, 0).type, ActionType::VoicingToggle);      // F2
+    EXPECT_EQ(r.resolve(0x3C, 0).type, ActionType::BassToggle);         // F3
+    EXPECT_EQ(r.resolve(0x3D, 0).type, ActionType::RhythmLedToggle);    // F4
+    EXPECT_EQ(r.resolve(0x3E, 0).type, ActionType::RhythmToggle);       // F5
+    EXPECT_EQ(r.resolve(0x3F, 0).type, ActionType::RhythmClockToggle);  // F6
+    EXPECT_EQ(r.resolve(0x40, 0).type, ActionType::RhythmPatternCycle); // F7
+    EXPECT_EQ(r.resolve(0x41, 0).type, ActionType::RhythmMute);         // F8
+}
+
+TEST(Keymap, TempoKeys) {
+    KeymapResolver r;
+    EXPECT_EQ(r.resolve(0x4B, 0).type, ActionType::TempoUp);   // Page Up
+    EXPECT_EQ(r.resolve(0x4E, 0).type, ActionType::TempoDown); // Page Down
 }
 
 TEST(Keymap, UnmappedKeysAreNone) {
@@ -149,7 +168,6 @@ TEST(Keymap, PresetNavigationKeys) {
 TEST(Keymap, SuperPresetKeys) {
     KeymapResolver r;
     constexpr uint8_t SUPER = 0x08;
-
     EXPECT_EQ(r.resolve(0x4A, SUPER).type, ActionType::PresetBankPrev);  // Super+Home
     EXPECT_EQ(r.resolve(0x4D, SUPER).type, ActionType::PresetBankNext);  // Super+End
 }
@@ -158,34 +176,18 @@ TEST(Keymap, InsertDeleteAreSaveClear) {
     KeymapResolver r;
     EXPECT_EQ(r.resolve(0x49, 0).type, ActionType::PresetSave);   // Insert
     EXPECT_EQ(r.resolve(0x4C, 0).type, ActionType::PresetClear);  // Delete
-
-    // Super no longer binds Insert/Delete.
     EXPECT_EQ(r.resolve(0x49, 0x08).type, ActionType::None);
     EXPECT_EQ(r.resolve(0x4C, 0x08).type, ActionType::None);
-}
-
-TEST(Keymap, F6TogglesClockOut) {
-    KeymapResolver r;
-    EXPECT_EQ(r.resolve(0x3F, 0).type, ActionType::RhythmClockToggle);  // F6
-}
-
-TEST(Keymap, F10TogglesRhythmLed) {
-    KeymapResolver r;
-    EXPECT_EQ(r.resolve(0x43, 0).type, ActionType::RhythmLedToggle);  // F10
 }
 
 TEST(Keymap, SuperNumberRowLoadsPreset) {
     KeymapResolver r;
     constexpr uint8_t SUPER = 0x08;
-
-    // Super+1..8 -> PresetLoad with index 0..7.
     for (int n = 0; n < 8; n++) {
         KeyAction a = r.resolve(0x1E + n, SUPER);
         EXPECT_EQ(a.type, ActionType::PresetLoad);
         EXPECT_EQ(a.index, n);
     }
-
-    // Super+9 and Super+0 are not valid preset slots -> None.
     EXPECT_EQ(r.resolve(0x26, SUPER).type, ActionType::None);  // 9
     EXPECT_EQ(r.resolve(0x27, SUPER).type, ActionType::None);  // 0
 }
@@ -193,7 +195,6 @@ TEST(Keymap, SuperNumberRowLoadsPreset) {
 TEST(Keymap, SuperPressIsInert) {
     KeymapResolver r;
     constexpr uint8_t SUPER = 0x08;
-
     EXPECT_EQ(r.resolve(0xE4, SUPER).type, ActionType::None);  // LGui press
     EXPECT_EQ(r.resolve(0xE8, SUPER).type, ActionType::None);  // RGui press
 }
@@ -201,19 +202,14 @@ TEST(Keymap, SuperPressIsInert) {
 TEST(Keymap, SuperEscIsPanic) {
     KeymapResolver r;
     constexpr uint8_t SUPER = 0x08;
-
     EXPECT_EQ(r.resolve(0x29, SUPER).type, ActionType::Panic);  // Super+Esc
-    // Esc alone remains ClearEdit, not panic.
     EXPECT_EQ(r.resolve(0x29, 0).type, ActionType::ClearEdit);
-    // Super+Esc with RGui also resolves to panic.
     EXPECT_EQ(r.resolve(0x29, 0x80).type, ActionType::Panic);
 }
 
 TEST(Keymap, SuperChordKeyIsInert) {
     KeymapResolver r;
     constexpr uint8_t SUPER = 0x08;
-
-    // Chord keys are not chord keys while Super is held.
     EXPECT_EQ(r.resolve(0x14, SUPER).type, ActionType::None);  // Q
     EXPECT_EQ(r.resolve(0x1E, 0).type, ActionType::StrumKey);  // 1 without Super
 }

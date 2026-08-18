@@ -86,3 +86,52 @@ TEST(Voicing, SmartProducesValidInversion) {
         EXPECT_GT(v[i], v[i - 1]);  // ascending
     }
 }
+
+// VR-6: minimum note count pads with ascending octave notes.
+TEST(Voicing, MinNotesPadsWithOctaveNotes) {
+    ResolvedChord c{0, ChordType::Major};  // C major
+    VoicingConfig cfg;
+    cfg.min_notes = 4;
+    auto v = voiceChord(c, 60, 0, 48, 84, cfg, {});
+    EXPECT_EQ(v, (std::vector<uint8_t>{60, 64, 67, 72}));  // C E G C
+
+    cfg.min_notes = 5;
+    v = voiceChord(c, 60, 0, 48, 84, cfg, {});
+    EXPECT_EQ(v, (std::vector<uint8_t>{60, 64, 67, 72, 76}));  // C E G C E
+}
+
+TEST(Voicing, MinNotesOnMaj7) {
+    ResolvedChord c{0, ChordType::Maj7};  // C E G B
+    VoicingConfig cfg;
+    cfg.min_notes = 5;
+    auto v = voiceChord(c, 60, 0, 48, 84, cfg, {});
+    EXPECT_EQ(v, (std::vector<uint8_t>{60, 64, 67, 71, 72}));  // C E G B C
+}
+
+// VR-7: minimum interval spread — tightest ascending configuration.
+TEST(Voicing, MinIntervalSpread) {
+    ResolvedChord c{0, ChordType::Major};  // C major
+    VoicingConfig cfg;
+    cfg.min_interval = 5;
+    auto v = voiceChord(c, 60, 0, 48, 84, cfg, {});
+    EXPECT_EQ(v, (std::vector<uint8_t>{60, 67, 76}));  // C G E (tightest)
+
+    cfg.min_interval = 4;
+    v = voiceChord(c, 60, 0, 48, 84, cfg, {});
+    EXPECT_EQ(v, (std::vector<uint8_t>{60, 67, 76}));  // C G E (not C E G)
+}
+
+// VR-8: manual inversions rotate the bass.
+TEST(Voicing, ManualInversions) {
+    ResolvedChord c{0, ChordType::Major};  // C major root {60,64,67}
+    VoicingConfig cfg;
+
+    cfg.inversion = InversionMode::First;
+    EXPECT_EQ(voiceChord(c, 60, 0, 48, 84, cfg, {}),
+              (std::vector<uint8_t>{64, 67, 72}));  // E G C
+
+    cfg.inversion = InversionMode::Second;
+    EXPECT_EQ(voiceChord(c, 60, 0, 48, 84, cfg, {}),
+              (std::vector<uint8_t>{67, 72, 76}));  // G C E
+}
+

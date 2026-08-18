@@ -103,7 +103,7 @@ TEST_F(PresetEngineTest, SuperHomeEndMoveBank) {
 }
 
 TEST_F(PresetEngineTest, HomeLeavesEditMenu) {
-    route(key(0xE1, true));   // Ctrl -> Rhythm Edit
+    route(key(0x44, true));   // F11 -> Rhythm Edit
     EXPECT_EQ(state_.editMenu, EditMenu::Rhythm);
 
     route(key(HOME, true));   // Home -> cursor mode, leaves edit menu
@@ -115,7 +115,7 @@ TEST_F(PresetEngineTest, MenuToggleLeavesCursorMode) {
     route(key(HOME, true));
     EXPECT_TRUE(state_.cursorActive);
 
-    route(key(0xE1, true));   // Ctrl -> Rhythm Edit
+    route(key(0x44, true));   // F11 -> Rhythm Edit
     EXPECT_FALSE(state_.cursorActive);
     EXPECT_EQ(state_.editMenu, EditMenu::Rhythm);
 }
@@ -166,7 +166,7 @@ TEST_F(PresetEngineTest, RhythmHotkeyCancelsCursor) {
     route(key(HOME, true));
     EXPECT_TRUE(state_.cursorActive);
 
-    route(key(0x40, true));   // F7 -> enable rhythm
+    route(key(0x3E, true));   // F5 -> enable rhythm
     EXPECT_FALSE(state_.cursorActive);
     EXPECT_TRUE(state_.pendingRhythm.enabled);
 }
@@ -292,7 +292,7 @@ TEST_F(PresetEngineTest, ClearResetsLiveParamsAndWritesDefaults) {
 TEST_F(PresetEngineTest, DirtyAppearsOnEditAndClearsOnSave) {
     EXPECT_FALSE(state_.dirty);
 
-    route(key(0x3E, true));   // F5 -> voicing Smart (differs from default)
+    route(key(0x3B, true));   // F2 -> voicing Smart (differs from default)
     EXPECT_EQ(state_.pendingChord.voicing_mode, VoicingMode::Smart);
     EXPECT_TRUE(state_.dirty);
 
@@ -302,7 +302,7 @@ TEST_F(PresetEngineTest, DirtyAppearsOnEditAndClearsOnSave) {
 }
 
 TEST_F(PresetEngineTest, DirtyClearsOnLoad) {
-    route(key(0x3E, true));   // voicing Smart -> dirty
+    route(key(0x3B, true));   // voicing Smart -> dirty
     EXPECT_TRUE(state_.dirty);
 
     route(key(0x1E, true, SUPER));   // Super+1 -> reload slot 0 (default)
@@ -311,7 +311,7 @@ TEST_F(PresetEngineTest, DirtyClearsOnLoad) {
 }
 
 TEST_F(PresetEngineTest, DirtyUnaffectedByCursorMovement) {
-    route(key(0x3E, true));   // dirty
+    route(key(0x3B, true));   // dirty
     EXPECT_TRUE(state_.dirty);
 
     route(key(END, true));    // browse cursor

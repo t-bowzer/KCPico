@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <climits>
 
 
 namespace {
@@ -45,6 +46,43 @@ std::vector<uint8_t> clamp127(const std::vector<int>& notes) {
     out.reserve(notes.size());
     for (int n : notes) out.push_back(static_cast<uint8_t>(std::max(0, std::min(127, n))));
     return out;
+}
+
+// The tightest ascending voicing of the chord's pitch classes where consecutive
+// notes are >= min_interval semitones apart and `bassIdx` is the lowest tone
+// (spec 6.4 VR-7). Searches all orderings of the remaining pitch classes and
+// keeps the one minimizing the top note. n <= 8, so the permutation space is
+// tiny (<= 5040); this runs only on chord trigger, not per-event.
+std::vector<int> tightestSpread(const std::vector<int>& pcs, int bassIdx,
+                                int bassNote, int minInterval) {
+    const int n = static_cast<int>(pcs.size());
+    std::vector<int> remaining;
+    remaining.reserve(n - 1);
+    for (int i = 0; i < n; i++) if (i != bassIdx) remaining.push_back(pcs[i]);
+    std::sort(remaining.begin(), remaining.end());
+
+    std::vector<int> best;
+    long bestTop = LONG_MAX;
+
+    do {
+        int prev = bassNote;
+        std::vector<int> cur;
+        cur.reserve(n);
+        cur.push_back(bassNote);
+        for (int pc : remaining) {
+            int target = prev + minInterval;
+            int rem = ((pc - target) % 12 + 12) % 12;   // smallest >= target with this pc
+            int note = target + rem;
+            cur.push_back(note);
+            prev = note;
+        }
+        if (static_cast<long>(cur.back()) < bestTop) {
+            bestTop = cur.back();
+            best = cur;
+        }
+    } while (std::next_permutation(remaining.begin(), remaining.end()));
+
+    return best;
 }
 
 } // namespace
@@ -109,3 +147,48 @@ std::vector<uint8_t> voiceSmart(const ResolvedChord& chord,
     return clamp127(bestNotes);
 }
 
+std::vector<uint8_t> voiceChord(const ResolvedChord& chord,
+                                uint8_t base_root_midi,
+                                int octave,
+                                uint8_t low,
+                                uint8_t high,
+                                const VoicingConfig& cfg,
+                                const std::vector<uint8_t>& previous) {
+    std::vector<int> pcs = chordPitchClasses(chord);
+    int n = static_cast<int>(pcs.size());
+    if (n == 0) return {};
+
+    int root = clampRootOctave(rootMidi(chord.rootPc, base_root_midi, octave));
+    int inv = static_cast<int>(cfg.inversion);
+    int bassIdx = std::min(inv, n - 1);
+    int bassNote = root + (pcs[bassIdx] - pcs[0]);
+
+    std::vector<int> notes;
+
+    if (cfg.min_interval > 0) {
+        // Minimum-interval spread (VR-7): rebuild as the tightest ascending
+        // configuration starting at the (possibly inverted) bass.
+        notes = tightestSpread(pcs, bassIdx, bassNote, cfg.min_interval);
+    } else {
+        std::vector<uint8_t> base = (cfg.voicing_mode == VoicingMode::Smart)
+            ? voiceSmart(chord, base_root_midi, octave, low, high, previous)
+            : voiceRootPosition(chord, base_root_midi, octave, low, high);
+
+        notes.reserve(base.size());
+        for (uint8_t b : base) notes.push_back(static_cast<int>(b));
+
+        // Manual inversion (VR-8): rotate so the chosen tone is the lowest —
+        // move the first `bassIdx` notes up an octave.
+        for (int i = 0; i < bassIdx; i++) notes[i] += 12;
+        std::sort(notes.begin(), notes.end());
+    }
+
+    // Minimum note count (VR-6): continue the ascending pitch-class cycle
+    // (next note = base[i % n] + 12) until the count is met.
+    while (static_cast<int>(notes.size()) < static_cast<int>(cfg.min_notes)) {
+        size_t i = notes.size();
+        notes.push_back(notes[i - n] + 12);
+    }
+
+    return clamp127(notes);
+}

@@ -65,13 +65,13 @@ TEST_F(ChordEngineTest, HeldChordLocksOctave) {
     EXPECT_FALSE(state_.isNoteActive(1, 60));
 }
 
-TEST_F(ChordEngineTest, HeldChordLocksExtension) {
+TEST_F(ChordEngineTest, HeldChordLocksInversion) {
     engine_->handleKeyEvent(key(0x17, true), 0);   // C major = {60,64,67}
     EXPECT_EQ(noteOnNotes(), (std::vector<uint8_t>{60, 64, 67}));
 
-    // Toggle add9 (Left arrow) — pending only, sounding chord unchanged.
-    state_.pendingChord.add9 = true;             // (EditEngine: Left arrow)
-    EXPECT_TRUE(state_.pendingChord.add9);
-    EXPECT_FALSE(state_.activeChord.add9);
+    // Inversion edit (PrtSc) — pending only, sounding chord unchanged.
+    state_.pendingChord.inversion = InversionMode::First;
+    EXPECT_EQ(state_.pendingChord.inversion, InversionMode::First);
+    EXPECT_EQ(state_.activeChord.inversion, InversionMode::Root);
     EXPECT_EQ(midi_.noteOnCount(), 3);
 }

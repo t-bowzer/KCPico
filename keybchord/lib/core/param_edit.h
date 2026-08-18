@@ -18,14 +18,19 @@ enum class ParamId : uint8_t {
     ChordDuration,
     ChordVelocity,
     ChordPan,
-    ChordAdd9,
-    ChordAdd11,
-    ChordAdd13,
+    ChordRoll,
+    ChordMinNotes,
+    ChordMinInterval,
+    ChordInversion,
+    ChordArpMode,
     // Strum
     StrumOctave,
     StrumDuration,
     StrumVelocity,
     StrumLayout,
+    StrumMode,
+    StrumRoot,
+    StrumScale,
     // Rhythm
     RhythmTempo,
     RhythmSwing,
@@ -34,6 +39,21 @@ enum class ParamId : uint8_t {
     RhythmEnable,
     RhythmClock,
     RhythmLed,
+    // Bass
+    BassEnable,
+    BassOctave,
+    BassDuration,
+    BassVelocity,
+    BassChannel,
+    // Drum (per-piece note code + velocity)
+    DrumKickNote,
+    DrumKickVel,
+    DrumSnareNote,
+    DrumSnareVel,
+    DrumHihatNote,
+    DrumHihatVel,
+    DrumOpenHatNote,
+    DrumOpenHatVel,
     COUNT
 };
 
@@ -56,7 +76,7 @@ std::string paramValueString(const StateManager& state, ParamId id);
 void paramStep(StateManager& state, ParamId id, int delta);
 
 // Single-key toggle/cycle semantics: bools flip; enums advance one step.
-// Direct main-menu shortcuts (F1/F5/arrows/F7/F8/F9) use this.
+// Direct main-menu shortcuts (F1/F2/F3/F4/F5/F6/F7/F8) use this.
 void paramCycle(StateManager& state, ParamId id);
 
 // True for parameters with a large value range that auto-repeat when the

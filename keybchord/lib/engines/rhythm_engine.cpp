@@ -165,7 +165,9 @@ void RhythmEngine::fireStep(uint64_t now_us) {
     if (!rp.muted) {
         auto events = stepEvents(*pat, static_cast<int>(step_));
         for (const auto& e : events) {
-            out_.push(midi::makeNoteOn(rp.channel, mapDrumNote(e.note, rp.drums), e.velocity));
+            uint8_t note = mapDrumNote(e.note, rp.drums);
+            uint8_t vel  = mapDrumVelocity(e.note, rp.drums, e.velocity);
+            out_.push(midi::makeNoteOn(rp.channel, note, vel));
         }
     }
 }

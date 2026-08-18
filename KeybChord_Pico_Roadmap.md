@@ -91,9 +91,10 @@ The system (spec §3) is a set of cooperating modules coordinated by a central S
 |-------------|---------------|----------------|
 | Input Manager | `lib/hw/input_usbhost.*` + Core 0 loop | TinyUSB + Pico-PIO-USB host; parse HID reports; track keys/modifiers; debounce; emit semantic events. |
 | Keymap Resolver | `lib/core/keymap.*` | HID usage codes + modifier byte → logical actions. Pure. |
-| Chord Engine | `lib/core/chords.*`, `lib/core/voicing.*` + `lib/engines/chord_engine.*` | Resolve root/quality + combinations; compute voicings; play modes + latching. |
+| Chord Engine | `lib/core/chords.*`, `lib/core/voicing.*` + `lib/engines/chord_engine.*` | Resolve root/quality + combinations; compute voicings (min-notes / min-interval / inversion); play modes + latching; chord roll; arp modes. |
 | Strum Engine | `lib/core/strum.*` + `lib/engines/strum_engine.*` | Derive note pool; map strum keys; apply strum params. |
-| Rhythm Engine | `lib/core/rhythm.*` + `lib/engines/rhythm_engine.*` | Core 1 scheduler/clock; GM drums ch10; arp/rhythm sync; integer tempo/swing; MIDI clock; LED beat callback. |
+| Bass Engine | `lib/core/bass.*` + `lib/engines/bass_engine.*` | Walking bass: meter-adaptive interval cycle on the rhythm beat; own octave/duration/velocity/channel. |
+| Rhythm Engine | `lib/core/rhythm.*` + `lib/engines/rhythm_engine.*` | Core 1 scheduler/clock; GM drums ch10; arp/bass sync; integer tempo/swing; MIDI clock; LED beat callback. |
 | MIDI Router | `lib/engines/midi_router.*` | Emit to DIN/UART; per-function channel routing; graceful behavior when unconnected. |
 | Display Manager | `lib/engines/display_manager.*` | Idle screen + transient param-edit screens + prompts on LCD1602. |
 | LED Indicator | `lib/hw/input_usbhost.*` (driven by rhythm engine) | Flash a configurable keyboard LED (Num/Caps/Scroll, default Num Lock) via HID SET_REPORT in sync with the master clock (FR-R8); best-effort. |
@@ -114,7 +115,7 @@ A `lib/hw/factory.*` selects real vs null at construction (real on `pico`, null/
 ### 2.4 Cores & timing model (spec §3.2, §7.3, NFR-1/2)
 
 - **Core 0 — real-time input path:** USB-host poll (TinyUSB task) → keymap resolver → engines mutate state → MIDI router dispatch over UART. Non-blocking writes. Target key-to-MIDI latency < 10 ms (NFR-1), bounded mainly by the ~1 ms USB poll interval.
-- **Core 1 — rhythm/clock:** a single **master MIDI clock** (24 PPQN) runs continuously in the background from boot; its tick counter and phase never reset, so nothing (rhythm or Clock-Out toggles) can make it drift or fall out of sync. The drum-step scheduler, the arp/rhythm chord sync, and the keyboard-LED beat flash all **slave to this master clock** (`time_us_64()`/`micros()`). Target step jitter < 2 ms (NFR-2). Only the `0xF8` clock byte is streamed (no Start/Stop/Continue). LED HID writes are queued here and applied on Core 0, off the Core 0 critical path.
+- **Core 1 — rhythm/clock:** a single **master MIDI clock** (24 PPQN) runs continuously in the background from boot; its tick counter and phase never reset, so nothing (rhythm or Clock-Out toggles) can make it drift or fall out of sync. The drum-step scheduler, the arpeggio sync, the walking bass, and the keyboard-LED beat flash all **slave to this master clock** (`time_us_64()`/`micros()`). Target step jitter < 2 ms (NFR-2). Only the `0xF8` clock byte is streamed (no Start/Stop/Continue). LED HID writes are queued here and applied on Core 0, off the Core 0 critical path.
 - **Cross-core state:** the State Manager mediates shared state; Core 1 reads a consistent snapshot of chord/arp params. Use SDK spin-lock/`mutex`/inter-core FIFO or double-buffered snapshots. Held-mode latching is two structures on the State Manager: `pending_params` (edited live on Core 0) and `active_params` (snapshot on chord trigger), per FR-C9 / VR-5.
 - **No dynamic allocation** in the real-time paths; use static/fixed buffers (NFR-3).
 
@@ -122,7 +123,7 @@ A `lib/hw/factory.*` selects real vs null at construction (real on `pico`, null/
 
 ```
 USB host (TinyUSB/PIO-USB) -> Input Manager -> Keymap Resolver
-      -> (Chord | Strum | Rhythm | Nav | Param) action
+      -> (Chord | Strum | Bass | Rhythm | Nav | Param) action
       -> State Manager -> engines produce MIDI events
       -> MIDI Router -> DIN/UART
 Display Manager and LED Indicator observe State Manager / scheduler for updates.
@@ -134,7 +135,8 @@ Display Manager and LED Indicator observe State Manager / scheduler for updates.
 |---------|-----------|
 | Held-mode latching (FR-C9/VR-5) | Snapshot sounding-relevant params on trigger into `active_params`; edits & preset-loads mutate only `pending_params`; applied on next trigger. |
 | Num-Lock independence (FR-S6) | Interpret raw keypad HID usages directly; never assert or depend on Num Lock. |
-| Shift/Caps/Tab as chord roots | Firmware owns the keyboard; reads modifier byte + key array from HID reports; functions use Ctrl/Alt/Super only. |
+| Shift/Caps/Tab as chord roots | Firmware owns the keyboard; reads modifier byte + key array from HID reports; function access uses the `F1`–`F12` keys and `Super` only (no modifier combos). |
+| Edit menus on the F-row | `F9`/`F10`/`F11`/`F12` open the Chord/Strum/Rhythm/Bass edit menus; `Ctrl` (held at power-on) presents the Mass Storage drive and has no runtime function. |
 | DIN-only MIDI | Single `MidiOutAdapter` over `Serial2` (UART1); no USB MIDI; no host/gadget conflict. |
 | No FPU | Integer/fixed-point everywhere in real-time paths; swing = integer 0–75. |
 | Panic (FR-C11) | `Super+Esc` → router sends CC120 + CC123 on all channels to DIN; clears active-note state. |
@@ -157,9 +159,10 @@ keybchord/                      # git repo root (PlatformIO project)
 │   │   ├── state.h/.cpp        # StateManager: pending vs active params, active notes
 │   │   ├── keymap.h/.cpp       # KeymapResolver: HID usage + modifiers -> actions
 │   │   ├── chords.h/.cpp       # interval formulas + combination matrix resolution
-│   │   ├── voicing.h/.cpp      # root_position / smart voice-leading, octave clamp (int)
+│   │   ├── voicing.h/.cpp      # root_position / smart voice-leading; min-notes / min-interval / inversion; octave clamp (int)
 │   │   ├── strum.h/.cpp        # note-pool derivation + key->note mapping
 │   │   ├── rhythm.h/.cpp       # step-sequence -> event math; integer tempo/swing/clock
+│   │   ├── bass.h/.cpp         # walking-bass interval blueprint + note math (pure)
 │   │   ├── naming.h/.cpp       # chord name (Omnichord flat spelling) for LCD
 │   │   ├── params.h/.cpp       # Parameter Reference model, ranges, clamp/step
 │   │   ├── presets.h/.cpp      # preset/bank model, dirty tracking, defaults
@@ -181,8 +184,9 @@ keybchord/                      # git repo root (PlatformIO project)
 │   │   └── factory.*           # real-vs-null adapter selection + probing
 │   │
 │   └── engines/                # bridge core + adapters + scheduler
-│       ├── chord_engine.*      # play modes, note lifecycle, latching
+│       ├── chord_engine.*      # play modes, note lifecycle, latching, roll, arp modes
 │       ├── strum_engine.*      # strum trigger -> pool notes -> router
+│       ├── bass_engine.*       # walking bass on the rhythm beat (own channel)
 │       ├── rhythm_engine.*     # Core 1 scheduler, clock, LED beat callback
 │       ├── midi_router.*       # DIN fan-out, per-function channel routing
 │       └── display_manager.*   # idle screen, param-edit feedback, prompts
@@ -204,6 +208,8 @@ keybchord/                      # git repo root (PlatformIO project)
 │   ├── test_combinations.cpp
 │   ├── test_voicing.cpp
 │   ├── test_extensions.cpp
+│   ├── test_arp_modes.cpp
+│   ├── test_bass.cpp
 │   ├── test_strum.cpp
 │   ├── test_rhythm.cpp
 │   ├── test_latching.cpp
@@ -387,7 +393,7 @@ Aligned 1:1 with spec §1.6 / §12. Each milestone ends with a **review stop** f
 **AC:** AC-9 (DIN output, graceful when unconnected).
 
 ### M3 — Chord engine
-**Deliverables:** Keymap Resolver (grid + modifier convention, HID usages); root/quality resolution; same-column + left-adjacent + leftmost-`` ` `` combination matrix; root-position & smart voicing (integer); independent add9/add11/add13; all five play modes with correct note lifecycle; Held-mode latching (snapshot vs pending).
+**Deliverables:** Keymap Resolver (grid + modifier convention, HID usages); root/quality resolution; same-column + left-adjacent + leftmost-`` ` `` combination matrix; root-position & smart voicing (integer); add9/add11/add13 extensions; all four play modes with correct note lifecycle; Held-mode latching (snapshot vs pending).
 **Verify:** chords/combinations correct; play modes behave; latching holds.
 **AC:** AC-1, AC-2, AC-3, AC-11, AC-12, AC-13, AC-14, AC-15.
 
@@ -397,7 +403,7 @@ Aligned 1:1 with spec §1.6 / §12. Each milestone ends with a **review stop** f
 **AC:** AC-4, AC-18.
 
 ### M5 — Rhythm engine
-**Deliverables:** Core 1 monotonic scheduler/clock; JSON pattern playback on ch10; integer tempo / fixed-point swing; mute (suppress drums, keep sync); MIDI clock 24 PPQN toggle (+ Start/Stop/Continue); arp/rhythm chord sync; Scroll Lock BPM LED indicator (FR-R8) via HID SET_REPORT with accented downbeat.
+**Deliverables:** Core 1 monotonic scheduler/clock; JSON pattern playback on ch10; integer tempo / fixed-point swing; mute (suppress drums, keep sync); MIDI clock 24 PPQN toggle (+ Start/Stop/Continue); arpeggio chord sync; Scroll Lock BPM LED indicator (FR-R8) via HID SET_REPORT with accented downbeat.
 **Verify:** patterns play; tempo/swing/mute/clock behave; Scroll Lock LED flashes on the beat when rhythm enabled.
 **AC:** AC-5, AC-6, AC-16, AC-23.
 
@@ -432,7 +438,31 @@ Aligned 1:1 with spec §1.6 / §12. Each milestone ends with a **review stop** f
 **Deliverables:** expose the onboard filesystem as a **USB Mass Storage** drive on the native USB port so `config.json`/presets/rhythms can be drag-drop edited from a PC, while keeping the USB-CDC serial debug log. The keyboard stays on the PIO-USB host port (GP0/GP1), so it never conflicts.
 **Constraint resolved:** a PC cannot mount LittleFS, so the storage backend moved from **LittleFS to FatFS** (arduino-pico `FatFS` on the onboard flash FTL). The drive is exposed with Adafruit TinyUSB's `Adafruit_USBD_MSC` bridged to FatFS's low-level `disk_read`/`disk_write`. `FatFSUSB` was not usable (it forbids Adafruit TinyUSB, which the keyboard host requires).
 
-> **M9 completed (2026-08-16).** Decisions: (1) **boot-key composite** — hold `F11` at power-on to also present the Mass Storage drive; the CDC serial log is present in *both* modes (never lost). A brief USB re-enumeration (`tud_disconnect`/`tud_connect`) follows when the drive is added. (2) **Self-provision in code** — the shipped `data/` LittleFS image is dropped; on first boot FatFS auto-formats and the firmware writes embedded defaults (config + 10×8 presets + 12 rhythms, `lib/core/defaults.*`). Build is now `pio run -e pico` (no `buildfs`/`buildunified`); flash `firmware.uf2`. (3) While the drive is presented, preset save/clear is suppressed to avoid FAT corruption; on eject the FatFS cache is remounted.
+> **M9 completed (2026-08-16).** Decisions: (1) **boot-key composite** — hold `F11` at power-on to also present the Mass Storage drive; the CDC serial log is present in *both* modes (never lost). A brief USB re-enumeration (`tud_disconnect`/`tud_connect`) follows when the drive is added. (2) **Self-provision in code** — the shipped `data/` LittleFS image is dropped; on first boot FatFS auto-formats and the firmware writes embedded defaults (config + 10×8 presets + 12 rhythms, `lib/core/defaults.*`). Build is now `pio run -e pico` (no `buildfs`/`buildunified`); flash `firmware.uf2`. (3) While the drive is presented, preset save/clear is suppressed to avoid FAT corruption; on eject the FatFS cache is remounted. *(Note: the boot key later moved from `F11` to `Ctrl` in M10.)*
+
+### M10 — Chord Engine upgrades & Walking Bass
+**Deliverables (from `Upgrade-Plan.txt`):**
+- **Chord roll** (`chord_roll_ms`, signed ms, step 5): stagger chord note-ons in Held/Press (positive ascends, negative descends); note-offs release together.
+- **Minimum note count** (`min_notes`, default 3): pad the chord with ascending octave notes to at least this count.
+- **Minimum interval spread** (`min_interval`, semitones, 0 = off): no two adjacent voicing notes closer than this; tightest ascending configuration. Applied as an orthogonal post-voicing layer.
+- **Manual inversions**: `PrtSc`/`ScLk`/`Pause` select 1st/2nd/3rd inversion; composes with smart voice-leading.
+- **Arpeggio modes** (`arp_mode`): Up / Down / Up-Down / Alternating / Random (seeded LCG).
+- **Held extensions**: `Left`/`Down`/`Right` become held add9/add11/add13 modifiers (latching per chord); the `add9`/`add11`/`add13` parameters and their ParamIds are removed.
+- **Walking bass (dedicated `BassEngine`)**: own `BassParams` (enabled, octave default −1, duration 150 ms, velocity 90, channel 3) + `Bass` edit menu + preset `bass` block. Fires a fixed interval cycle on the rhythm **beat** (meter-adaptive via `beats_per_bar`); 11-type interval blueprint (spec 6.8); short percussive note.
+- **Play-mode `Rhythm` removed** (4 modes: Held/Press/Arp/Silent); preset `play_mode` backward-compat remap (old Rhythm→Arpeggio, old Silent→Silent).
+- **Keymap consolidation**: menus move to `F9`(Chord)/`F10`(Strum)/`F11`(Rhythm)/`F12`(Bass); hotkeys regroup to `F1`–`F8` (F1 play mode, F2 voicing, F3 bass toggle, F4 beat LED, F5 rhythm on/off, F6 clock, F7 pattern, F8 mute); boot key moves to `Ctrl`.
+**Verify:** roll/min-notes/min-interval/inversion/arp modes behave; held extensions latch; walking bass cycles correctly on the beat across meters; presets round-trip the new params; menus/hotkeys per spec §5.
+**AC:** AC-24, AC-25, AC-26, AC-27, AC-28, AC-29 (+ updated AC-3/AC-6/AC-13/AC-23).
+
+> **M10 completed (2026-08-17).** In addition to the roadmap scope above, the
+> Upgrade-Plan's **strum** and **rhythm drum** items were folded in: strum gains
+> a `strum_mode` (follow-chord / scale / piano) with selectable root + scale/mode
+> and **duration-as-minimum** (held keys sustain past the duration); rhythm gains
+> a **Drum Edit** sub-menu (F11 → F8) for per-piece drum code + velocity with
+> audition. The keymap consolidated to F9–F12 menus, F1–F8 hotkeys, PrtSc/ScLk/
+> Pause inversions, held Left/Down/Right extensions, and the boot key moved to
+> `Ctrl`. `play_mode` legacy int `Rhythm`→`Arpeggio` remap on load. Native suite:
+> **287/287 green**; Pico build SUCCESS (RAM 12.7%, Flash 12.3%).
 
 ### 6.1 Milestone → Acceptance Criteria coverage matrix
 
@@ -440,17 +470,17 @@ Aligned 1:1 with spec §1.6 / §12. Each milestone ends with a **review stop** f
 |----|------------|
 | AC-1 Chord notes on DIN | M2 (output) + M3 (chords) |
 | AC-2 Quality combinations | M3 |
-| AC-3 Five play modes / lifecycle | M3 |
+| AC-3 Four play modes / lifecycle | M3 |
 | AC-4 Strum order + layouts + params | M4 |
 | AC-5 Rhythm drums / tempo / swing / mute | M5 |
-| AC-6 Arp/rhythm follow clock | M5 |
+| AC-6 Arp/bass follow clock | M5 + M10 (bass) |
 | AC-7 80-slot presets + nav + confirm | M7 |
 | AC-8 LCD idle + edits + prompts | M6 |
 | AC-9 DIN output, graceful when unconnected | M2 |
 | AC-10 Key-to-MIDI latency (NFR-1) | M8 |
 | AC-11 Modifier keys as chord roots | M3 |
 | AC-12 Voicing mode toggle + persist | M3 (+ M7 persist) |
-| AC-13 Independent extensions + persist | M3 (+ M7 persist) |
+| AC-13 Held extensions (add9/11/13) | M3 (+ M10 refactor) |
 | AC-14 Left-adjacent + leftmost combos | M3 |
 | AC-15 Held-mode latching | M3 |
 | AC-16 MIDI clock toggle | M5 (clock-as-master in M7) |
@@ -460,7 +490,13 @@ Aligned 1:1 with spec §1.6 / §12. Each milestone ends with a **review stop** f
 | AC-20 Dirty marker | M6 (display) + M7 (logic) |
 | AC-21 Uninitialized defaults + channels | M1/M7 |
 | AC-22 Corrupt/missing config fallback | M1/M8 |
-| AC-23 BPM LED (configurable) | M5 (refined M7) |
+| AC-23 BPM LED (configurable) | M5 (refined M7/M10) |
+| AC-24 Chord roll | M10 |
+| AC-25 Min note count | M10 |
+| AC-26 Min interval spread | M10 |
+| AC-27 Manual inversions | M10 |
+| AC-28 Arpeggio modes | M10 |
+| AC-29 Walking bass | M10 |
 
 ---
 
@@ -486,15 +522,17 @@ Written before/alongside each core module. No Arduino/hardware includes (enforce
 |-----------|-------|----------|-----|
 | `test_chords.cpp` | Every type in §6.2 → exact MIDI note sets; all 12 roots at base octave; flat spelling of pitch classes. | §6.2 | AC-1 |
 | `test_combinations.cpp` | Same-column (maj-only, min-only, 7th-only, maj+7=maj7, min+7=min7, maj+min=dim, maj+min+7=aug); left-adjacent (maj+left-7th=sus4, maj+left-min=add9); leftmost col via `` ` `` (Tab+`` ` ``=sus4 Db, Caps+`` ` ``=add9 Db). | §6.3 | AC-2, AC-14 |
-| `test_voicing.cpp` | Root-position within note range; smart voice-leading picks nearest inversion (integer distance); octave shift ±12 clamped to MIDI 0–127 (VR-3). | §6.4 | AC-12 |
-| `test_extensions.cpp` | add9 (+14), add11 (+17), add13 (+21) each independent; all 8 flag combinations; left-adjacent add9 sets the flag. | §6.2 | AC-13 |
+| `test_voicing.cpp` | Root-position within note range; smart voice-leading picks nearest inversion (integer distance); octave shift ±12 clamped to MIDI 0–127 (VR-3); min-note padding (VR-6); min-interval spread (VR-7); manual inversions (VR-8); chord-roll ordering (VR-9). | §6.4 | AC-12, AC-25, AC-26, AC-27, AC-24 |
+| `test_extensions.cpp` | add9 (+14), add11 (+17), add13 (+21) applied as held modifiers; all combinations; left-adjacent add9 sets the flag. | §6.2 | AC-13 |
+| `test_arp_modes.cpp` | Arpeggio index sequencing for Up / Down / Up-Down / Alternating / Random (deterministic seed). | §6.7 | AC-28 |
+| `test_bass.cpp` | Walking-bass interval blueprint for all 11 types; meter adaptation (4/4 vs 3/4); bass note = root −12 + offset; octave/duration/velocity/channel params. | §6.8, §4.7 | AC-29 |
 | `test_strum.cpp` | Note-pool derivation over strum octave range; key→note ordering for full (`1..0`, keypad `0 . 1..9`) and limited (`0 . 2 3 5 6 8 9 / *`) layouts; Silent-mode pool still derived; keypad +/- excluded. | §6.6, FR-S2 | AC-4, AC-18 |
 | `test_rhythm.cpp` | Pattern → scheduled step events; integer BPM→interval math; **fixed-point swing** delay on off-beat steps (0–75); mute suppresses note-ons but keeps timeline; MIDI clock 24 PPQN interval math. | §7.2, §7.3 | AC-5, AC-6, AC-16 |
 | `test_latching.cpp` | Held-mode: snapshot on trigger; editing any chord param or loading a preset does NOT mutate active notes; applies on next trigger; other modes apply per timing (FR-C9/VR-5). | FR-C9 | AC-15 |
-| `test_keymap.cpp` | HID usage + modifier byte → action mapping; Shift/Caps/Tab resolve as chord roots; keypad usages Num-Lock-independent; Ctrl/Alt/Super combos; `+`/`-` context-sensitivity. | §5 | AC-11, AC-18 |
+| `test_keymap.cpp` | HID usage + modifier byte → action mapping; Shift/Caps/Tab resolve as chord roots; keypad usages Num-Lock-independent; F-key menu/hotkey mapping; Super combos (presets/panic); `+`/`-` context-sensitivity. | §5 | AC-11, AC-18 |
 | `test_naming.cpp` | `<Root><quality>` flat spelling across all qualities/extensions and 12 roots (`Eb`, `Ebm`, `Eb7`, `Ebmaj7`, `Ebm7`, `Ebdim`, `Ebaug`, `Ebsus4`, `Ebadd9`). | §6.5 | AC-8 |
 | `test_params.cpp` | Clamp to [Min,Max] in Step for every Parameter Reference row; enum cycling; out-of-range → Default; swing integer 0–75 step 5. | §9 | AC-21 |
-| `test_presets.cpp` | 80-slot save/recall of chord/strum/rhythm + channels (via storage stub); dirty flag set/cleared; default channels 1/2/10; uninitialized/cleared slots load factory defaults. | §4.4 | AC-7, AC-20, AC-21 |
+| `test_presets.cpp` | 80-slot save/recall of chord/strum/bass/rhythm + channels (via storage stub); dirty flag set/cleared; default channels 1/2/3/10; uninitialized/cleared slots load factory defaults; legacy `play_mode` remap (old Rhythm→Arpeggio). | §4.4 | AC-7, AC-20, AC-21 |
 | `test_config.cpp` | Schema validation; first-boot generation of config + 10×8 presets (storage stub); corrupt/missing regenerate; out-of-range per-field fallback with warning; never throws. | NFR-9 | AC-22 |
 
 **Additional cross-cutting unit tests:**
@@ -511,13 +549,15 @@ Written before/alongside each core module. No Arduino/hardware includes (enforce
 
 ### 7.3 Manual hardware checklist (spec §11.3)
 
-Executed on assembled hardware with an external synth/DAW and optional DIN monitor. 1:1 with AC-1…AC-23. Hardware-only highlights:
+Executed on assembled hardware with an external synth/DAW and optional DIN monitor. 1:1 with AC-1…AC-29. Hardware-only highlights:
 
 - **AC-9 / NFR-5:** unplug/replug keyboard (hot-plug re-enumeration); remove LCD; disconnect DIN — app keeps running; DIN resumes when reconnected.
 - **AC-11:** confirm Tab/Caps/Shift×2/`[`/`'` act as chord roots (HID report parsing).
 - **AC-17:** stuck-note recovery via panic.
 - **AC-18:** numpad strum identical with Num Lock on and off.
-- **AC-23:** Scroll Lock LED flashes in time (accented downbeat); `Super+F8` toggles it; removing the keyboard/LED does not affect timing or MIDI.
+- **AC-23:** configured LED flashes in time (accented downbeat); `F4` (or Beat LED in the Rhythm menu) toggles it; removing the keyboard/LED does not affect timing or MIDI.
+- **AC-27:** `PrtSc`/`ScLk`/`Pause` select 1st/2nd/3rd inversion.
+- **AC-29:** walking bass cycles on the beat across meters; own channel/octave/velocity/duration honored.
 - **NFR-6:** simultaneous chord + strum key presses (document keyboard rollover limits; try a full-NKRO keyboard vs a boot-protocol one).
 
 ### 7.4 Test gates
@@ -581,7 +621,7 @@ Items 2–4 are isolated to data/display files and do not block implementation.
 1. User reviews this addendum against the Pico spec; confirm architecture, layout, and milestone plan.
 2. On approval, begin **M1 — Scaffolding** (PlatformIO project, git init, `platformio.ini` with pinned deps, `src/main.cpp` dual-core entry, LittleFS config loader with first-boot defaults, adapter interfaces + null/stub fallbacks, GoogleTest skeleton), then stop for review.
 3. **Validate the USB-host keyboard path and N-key rollover early** (during/right after M2) with the actual target keyboard — this is the highest-risk item.
-4. Proceed through M3–M8, stopping after each for user testing/feedback.
+4. Proceed through M3–M10, stopping after each for user testing/feedback.
 
 ---
 

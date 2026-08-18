@@ -14,12 +14,34 @@ StrumLayout StrumEngine::activeLayout() const {
                                             : StrumLayout::Full;
 }
 
+std::vector<uint8_t> StrumEngine::notePool(StrumLayout layout, size_t count) const {
+    const StrumParams& sp = state_.pendingStrum;
+    switch (sp.mode) {
+        case StrumMode::Scale:
+            return buildScalePool(sp.scale_type, sp.root_pc, state_.config.base_root_midi,
+                                  sp.octave, count);
+        case StrumMode::Piano:
+            return buildPianoPool(sp.root_pc, state_.config.base_root_midi,
+                                  sp.octave, count);
+        case StrumMode::FollowChord:
+        default: {
+            // Immediate pickup (FR-S5): the selected chord already carries any
+            // held extensions (merged in the chord engine), so the pool reflects
+            // the latest edits with no latching.
+            if (!state_.selectedChordValid) return {};
+            return buildNotePool(state_.selectedChord, state_.config.base_root_midi,
+                                 sp.octave, count);
+        }
+    }
+}
+
 void StrumEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
     KeyAction a = keymap_.resolve(ev.hid_usage, ev.modifiers);
 
     switch (a.type) {
         case ActionType::StrumKey:
             if (ev.pressed) playStrum(ev.hid_usage, now_us);
+            else            releaseStrum(ev.hid_usage, now_us);
             break;
 
         default:
@@ -29,72 +51,73 @@ void StrumEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
 
 void StrumEngine::update(uint64_t now_us) {
     for (auto& n : notes_) {
-        if (n.active && now_us >= n.deadline_us) {
-            router_.noteOff(n.channel, n.note);
-            n.active = false;
+        if (n.active && n.released && now_us >= n.deadline_us) {
+            noteOff(n);
         }
     }
 }
 
 void StrumEngine::allNotesOff() {
     for (auto& n : notes_) {
-        if (n.active) {
-            router_.noteOff(n.channel, n.note);
-            n.active = false;
-        }
+        if (n.active) noteOff(n);
     }
 }
 
 void StrumEngine::playStrum(uint8_t usage, uint64_t now_us) {
     StrumLayout layout = activeLayout();
     int idx = strumIndexFor(usage, layout);
-    if (idx < 0 || !state_.selectedChordValid) return;
+    if (idx < 0) return;
 
-    // Immediate pickup (FR-S5): read current strum params directly (no latching)
-    // and merge any independently-toggled chord extensions over the selected
-    // chord so the pool reflects the latest edits.
     const StrumParams& sp = state_.pendingStrum;
-
-    ResolvedChord chord = state_.selectedChord;
-    chord.add9  = chord.add9  || state_.pendingChord.add9;
-    chord.add11 = chord.add11 || state_.pendingChord.add11;
-    chord.add13 = chord.add13 || state_.pendingChord.add13;
-
-    auto pool = buildNotePool(chord, state_.config.base_root_midi, sp.octave,
-                              static_cast<size_t>(strumKeyCount(layout)));
+    auto pool = notePool(layout, static_cast<size_t>(strumKeyCount(layout)));
     if (idx >= static_cast<int>(pool.size())) return;
 
     uint8_t note = pool[idx];
 
-    // Re-articulate an already-sounding note: send its note-off before the new
-    // note-on so a re-strum uses the current note duration (FR-S5) and the synth
-    // never sees an un-paired duplicate note-on (which can hold the old duration
-    // or hang on some synths).
-    releaseNote(sp.channel, note);
+    // Re-articulate a note already sounding on this key (re-strum) so the new
+    // press uses the current duration/velocity and the synth never sees an
+    // un-paired duplicate note-on.
+    for (auto& n : notes_) {
+        if (n.active && n.usage == usage) {
+            noteOff(n);
+        }
+    }
 
     logStrumPlay(static_cast<uint8_t>(idx), note, sp.channel, sp.note_duration_ms);
     router_.noteOn(sp.channel, note, sp.velocity);
-    addSoundingNote(sp.channel, note,
+    addSoundingNote(usage, sp.channel, note,
                     now_us + static_cast<uint64_t>(sp.note_duration_ms) * 1000ULL);
 }
 
-void StrumEngine::releaseNote(uint8_t channel, uint8_t note) {
+void StrumEngine::releaseStrum(uint8_t usage, uint64_t now_us) {
     for (auto& n : notes_) {
-        if (n.active && n.channel == channel && n.note == note) {
-            router_.noteOff(n.channel, n.note);
-            n.active = false;
-            return;
+        if (n.active && n.usage == usage) {
+            n.released = true;
+            // If the minimum duration has already elapsed, release immediately;
+            // otherwise update() releases it when the deadline passes.
+            if (now_us >= n.deadline_us) {
+                noteOff(n);
+            }
         }
     }
 }
 
-void StrumEngine::addSoundingNote(uint8_t channel, uint8_t note, uint64_t deadline_us) {
+void StrumEngine::noteOff(StrumNote& n) {
+    router_.noteOff(n.channel, n.note);
+    n.active = false;
+    n.released = false;
+}
+
+void StrumEngine::addSoundingNote(uint8_t usage, uint8_t channel, uint8_t note,
+                                  uint64_t deadline_us) {
     // First free slot.
     for (auto& n : notes_) {
         if (!n.active) {
+            n.usage       = usage;
             n.note        = note;
             n.channel     = channel;
             n.deadline_us = deadline_us;
+            n.released    = false;
             n.active      = true;
             return;
         }
@@ -106,8 +129,11 @@ void StrumEngine::addSoundingNote(uint8_t channel, uint8_t note, uint64_t deadli
     for (size_t i = 1; i < MAX_STRUM_NOTES; i++) {
         if (notes_[i].deadline_us < notes_[earliest].deadline_us) earliest = i;
     }
-    router_.noteOff(notes_[earliest].channel, notes_[earliest].note);
+    noteOff(notes_[earliest]);
+    notes_[earliest].usage       = usage;
     notes_[earliest].note        = note;
     notes_[earliest].channel     = channel;
     notes_[earliest].deadline_us = deadline_us;
+    notes_[earliest].released    = false;
+    notes_[earliest].active      = true;
 }

@@ -87,15 +87,18 @@ TEST(Presets, SameParamsIgnoresName) {
 TEST(Presets, MakePresetCopiesParams) {
     ChordParams c = ChordParams::defaults();
     StrumParams s = StrumParams::defaults();
+    BassParams b = BassParams::defaults();
     RhythmParams r = RhythmParams::defaults();
     c.channel = 5;
     s.channel = 7;
+    b.channel = 9;
     r.channel = 12;
 
-    PresetSlot p = makePreset(c, s, r, "Built");
+    PresetSlot p = makePreset(c, s, b, r, "Built");
     EXPECT_EQ(p.name, "Built");
     EXPECT_EQ(p.chord.channel, 5);
     EXPECT_EQ(p.strum.channel, 7);
+    EXPECT_EQ(p.bass.channel, 9);
     EXPECT_EQ(p.rhythm.channel, 12);
 }
 
@@ -167,4 +170,86 @@ TEST(Presets, RhythmDrumMapRoundTrip) {
     EXPECT_EQ(loaded.rhythm.drums.snare, 40);
     EXPECT_EQ(loaded.rhythm.drums.hihat, 44);
     EXPECT_EQ(loaded.rhythm.drums.open_hat, 45);
+}
+
+TEST(Presets, DrumVelocityRoundTrip) {
+    StorageStub storage;
+
+    PresetSlot orig = PresetSlot::defaults();
+    orig.rhythm.drums.kick_vel = 100;
+    orig.rhythm.drums.snare_vel = 90;
+    EXPECT_TRUE(savePreset(storage, 2, 2, orig));
+
+    PresetSlot loaded = loadPreset(storage, 2, 2);
+    EXPECT_EQ(loaded.rhythm.drums.kick_vel, 100);
+    EXPECT_EQ(loaded.rhythm.drums.snare_vel, 90);
+}
+
+TEST(Presets, BassBlockRoundTrip) {
+    StorageStub storage;
+
+    PresetSlot orig = PresetSlot::defaults();
+    orig.bass.enabled = true;
+    orig.bass.octave = -2;
+    orig.bass.note_duration_ms = 200;
+    orig.bass.velocity = 110;
+    orig.bass.channel = 5;
+    EXPECT_TRUE(savePreset(storage, 3, 0, orig));
+
+    PresetSlot loaded = loadPreset(storage, 3, 0);
+    EXPECT_TRUE(loaded.bass.enabled);
+    EXPECT_EQ(loaded.bass.octave, -2);
+    EXPECT_EQ(loaded.bass.note_duration_ms, 200);
+    EXPECT_EQ(loaded.bass.velocity, 110);
+    EXPECT_EQ(loaded.bass.channel, 5);
+}
+
+TEST(Presets, ChordUpgradesRoundTrip) {
+    StorageStub storage;
+
+    PresetSlot orig = PresetSlot::defaults();
+    orig.chord.chord_roll_ms = -120;
+    orig.chord.min_notes = 5;
+    orig.chord.min_interval = 4;
+    orig.chord.inversion = InversionMode::Second;
+    orig.chord.arp_mode = ArpMode::Random;
+    EXPECT_TRUE(savePreset(storage, 4, 0, orig));
+
+    PresetSlot loaded = loadPreset(storage, 4, 0);
+    EXPECT_EQ(loaded.chord.chord_roll_ms, -120);
+    EXPECT_EQ(loaded.chord.min_notes, 5);
+    EXPECT_EQ(loaded.chord.min_interval, 4);
+    EXPECT_EQ(loaded.chord.inversion, InversionMode::Second);
+    EXPECT_EQ(loaded.chord.arp_mode, ArpMode::Random);
+}
+
+TEST(Presets, StrumModeRoundTrip) {
+    StorageStub storage;
+
+    PresetSlot orig = PresetSlot::defaults();
+    orig.strum.mode = StrumMode::Scale;
+    orig.strum.root_pc = 7;
+    orig.strum.scale_type = ScaleType::Blues;
+    EXPECT_TRUE(savePreset(storage, 4, 1, orig));
+
+    PresetSlot loaded = loadPreset(storage, 4, 1);
+    EXPECT_EQ(loaded.strum.mode, StrumMode::Scale);
+    EXPECT_EQ(loaded.strum.root_pc, 7);
+    EXPECT_EQ(loaded.strum.scale_type, ScaleType::Blues);
+}
+
+TEST(Presets, LegacyPlayModeRhythmRemappedToArpeggio) {
+    StorageStub storage;
+
+    // Old int play_mode: 3 = Rhythm (now removed) -> Arpeggio.
+    storage.writeFile("/presets/bank1.json",
+        "[{\"chord\":{\"play_mode\":3}}]");
+    PresetSlot p = loadPreset(storage, 0, 0);
+    EXPECT_EQ(p.chord.play_mode, PlayMode::Arpeggio);
+
+    // Old 4 = Silent -> Silent.
+    storage.writeFile("/presets/bank1.json",
+        "[{\"chord\":{\"play_mode\":4}}]");
+    p = loadPreset(storage, 0, 0);
+    EXPECT_EQ(p.chord.play_mode, PlayMode::Silent);
 }

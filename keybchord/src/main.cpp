@@ -9,6 +9,7 @@
 #include "midimsg.h"
 #include "chord_engine.h"
 #include "strum_engine.h"
+#include "bass_engine.h"
 #include "rhythm_engine.h"
 #include "edit_engine.h"
 #include "display_manager.h"
@@ -31,6 +32,7 @@ static KeymapResolver  g_keymap;
 static MidiRouter*     g_router = nullptr;
 static ChordEngine*    g_chordEngine = nullptr;
 static StrumEngine*    g_strumEngine = nullptr;
+static BassEngine*     g_bassEngine = nullptr;
 static MidiEventQueue  g_rhythmQueue;
 static RhythmEngine*   g_rhythmEngine = nullptr;
 static DisplayManager* g_display = nullptr;
@@ -61,6 +63,13 @@ static uint8_t ledUsageFor(const AppConfig& cfg) {    switch (cfg.led_indicator)
 static bool     g_ledOn       = false;
 static uint64_t g_ledOffAtUs  = 0;
 static bool     g_ledDirty    = false;
+
+// Drum audition (Upgrade-Plan): a one-shot note-on/note-off so the user hears
+// the selected drum code while editing it in the Drum menu.
+static uint8_t  g_auditionNote = 0xFF;
+static uint8_t  g_auditionChannel = 0;
+static uint64_t g_auditionOffAtUs = 0;
+
 static bool     g_wasConnected = false;  // keyboard hot-plug edge tracking
 static bool     g_hotplugArmed = false;  // skip the first loop's false edge
 
@@ -94,11 +103,12 @@ static bool applyLedState(bool on) {
     return allOk;
 }
 
-// Esc (main menu) and keyboard hot-plug disconnect: release chord + strum
-// notes only — the rhythm and beat LED are left untouched.
+// Esc (main menu) and keyboard hot-plug disconnect: release chord + strum +
+// bass notes only — the rhythm and beat LED are left untouched.
 static void cancelChordStrum() {
     if (g_chordEngine) g_chordEngine->allNotesOff();
     if (g_strumEngine) g_strumEngine->allNotesOff();
+    if (g_bassEngine)  g_bassEngine->allNotesOff();
     g_state.allNotesOff();
 }
 
@@ -121,12 +131,13 @@ static void handlePanic() {
     logInfo("Panic: all-sound-off + all-notes-off (16ch)");
 }
 
-// Polls the keyboard for a short window at boot looking for a held F11. When
-// held, the native USB port also presents the FatFS Mass Storage drive so the
-// user can drag-drop edit config.json/presets/rhythms (M9). Returns true if the
-// drive should be enabled.
+// Polls the keyboard for a short window at boot looking for a held Ctrl (LCtrl
+// or RCtrl, reported in the HID modifier byte). When held, the native USB port
+// also presents the FatFS Mass Storage drive so the user can drag-drop edit
+// config.json/presets/rhythms (M9/M10). Returns true if the drive should be
+// enabled.
 static bool detectBootKey() {
-    constexpr uint8_t HID_USAGE_F11 = 0x44;
+    constexpr uint8_t CTRL_MASK = 0x11;  // LCtrl | RCtrl
     uint64_t deadline = nowUs() + 2000000ULL;  // hard cap (no keyboard present)
     bool connectedSeen = false;
 
@@ -134,12 +145,12 @@ static bool detectBootKey() {
         bool connected = g_adapters.input->connected();
         auto events = g_adapters.input->poll();
         for (const auto& ev : events) {
-            if (ev.pressed && ev.hid_usage == HID_USAGE_F11) {
+            if (ev.pressed && (ev.modifiers & CTRL_MASK)) {
                 return true;
             }
         }
         // Once the keyboard has enumerated and its initial report has been read
-        // without F11, the boot key was not held — stop waiting.
+        // without Ctrl, the boot key was not held — stop waiting.
         if (connected && connectedSeen) break;
         if (connected) connectedSeen = true;
         delay(10);
@@ -162,6 +173,7 @@ void setup() {
     g_router = new MidiRouter(*g_adapters.midiOut, g_state);
     g_chordEngine = new ChordEngine(g_state, *g_router);
     g_strumEngine = new StrumEngine(g_state, *g_router);
+    g_bassEngine  = new BassEngine(g_state, *g_router);
     g_rhythmEngine = new RhythmEngine(g_state, g_rhythmQueue);
     g_rhythmEngine->setPatterns(loadRhythmPatterns(storage));
 
@@ -171,6 +183,13 @@ void setup() {
     g_editEngine = new EditEngine(g_state, *g_display);
     g_editEngine->setModeChangedCallback([]() { g_chordEngine->onModeChanged(); });
     g_editEngine->setPatternChangedCallback([]() { g_rhythmEngine->onPatternChanged(); });
+    g_editEngine->setDrumAuditionCallback([](uint8_t note) {
+        uint8_t ch = g_state.pendingRhythm.channel;
+        g_router->noteOn(ch, note, 100);
+        g_auditionNote = note;
+        g_auditionChannel = ch;
+        g_auditionOffAtUs = nowUs() + 120000ULL;  // 120 ms audition
+    });
 
     g_presetEngine = new PresetEngine(g_state, *g_adapters.storage, *g_display);
     g_presetEngine->setModeChangedCallback([]() { g_chordEngine->onModeChanged(); });
@@ -282,8 +301,15 @@ void loop() {
 
     g_chordEngine->update(nowUs());
     g_strumEngine->update(nowUs());
+    g_bassEngine->update(nowUs());
     g_presetEngine->update(nowUs());
     g_editEngine->update(nowUs());
+
+    // Drum audition note-off (one-shot).
+    if (g_auditionNote != 0xFF && nowUs() >= g_auditionOffAtUs) {
+        g_router->noteOff(g_auditionChannel, g_auditionNote);
+        g_auditionNote = 0xFF;
+    }
 
     // Render the LCD idle/edit/prompt frame from the live state.
     if (g_display) {

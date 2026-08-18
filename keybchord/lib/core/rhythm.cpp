@@ -108,6 +108,18 @@ uint8_t mapDrumNote(uint8_t note, const DrumMap& drums) {
     }
 }
 
+uint8_t mapDrumVelocity(uint8_t note, const DrumMap& drums, uint8_t patternVelocity) {
+    uint8_t v = 0;
+    switch (note) {
+        case 36: v = drums.kick_vel;     break;
+        case 38: v = drums.snare_vel;    break;
+        case 42: v = drums.hihat_vel;    break;
+        case 46: v = drums.open_hat_vel; break;
+        default: return patternVelocity;
+    }
+    return (v == 0) ? patternVelocity : v;
+}
+
 const char* rhythmName(int index) {
     if (index < 0 || index >= RHYTHM_COUNT) return kRhythmNames[0];
     return kRhythmNames[index];

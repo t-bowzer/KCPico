@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 #include "base.h"
 #include "keymap.h"
@@ -19,12 +20,15 @@ public:
     void allNotesOff();
 
 private:
-    // A strummed note currently sounding, released after note_duration_ms.
+    // A strummed note. note_duration_ms is a *minimum*: the note stays sounding
+    // while its key is held, and is released at max(release, deadline).
     struct StrumNote {
-        uint8_t  note       = 0;
-        uint8_t  channel    = 0;
+        uint8_t  usage       = 0;
+        uint8_t  note        = 0;
+        uint8_t  channel     = 0;
         uint64_t deadline_us = 0;
-        bool     active     = false;
+        bool     active      = false;
+        bool     released    = false;
     };
 
     static constexpr size_t MAX_STRUM_NOTES = 16;
@@ -36,7 +40,9 @@ private:
     StrumNote notes_[MAX_STRUM_NOTES];
 
     StrumLayout activeLayout() const;
+    std::vector<uint8_t> notePool(StrumLayout layout, size_t count) const;
     void playStrum(uint8_t usage, uint64_t now_us);
-    void releaseNote(uint8_t channel, uint8_t note);
-    void addSoundingNote(uint8_t channel, uint8_t note, uint64_t deadline_us);
+    void releaseStrum(uint8_t usage, uint64_t now_us);
+    void noteOff(StrumNote& n);
+    void addSoundingNote(uint8_t usage, uint8_t channel, uint8_t note, uint64_t deadline_us);
 };

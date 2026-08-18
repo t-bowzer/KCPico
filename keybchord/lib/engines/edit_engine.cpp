@@ -5,7 +5,6 @@
 
 namespace {
 
-constexpr uint8_t HID_USAGE_F12   = 0x45;
 constexpr uint8_t HID_USAGE_LEFT  = 0x50;
 constexpr uint8_t HID_USAGE_RIGHT = 0x4F;
 constexpr uint8_t HID_USAGE_UP    = 0x52;
@@ -32,6 +31,29 @@ int stepDir(ActionType t) {
     }
 }
 
+// True for drum *note* parameters (auditioned on change); velocities are not.
+bool isDrumNoteParam(ParamId id) {
+    switch (id) {
+        case ParamId::DrumKickNote:
+        case ParamId::DrumSnareNote:
+        case ParamId::DrumHihatNote:
+        case ParamId::DrumOpenHatNote:
+            return true;
+        default:
+            return false;
+    }
+}
+
+uint8_t drumNoteValue(const StateManager& state, ParamId id) {
+    switch (id) {
+        case ParamId::DrumKickNote:    return state.pendingRhythm.drums.kick;
+        case ParamId::DrumSnareNote:   return state.pendingRhythm.drums.snare;
+        case ParamId::DrumHihatNote:   return state.pendingRhythm.drums.hihat;
+        case ParamId::DrumOpenHatNote: return state.pendingRhythm.drums.open_hat;
+        default:                       return 0;
+    }
+}
+
 } // namespace
 
 
@@ -48,6 +70,10 @@ void EditEngine::setPatternChangedCallback(std::function<void()> cb) {
 
 void EditEngine::setAnyEditCallback(std::function<void()> cb) {
     anyEdit_ = std::move(cb);
+}
+
+void EditEngine::setDrumAuditionCallback(std::function<void(uint8_t)> cb) {
+    drumAudition_ = std::move(cb);
 }
 
 ParamId EditEngine::currentParam() const {
@@ -95,6 +121,9 @@ void EditEngine::applyParamStep(ParamId id, int delta, bool inMenu, uint64_t now
     paramStep(state_, id, delta);
     if (id == ParamId::ChordMode && modeChanged_) modeChanged_();
     if (id == ParamId::RhythmPattern && patternChanged_) patternChanged_();
+    if (isDrumNoteParam(id) && drumAudition_) {
+        drumAudition_(drumNoteValue(state_, id));
+    }
     if (anyEdit_) anyEdit_();
     display_.showValue(paramFullName(id), paramValueString(state_, id), inMenu, now_us);
 }
@@ -119,7 +148,6 @@ void EditEngine::update(uint64_t now_us) {
     if (repeatDelta_ != 0 && now_us >= repeatDeadlineUs_) {
         applyParamStep(repeatParam_, repeatDelta_, repeatInMenu_, now_us);
         repeatDeadlineUs_ = now_us + REPEAT_INTERVAL_US;
-        // An auto-repeating value is user activity: keep the menu open.
         menuDeadlineUs_ = now_us +
             static_cast<uint64_t>(state_.config.menu_timeout_ms) * 1000ULL;
     }
@@ -144,17 +172,42 @@ void EditEngine::applyDirect(uint8_t usage, const KeyAction& a, uint64_t now_us)
             paramCycle(state_, ParamId::ChordVoicing);
             show(ParamId::ChordVoicing);
             break;
-        case ActionType::ExtToggle9:
-            paramCycle(state_, ParamId::ChordAdd9);
-            show(ParamId::ChordAdd9);
+        case ActionType::BassToggle:
+            paramCycle(state_, ParamId::BassEnable);
+            show(ParamId::BassEnable);
             break;
-        case ActionType::ExtToggle11:
-            paramCycle(state_, ParamId::ChordAdd11);
-            show(ParamId::ChordAdd11);
+        case ActionType::RhythmLedToggle:
+            paramCycle(state_, ParamId::RhythmLed);
+            show(ParamId::RhythmLed);
             break;
-        case ActionType::ExtToggle13:
-            paramCycle(state_, ParamId::ChordAdd13);
-            show(ParamId::ChordAdd13);
+        case ActionType::RhythmToggle:
+            paramCycle(state_, ParamId::RhythmEnable);
+            show(ParamId::RhythmEnable);
+            break;
+        case ActionType::RhythmClockToggle:
+            paramCycle(state_, ParamId::RhythmClock);
+            show(ParamId::RhythmClock);
+            break;
+        case ActionType::RhythmPatternCycle:
+            paramCycle(state_, ParamId::RhythmPattern);
+            if (patternChanged_) patternChanged_();
+            show(ParamId::RhythmPattern);
+            break;
+        case ActionType::RhythmMute:
+            paramCycle(state_, ParamId::RhythmMute);
+            show(ParamId::RhythmMute);
+            break;
+        case ActionType::Inversion1:
+            state_.pendingChord.inversion = InversionMode::First;
+            show(ParamId::ChordInversion);
+            break;
+        case ActionType::Inversion2:
+            state_.pendingChord.inversion = InversionMode::Second;
+            show(ParamId::ChordInversion);
+            break;
+        case ActionType::Inversion3:
+            state_.pendingChord.inversion = InversionMode::Third;
+            show(ParamId::ChordInversion);
             break;
         case ActionType::ChordOctaveUp:
             paramStep(state_, ParamId::ChordOctave, +1);
@@ -182,27 +235,6 @@ void EditEngine::applyDirect(uint8_t usage, const KeyAction& a, uint64_t now_us)
             show(ParamId::RhythmTempo);
             armRepeat(usage, -1, ParamId::RhythmTempo, false, now_us);
             break;
-        case ActionType::RhythmToggle:
-            paramCycle(state_, ParamId::RhythmEnable);
-            show(ParamId::RhythmEnable);
-            break;
-        case ActionType::RhythmPatternCycle:
-            paramCycle(state_, ParamId::RhythmPattern);
-            if (patternChanged_) patternChanged_();
-            show(ParamId::RhythmPattern);
-            break;
-        case ActionType::RhythmMute:
-            paramCycle(state_, ParamId::RhythmMute);
-            show(ParamId::RhythmMute);
-            break;
-        case ActionType::RhythmClockToggle:
-            paramCycle(state_, ParamId::RhythmClock);
-            show(ParamId::RhythmClock);
-            break;
-        case ActionType::RhythmLedToggle:
-            paramCycle(state_, ParamId::RhythmLed);
-            show(ParamId::RhythmLed);
-            break;
         default:
             break;
     }
@@ -217,7 +249,6 @@ bool EditEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
     KeyAction a = keymap_.resolve(ev.hid_usage, ev.modifiers);
     bool inMenu = state_.editMenu != EditMenu::None;
 
-    // Any key press while a menu is open resets the idle timeout.
     if (inMenu) {
         menuDeadlineUs_ = now_us +
             static_cast<uint64_t>(state_.config.menu_timeout_ms) * 1000ULL;
@@ -227,6 +258,7 @@ bool EditEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
         case ActionType::MenuChord:  enterOrSwitch(EditMenu::Chord, now_us);  return true;
         case ActionType::MenuStrum:  enterOrSwitch(EditMenu::Strum, now_us);  return true;
         case ActionType::MenuRhythm: enterOrSwitch(EditMenu::Rhythm, now_us); return true;
+        case ActionType::MenuBass:   enterOrSwitch(EditMenu::Bass, now_us);   return true;
         case ActionType::ClearEdit:   // Esc
             if (inMenu) exitMenu();
             return true;
@@ -234,15 +266,14 @@ bool EditEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
             break;
     }
 
-    // F12 is a fallback entry into Chord Edit (for keyboards without a Menu key).
-    if (ev.hid_usage == HID_USAGE_F12 && !inMenu) {
-        enterOrSwitch(EditMenu::Chord, now_us);
-        return true;
-    }
-
     if (inMenu) {
         int f = functionKeyIndex(ev.hid_usage);
         if (f >= 0) {
+            // F8 inside the Rhythm menu opens the Drum sub-menu.
+            if (state_.editMenu == EditMenu::Rhythm && f == 7) {
+                enterOrSwitch(EditMenu::Drum, now_us);
+                return true;
+            }
             selectParam(f);
             return true;
         }
@@ -273,11 +304,14 @@ bool EditEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
         }
     }
 
-    // Main menu: forward chord/strum keys; consume and apply everything else.
+    // Main menu: forward chord/strum/held-extension keys; consume the rest.
     switch (a.type) {
         case ActionType::ChordKey:
         case ActionType::Backtick:
         case ActionType::StrumKey:
+        case ActionType::Ext9:
+        case ActionType::Ext11:
+        case ActionType::Ext13:
             return false;
         default:
             applyDirect(ev.hid_usage, a, now_us);

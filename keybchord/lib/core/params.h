@@ -106,7 +106,8 @@ struct StrumParams {
 
 // Per-preset GM drum-kit mapping (FR-R3) plus per-piece velocity override
 // (Upgrade-Plan "Rhythm engine upgrades"). A velocity of 0 means "follow the
-// pattern's authored step velocity"; 1..127 forces a fixed velocity.
+// pattern's authored step velocity"; 1..127 forces a fixed velocity; 128
+// (DRUM_VELOCITY_OFF) mutes the piece.
 struct DrumMap {
     uint8_t kick           = 36;   // Bass Drum 1
     uint8_t kick_vel       = 0;
@@ -116,12 +117,39 @@ struct DrumMap {
     uint8_t hihat_vel      = 0;
     uint8_t open_hat       = 46;   // Open Hi-Hat
     uint8_t open_hat_vel   = 0;
+    uint8_t rimshot        = 37;   // Side Stick
+    uint8_t rimshot_vel    = 0;
+    uint8_t clap           = 39;   // Hand Clap
+    uint8_t clap_vel       = 0;
+    uint8_t crash          = 49;   // Crash Cymbal 1
+    uint8_t crash_vel      = 0;
+    uint8_t ride           = 51;   // Ride Cymbal 1
+    uint8_t ride_vel       = 0;
+    uint8_t bongo          = 61;   // Low Bongo
+    uint8_t bongo_vel      = 0;
+    uint8_t conga_lo       = 62;   // Mute Hi Conga
+    uint8_t conga_lo_vel   = 0;
+    uint8_t conga_hi       = 63;   // Open Hi Conga
+    uint8_t conga_hi_vel   = 0;
+    uint8_t clave          = 75;   // Claves
+    uint8_t clave_vel      = 0;
+    uint8_t shaker         = 82;   // Shaker
+    uint8_t shaker_vel     = 0;
 
     bool operator==(const DrumMap& o) const {
         return kick == o.kick && kick_vel == o.kick_vel &&
                snare == o.snare && snare_vel == o.snare_vel &&
                hihat == o.hihat && hihat_vel == o.hihat_vel &&
-               open_hat == o.open_hat && open_hat_vel == o.open_hat_vel;
+               open_hat == o.open_hat && open_hat_vel == o.open_hat_vel &&
+               rimshot == o.rimshot && rimshot_vel == o.rimshot_vel &&
+               clap == o.clap && clap_vel == o.clap_vel &&
+               crash == o.crash && crash_vel == o.crash_vel &&
+               ride == o.ride && ride_vel == o.ride_vel &&
+               bongo == o.bongo && bongo_vel == o.bongo_vel &&
+               conga_lo == o.conga_lo && conga_lo_vel == o.conga_lo_vel &&
+               conga_hi == o.conga_hi && conga_hi_vel == o.conga_hi_vel &&
+               clave == o.clave && clave_vel == o.clave_vel &&
+               shaker == o.shaker && shaker_vel == o.shaker_vel;
     }
 };
 
@@ -137,12 +165,29 @@ struct RhythmParams {
     static RhythmParams defaults();
 };
 
+// Walking-bass pattern (Upgrade-Plan): the default interval cycle plus a set of
+// user-selectable root/5th patterns. `Hold` sustains the root while the chord
+// is sounding rather than being beat-driven.
+enum class BassPattern : uint8_t {
+    Walking = 0,   // root-3rd-5th-6th/7th cycle on each beat (spec 6.8)
+    Whole,         // root, whole notes
+    Half,          // root, half notes
+    Quarter,       // root, quarter notes
+    HalfAlt,       // root/5th alternating half notes
+    QuarterAlt,    // root/5th alternating quarter notes
+    ThreeFourAlt,  // root on beat 1, 5th on the last beat
+    Hold,          // root sustained while the chord is held
+    WalkNoSixth,   // root (half) -> 3rd (quarter) -> 5th (quarter) -> repeat
+    COUNT
+};
+
 struct BassParams {
-    bool    enabled          = false;
-    int8_t  octave           = -1;
-    int16_t note_duration_ms = 150;
-    uint8_t velocity         = 90;
-    uint8_t channel          = 3;
+    bool        enabled          = false;
+    int8_t      octave           = -1;
+    int16_t     note_duration_ms = 150;
+    uint8_t     velocity         = 90;
+    uint8_t     channel          = 3;
+    BassPattern pattern          = BassPattern::Walking;
 
     static BassParams defaults();
 };
@@ -175,9 +220,9 @@ constexpr int8_t  CHORD_OCTAVE_MIN = -3;
 constexpr int8_t  CHORD_OCTAVE_MAX = 3;
 constexpr uint8_t CHORD_CHANNEL_MIN = 1;
 constexpr uint8_t CHORD_CHANNEL_MAX = 16;
-constexpr int16_t CHORD_ROLL_MIN = -400;
-constexpr int16_t CHORD_ROLL_MAX = 400;
-constexpr int16_t CHORD_ROLL_STEP = 5;
+constexpr int16_t CHORD_ROLL_MIN = -2000;
+constexpr int16_t CHORD_ROLL_MAX = 2000;
+constexpr int16_t CHORD_ROLL_STEP = 10;
 constexpr uint8_t CHORD_MIN_NOTES_MIN = 2;
 constexpr uint8_t CHORD_MIN_NOTES_MAX = 6;
 constexpr uint8_t CHORD_MIN_INTERVAL_MIN = 0;
@@ -216,6 +261,7 @@ constexpr uint8_t DRUM_NOTE_MIN = 0;
 constexpr uint8_t DRUM_NOTE_MAX = 127;
 constexpr uint8_t DRUM_VELOCITY_MIN = 0;  // 0 = follow pattern velocity
 constexpr uint8_t DRUM_VELOCITY_MAX = 127;
+constexpr uint8_t DRUM_VELOCITY_OFF = 128;  // mute the piece entirely
 
 constexpr uint8_t MIDI_NOTE_MIN = 0;
 constexpr uint8_t MIDI_NOTE_MAX = 127;

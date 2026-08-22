@@ -45,6 +45,7 @@ enum class ParamId : uint8_t {
     BassDuration,
     BassVelocity,
     BassChannel,
+    BassPattern,
     // Drum (per-piece note code + velocity)
     DrumKickNote,
     DrumKickVel,
@@ -54,6 +55,24 @@ enum class ParamId : uint8_t {
     DrumHihatVel,
     DrumOpenHatNote,
     DrumOpenHatVel,
+    DrumRimshotNote,
+    DrumRimshotVel,
+    DrumClapNote,
+    DrumClapVel,
+    DrumCrashNote,
+    DrumCrashVel,
+    DrumRideNote,
+    DrumRideVel,
+    DrumBongoNote,
+    DrumBongoVel,
+    DrumCongaLoNote,
+    DrumCongaLoVel,
+    DrumCongaHiNote,
+    DrumCongaHiVel,
+    DrumClaveNote,
+    DrumClaveVel,
+    DrumShakerNote,
+    DrumShakerVel,
     COUNT
 };
 

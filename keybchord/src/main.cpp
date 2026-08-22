@@ -174,6 +174,7 @@ void setup() {
     g_chordEngine = new ChordEngine(g_state, *g_router);
     g_strumEngine = new StrumEngine(g_state, *g_router);
     g_bassEngine  = new BassEngine(g_state, *g_router);
+    g_bassEngine->setChordEngine(g_chordEngine);
     g_rhythmEngine = new RhythmEngine(g_state, g_rhythmQueue);
     g_rhythmEngine->setPatterns(loadRhythmPatterns(storage));
 

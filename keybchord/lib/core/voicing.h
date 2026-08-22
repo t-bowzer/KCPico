@@ -25,6 +25,10 @@ std::vector<uint8_t> voiceSmart(const ResolvedChord& chord,
                                 uint8_t high,
                                 const std::vector<uint8_t>& previous);
 
+// Clamped root MIDI note used by the voicing pipeline (the C1..C7 window, spec
+// VR-3). Extension tensions are appended above this root.
+int voicingRoot(int rootPc, uint8_t base_root_midi, int octave);
+
 // Full voicing pipeline (M10): base voicing (root/smart) + manual inversion +
 // minimum-interval spread + minimum-note padding. All integer (spec 6.4 VR-6..9).
 struct VoicingConfig {

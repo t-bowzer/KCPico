@@ -10,9 +10,12 @@ constexpr uint8_t kNumberRowFull[10] = {
     0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
 };
 
-// Full layout, numpad: 0 . 1 2 3 4 5 6 7 8 9 -> positions 0..10.
-constexpr uint8_t kNumpadFull[11] = {
+// Full layout, numpad: 0 . 1 2 3 4 5 6 7 8 9 NumLock / * -> positions 0..13.
+// Num Lock, / and * sit at the top of the numpad and extend the full strum
+// plate (FR-S7/S8).
+constexpr uint8_t kNumpadFull[14] = {
     0x62, 0x63, 0x59, 0x5A, 0x5B, 0x5C, 0x5D, 0x5E, 0x5F, 0x60, 0x61,
+    0x53, 0x54, 0x55,
 };
 
 // Limited layout, numpad center path: 0 . 2 3 5 6 8 9 / * -> positions 0..9.
@@ -64,7 +67,7 @@ const char* const kScaleShortNames[] = {
 int strumIndexFor(uint8_t hid_usage, StrumLayout layout) {
     switch (layout) {
         case StrumLayout::Full: {
-            int np = indexOf(kNumpadFull, 11, hid_usage);
+            int np = indexOf(kNumpadFull, 14, hid_usage);
             if (np >= 0) return np;
             return indexOf(kNumberRowFull, 10, hid_usage);
         }
@@ -77,7 +80,7 @@ int strumIndexFor(uint8_t hid_usage, StrumLayout layout) {
 
 int strumKeyCount(StrumLayout layout) {
     switch (layout) {
-        case StrumLayout::Full:    return 11;
+        case StrumLayout::Full:    return 14;
         case StrumLayout::Limited: return 10;
         default:                   return 0;
     }

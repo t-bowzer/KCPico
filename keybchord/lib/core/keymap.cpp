@@ -84,12 +84,14 @@ constexpr uint8_t HID_USAGE_MINUS      = 0x2D;  // number-row -
 constexpr uint8_t HID_USAGE_EQUALS     = 0x2E;  // number-row =
 constexpr uint8_t HID_USAGE_KP_SLASH   = 0x54;
 constexpr uint8_t HID_USAGE_KP_STAR    = 0x55;
+constexpr uint8_t HID_USAGE_NUM_LOCK   = 0x53;
 constexpr uint8_t HID_USAGE_KP_MINUS   = 0x56;
 constexpr uint8_t HID_USAGE_KP_PLUS    = 0x57;
 constexpr uint8_t HID_USAGE_HOME       = 0x4A;
 constexpr uint8_t HID_USAGE_END        = 0x4D;
 constexpr uint8_t HID_USAGE_INSERT     = 0x49;
 constexpr uint8_t HID_USAGE_DELETE     = 0x4C;
+constexpr uint8_t HID_USAGE_SPACE      = 0x2C;
 
 constexpr uint8_t NUMBER_ROW_STRUM_LO  = 0x1E;  // 1
 constexpr uint8_t NUMBER_ROW_STRUM_HI  = 0x27;  // 0
@@ -103,7 +105,8 @@ bool isNumberRowStrum(uint8_t usage) {
 bool isKeypadStrum(uint8_t usage) {
     return (usage >= KEYPAD_STRUM_LO && usage <= KEYPAD_STRUM_HI)
         || usage == HID_USAGE_KP_SLASH
-        || usage == HID_USAGE_KP_STAR;
+        || usage == HID_USAGE_KP_STAR
+        || usage == HID_USAGE_NUM_LOCK;
 }
 
 bool lookupChordKey(uint8_t usage, GridCell& out) {
@@ -193,6 +196,7 @@ KeyAction KeymapResolver::resolve(uint8_t hid_usage, uint8_t modifiers) const {
         case HID_USAGE_END:      a.type = ActionType::PresetNext;       break;
         case HID_USAGE_INSERT:   a.type = ActionType::PresetSave;       break;
         case HID_USAGE_DELETE:   a.type = ActionType::PresetClear;      break;
+        case HID_USAGE_SPACE:    a.type = ActionType::TapTempo;         break;
         default:
             if (isNumberRowStrum(hid_usage) || isKeypadStrum(hid_usage)) {
                 a.type = ActionType::StrumKey;

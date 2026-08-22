@@ -68,9 +68,10 @@ TEST(Strum, FullLayoutNumpadOrdering) {
     EXPECT_EQ(strumIndexFor(0x61, StrumLayout::Full), 10);  // Keypad 9
 }
 
-TEST(Strum, FullLayoutExcludesKeypadSlashStar) {
-    EXPECT_EQ(strumIndexFor(0x54, StrumLayout::Full), -1);  // Keypad /
-    EXPECT_EQ(strumIndexFor(0x55, StrumLayout::Full), -1);  // Keypad *
+TEST(Strum, FullLayoutIncludesNumLockSlashStar) {
+    EXPECT_EQ(strumIndexFor(0x53, StrumLayout::Full), 11);  // Num Lock
+    EXPECT_EQ(strumIndexFor(0x54, StrumLayout::Full), 12);  // Keypad /
+    EXPECT_EQ(strumIndexFor(0x55, StrumLayout::Full), 13);  // Keypad *
 }
 
 TEST(Strum, LimitedLayoutOrdering) {
@@ -102,6 +103,6 @@ TEST(Strum, NumpadPlusMinusNeverStrum) {
 }
 
 TEST(Strum, KeyCount) {
-    EXPECT_EQ(strumKeyCount(StrumLayout::Full), 11);
+    EXPECT_EQ(strumKeyCount(StrumLayout::Full), 14);
     EXPECT_EQ(strumKeyCount(StrumLayout::Limited), 10);
 }

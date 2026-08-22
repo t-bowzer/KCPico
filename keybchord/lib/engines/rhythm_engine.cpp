@@ -167,6 +167,7 @@ void RhythmEngine::fireStep(uint64_t now_us) {
         for (const auto& e : events) {
             uint8_t note = mapDrumNote(e.note, rp.drums);
             uint8_t vel  = mapDrumVelocity(e.note, rp.drums, e.velocity);
+            if (vel == 0) continue;  // piece muted via the "off" velocity override
             out_.push(midi::makeNoteOn(rp.channel, note, vel));
         }
     }

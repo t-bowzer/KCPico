@@ -88,6 +88,10 @@ std::vector<int> tightestSpread(const std::vector<int>& pcs, int bassIdx,
 } // namespace
 
 
+int voicingRoot(int rootPc, uint8_t base_root_midi, int octave) {
+    return clampRootOctave(rootMidi(rootPc, base_root_midi, octave));
+}
+
 std::vector<uint8_t> voiceRootPosition(const ResolvedChord& chord,
                                        uint8_t base_root_midi,
                                        int octave,
@@ -158,17 +162,35 @@ std::vector<uint8_t> voiceChord(const ResolvedChord& chord,
     int n = static_cast<int>(pcs.size());
     if (n == 0) return {};
 
+    int coreCount = chordIntervalCount(chord.type);
+    const uint8_t* iv = chordIntervals(chord.type);
+    if (coreCount == 0) return {};
+
     int root = clampRootOctave(rootMidi(chord.rootPc, base_root_midi, octave));
+
+    // Inversion (VR-8) selects which core chord tone sits in the bass by its
+    // position in the interval formula (0=root, 1=3rd, 2=5th, 3=7th) — NOT by
+    // its position in the sorted pitch-class list. Using the sorted list broke
+    // every non-C root (e.g. F major's 1st inversion dropped to the root). A
+    // request beyond the chord's own tones wraps into the next octave so, e.g.,
+    // the 3rd inversion of a triad (no 7th) stays distinct from the 2nd.
     int inv = static_cast<int>(cfg.inversion);
-    int bassIdx = std::min(inv, n - 1);
-    int bassNote = root + (pcs[bassIdx] - pcs[0]);
+    int octaveShift = inv / coreCount;
+    int coreBassIdx = inv % coreCount;
+    int bassInterval = iv[coreBassIdx];
+    int bassNote = root + bassInterval + 12 * octaveShift;
 
     std::vector<int> notes;
 
     if (cfg.min_interval > 0) {
         // Minimum-interval spread (VR-7): rebuild as the tightest ascending
         // configuration starting at the (possibly inverted) bass.
-        notes = tightestSpread(pcs, bassIdx, bassNote, cfg.min_interval);
+        int bassPc = ((chord.rootPc + bassInterval) % 12 + 12) % 12;
+        int bassPcIdx = 0;
+        for (int i = 0; i < n; i++) {
+            if (pcs[i] == bassPc) { bassPcIdx = i; break; }
+        }
+        notes = tightestSpread(pcs, bassPcIdx, bassNote, cfg.min_interval);
     } else {
         std::vector<uint8_t> base = (cfg.voicing_mode == VoicingMode::Smart)
             ? voiceSmart(chord, base_root_midi, octave, low, high, previous)
@@ -178,8 +200,12 @@ std::vector<uint8_t> voiceChord(const ResolvedChord& chord,
         for (uint8_t b : base) notes.push_back(static_cast<int>(b));
 
         // Manual inversion (VR-8): rotate so the chosen tone is the lowest —
-        // move the first `bassIdx` notes up an octave.
-        for (int i = 0; i < bassIdx; i++) notes[i] += 12;
+        // move the first `coreBassIdx` notes up an octave (root-position notes
+        // are in interval order, so this lands the selected core tone in the
+        // bass), then apply any octave wrap.
+        int rotate = std::min(coreBassIdx, static_cast<int>(notes.size()) - 1);
+        for (int i = 0; i < rotate; i++) notes[i] += 12;
+        for (int& nt : notes) nt += 12 * octaveShift;
         std::sort(notes.begin(), notes.end());
     }
 

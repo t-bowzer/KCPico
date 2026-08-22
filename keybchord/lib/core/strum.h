@@ -13,8 +13,9 @@ enum class StrumLayout : uint8_t {
     COUNT
 };
 
-// Largest strum key set across layouts (full numpad = 11 keys).
-constexpr int STRUM_MAX_KEYS = 11;
+// Largest strum key set across layouts (full numpad = 14 keys incl. Num Lock,
+// / and *).
+constexpr int STRUM_MAX_KEYS = 14;
 
 // Maps a raw HID usage to its strum position (0..N-1) for the given layout, or
 // -1 if the usage is not a strum key in that layout. Num-Lock independent: the
@@ -23,8 +24,8 @@ constexpr int STRUM_MAX_KEYS = 11;
 // strum keys (reserved for octave/value).
 int strumIndexFor(uint8_t hid_usage, StrumLayout layout);
 
-// Number of strum keys in a layout (full = 11 to cover the numpad superset,
-// limited = 10).
+// Number of strum keys in a layout (full = 14 to cover the numpad superset
+// incl. Num Lock, / and *; limited = 10).
 int strumKeyCount(StrumLayout layout);
 
 // Scale/mode interval table (semitones from root) for the strum Scale mode.

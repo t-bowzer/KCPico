@@ -47,8 +47,9 @@ void ChordEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
 
 // Held extensions (FR-C7): Left/Down/Right add add9/add11/add13 to the
 // currently-sounding chord for as long as the arrow is held. The extension
-// latches onto the current chord (re-triggers it), including a Held-mode chord
-// whose keys have already been released.
+// latches onto the current chord (including a Held-mode chord whose keys have
+// already been released). When a chord is already sounding, only the changed
+// note(s) are added/removed so the base chord is not re-attacked.
 void ChordEngine::setExt(int which, bool held, uint64_t now_us) {
     bool* flag = nullptr;
     switch (which) {
@@ -78,9 +79,116 @@ void ChordEngine::setExt(int which, bool held, uint64_t now_us) {
     state_.selectedChord = merged;
     state_.selectedChordValid = true;
 
-    // Force a re-trigger so the extension is audible immediately, even on a
-    // latched Held-mode chord (no keys held).
-    triggerChord(merged, now_us);
+    // When a chord is already sounding, add/remove only the changed extension
+    // note(s) so the base chord is not re-attacked on extension press/release.
+    // Arpeggio rebuilds its step sequence in place instead of restarting.
+    // Otherwise (Silent, chord roll) fall back to a full re-trigger.
+    if (arpActive_) {
+        applyArpExtension(merged, now_us);
+    } else if (sounding_ && rollPending_.empty() &&
+               (state_.activeChord.play_mode == PlayMode::Held ||
+                state_.activeChord.play_mode == PlayMode::PressToPlay)) {
+        applyExtensionMerge(merged, now_us);
+    } else {
+        triggerChord(merged, now_us);
+    }
+}
+
+// Compute the voiced base chord (no extensions) plus the extension tensions
+// appended above it. Splitting them keeps extension toggles from re-running the
+// min-interval spread (which would re-assign and re-attack the base notes).
+void ChordEngine::computeVoicing(const ResolvedChord& chord,
+                                 std::vector<uint8_t>& base,
+                                 std::vector<uint8_t>& combined) {
+    const ChordParams& p = state_.activeChord;
+    const AppConfig& cfg = state_.config;
+
+    ResolvedChord baseChord = chord;
+    baseChord.add9 = baseChord.add11 = baseChord.add13 = false;
+
+    VoicingConfig vc;
+    vc.voicing_mode = p.voicing_mode;
+    vc.inversion    = p.inversion;
+    vc.min_notes    = p.min_notes;
+    vc.min_interval = p.min_interval;
+
+    base = voiceChord(baseChord, cfg.base_root_midi, p.octave,
+                      cfg.note_range_low, cfg.note_range_high, vc, prevVoicing_);
+
+    // Extension tensions: the notes in the full root-position set that are not
+    // part of the base chord's intervals.
+    int root = voicingRoot(chord.rootPc, cfg.base_root_midi, p.octave);
+    std::vector<uint8_t> full = chordNotes(chord, root);
+    std::vector<uint8_t> baseRP = chordNotes(baseChord, root);
+
+    combined = base;
+    for (uint8_t n : full) {
+        if (std::find(baseRP.begin(), baseRP.end(), n) == baseRP.end()) {
+            combined.push_back(n);
+        }
+    }
+    std::sort(combined.begin(), combined.end());
+    combined.erase(std::unique(combined.begin(), combined.end()), combined.end());
+}
+
+// Diff-based extension update: voice the merged chord and note-off/note-on only
+// the notes that changed, leaving the sustained base chord untouched.
+void ChordEngine::applyExtensionMerge(const ResolvedChord& chord, uint64_t now_us) {
+    const ChordParams& p = state_.activeChord;
+
+    std::vector<uint8_t> base, notes;
+    computeVoicing(chord, base, notes);
+
+    for (uint8_t n : activeNotes_) {
+        if (std::find(notes.begin(), notes.end(), n) == notes.end()) {
+            router_.noteOff(activeChannel_, n);
+        }
+    }
+    for (uint8_t n : notes) {
+        if (std::find(activeNotes_.begin(), activeNotes_.end(), n) == activeNotes_.end()) {
+            router_.noteOn(activeChannel_, n, p.velocity);
+        }
+    }
+
+    prevVoicing_ = base;
+    voicing_ = notes;
+    activeNotes_ = notes;
+    currentChord_ = chord;
+    currentChordValid_ = true;
+}
+
+// Extension change during arpeggio: rebuild the arp sequence in place (add/remove
+// the extension note) without restarting or re-attacking the held chord.
+void ChordEngine::applyArpExtension(const ResolvedChord& chord, uint64_t now_us) {
+    const ChordParams& p = state_.activeChord;
+
+    std::vector<uint8_t> base, notes;
+    computeVoicing(chord, base, notes);
+
+    prevVoicing_ = base;
+    voicing_ = notes;
+    currentChord_ = chord;
+    currentChordValid_ = true;
+
+    if (!voicing_.empty()) {
+        arpSeq_ = arpSequence(p.arp_mode, voicing_.size());
+        if (!arpSeq_.empty()) arpPos_ = arpPos_ % arpSeq_.size();
+    }
+
+    // If the currently-sounding note was removed (extension released), replace it
+    // with the note at the current arp position.
+    if (!activeNotes_.empty()) {
+        uint8_t sounding = activeNotes_[0];
+        bool stillVoiced = std::find(voicing_.begin(), voicing_.end(), sounding) != voicing_.end();
+        if (!stillVoiced && !voicing_.empty()) {
+            for (uint8_t n : activeNotes_) router_.noteOff(activeChannel_, n);
+            activeNotes_.clear();
+            size_t idx = arpSeq_.empty() ? 0 : arpSeq_[arpPos_ % arpSeq_.size()];
+            uint8_t note = voicing_[idx];
+            router_.noteOn(activeChannel_, note, p.velocity);
+            activeNotes_.push_back(note);
+        }
+    }
 }
 
 void ChordEngine::onModeChanged() {
@@ -103,9 +211,9 @@ void ChordEngine::update(uint64_t now_us) {
 
     if (arpActive_) {
         if (followRhythmClock()) {
-            if (state_.rhythmClock.running &&
-                state_.rhythmClock.stepAbs != lastRhythmStep_) {
-                lastRhythmStep_ = state_.rhythmClock.stepAbs;
+            uint32_t stepAbs = state_.rhythmClock.stepAbs;
+            if (stepAbs != lastRhythmStep_) {
+                lastRhythmStep_ = stepAbs;
                 stepArpeggio(now_us);
             }
         } else if (now_us >= arpNext_us_) {
@@ -120,7 +228,7 @@ void ChordEngine::update(uint64_t now_us) {
 }
 
 bool ChordEngine::followRhythmClock() const {
-    return state_.pendingRhythm.enabled &&
+    return state_.rhythmClock.running &&
            state_.activeChord.play_mode == PlayMode::Arpeggio;
 }
 
@@ -130,6 +238,7 @@ void ChordEngine::allNotesOff() {
     currentChordValid_ = false;
     baseChordValid_ = false;
     releaseBufferPending_ = false;
+    pendingSwitch_ = false;
 }
 
 void ChordEngine::addCell(const GridCell& cell) {
@@ -154,6 +263,14 @@ void ChordEngine::onPress(uint64_t now_us) {
 }
 
 void ChordEngine::onRelease(uint64_t now_us) {
+    // A pending switch (an overlapped new-chord press that formed an invalid
+    // combination) re-resolves immediately once the stale key is lifted, in
+    // every play mode, so the new chord lands without the release-buffer delay.
+    if (pendingSwitch_) {
+        pendingSwitch_ = false;
+        resolveAndTriggerIfChanged(now_us, false);
+        return;
+    }
     if (state_.activeChord.play_mode == PlayMode::Held) {
         return;
     }
@@ -164,6 +281,7 @@ void ChordEngine::onRelease(uint64_t now_us) {
 void ChordEngine::resolveAndTriggerIfChanged(uint64_t now_us, bool force) {
     ResolvedChord chord;
     if (resolveChord(heldCells_, backtickHeld_, chord)) {
+        pendingSwitch_ = false;
         baseChord_ = chord;
         baseChordValid_ = true;
 
@@ -192,24 +310,20 @@ void ChordEngine::resolveAndTriggerIfChanged(uint64_t now_us, bool force) {
         return;
     }
 
-    // Keys still held but no valid combination: keep the current chord.
+    // Keys still held but no valid combination: keep the current chord. Remember
+    // the intent so the chord can switch once the stale key is released.
+    if (currentChordValid_) {
+        pendingSwitch_ = true;
+    }
 }
 
 void ChordEngine::triggerChord(const ResolvedChord& chord, uint64_t now_us) {
     state_.snapshotChord();
     const ChordParams& p = state_.activeChord;
-    const AppConfig& cfg = state_.config;
 
-    VoicingConfig vc;
-    vc.voicing_mode = p.voicing_mode;
-    vc.inversion    = p.inversion;
-    vc.min_notes    = p.min_notes;
-    vc.min_interval = p.min_interval;
-
-    std::vector<uint8_t> notes = voiceChord(chord, cfg.base_root_midi, p.octave,
-                                            cfg.note_range_low, cfg.note_range_high,
-                                            vc, prevVoicing_);
-    prevVoicing_ = notes;
+    std::vector<uint8_t> base, notes;
+    computeVoicing(chord, base, notes);
+    prevVoicing_ = base;
 
     stopSound();
     activeChannel_ = p.channel;
@@ -255,7 +369,9 @@ void ChordEngine::triggerChord(const ResolvedChord& chord, uint64_t now_us) {
 // Staggered chord note-ons (VR-9): positive ascends, negative descends;
 // note-offs still release together via stopSound().
 void ChordEngine::scheduleRoll(const std::vector<uint8_t>& notes, uint64_t now_us) {
-    int step = std::abs(static_cast<int>(state_.activeChord.chord_roll_ms));
+    // chord_roll_ms is milliseconds; convert to microseconds before staggering.
+    uint64_t stepUs = static_cast<uint64_t>(
+        std::abs(static_cast<int>(state_.activeChord.chord_roll_ms))) * 1000ULL;
     bool ascending = state_.activeChord.chord_roll_ms > 0;
 
     std::vector<uint8_t> order = notes;
@@ -263,7 +379,7 @@ void ChordEngine::scheduleRoll(const std::vector<uint8_t>& notes, uint64_t now_u
 
     rollPending_.clear();
     for (size_t i = 0; i < order.size(); i++) {
-        rollPending_.push_back({order[i], now_us + static_cast<uint64_t>(step) * i});
+        rollPending_.push_back({order[i], now_us + stepUs * i});
     }
 }
 
@@ -348,6 +464,7 @@ void ChordEngine::releaseChord() {
     stopSound();
     currentChordValid_ = false;
     baseChordValid_ = false;
+    pendingSwitch_ = false;
 }
 
 void ChordEngine::stopSound() {

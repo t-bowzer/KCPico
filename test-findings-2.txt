@@ -1,0 +1,520 @@
+Testing observations:
+- It seems like there is a bit of delay in swapping between chords in pressed mode. Here's a snippet from serial out showing a bit of a delay if i press G, hold, and then press H (while still holding G), and then release G. I would expect the Gm (H key press) to play as soon as I release G, but there's a slight delay. Please investigate. 
+
+[646190] LED COMPLETE dev=1 len=1
+[646201] LED usage=0x1 on=0 ok=1
+[646232] LED COMPLETE dev=1 len=1
+[646617] LED usage=0x1 on=1 ok=1
+[646648] LED COMPLETE dev=1 len=1
+[646658] LED usage=0x1 on=0 ok=1
+[646690] LED COMPLETE dev=1 len=1
+[647084] LED usage=0x1 on=1 ok=1
+[647115] LED COMPLETE dev=1 len=1
+[647126] LED usage=0x1 on=0 ok=1
+[647157] LED COMPLETE dev=1 len=1
+[647272] KEY DN usage=0xB mods=0x0
+[647272] KEY UP usage=0xA mods=0x0
+[647304] MIDI ch=1 NoteOff C3 vel=0
+[647304] MIDI ch=1 NoteOff G3 vel=0
+[647305] MIDI ch=1 NoteOff Eb4 vel=0
+[647305] MIDI ch=1 CC Pan val=64
+[647333] MIDI ch=1 NoteOn G3 vel=100
+[647344] MIDI ch=1 NoteOn D4 vel=100
+[647366] MIDI ch=1 NoteOn Bb4 vel=100
+[647544] LED usage=0x1 on=1 ok=1
+[647575] LED COMPLETE dev=1 len=1
+[647586] LED usage=0x1 on=0 ok=1
+[647617] LED COMPLETE dev=1 len=1
+[648002] LED usage=0x1 on=1 ok=1
+[648033] LED COMPLETE dev=1 len=1
+[648043] LED usage=0x1 on=0 ok=1
+[648075] LED COMPLETE dev=1 len=1
+[648469] LED usage=0x1 on=1 ok=1
+[648500] LED COMPLETE dev=1 len=1
+[648511] LED usage=0x1 on=0 ok=1
+[648542] LED COMPLETE dev=1 len=1
+[648927] LED usage=0x1 on=1 ok=1
+[648958] LED COMPLETE dev=1 len=1
+[648968] LED usage=0x1 on=0 ok=1
+[649000] LED COMPLETE dev=1 len=1
+[649187] KEY DN usage=0xA mods=0x0
+[649218] KEY UP usage=0xB mods=0x0
+[649250] MIDI ch=1 NoteOff G3 vel=0
+[649250] MIDI ch=1 NoteOff D4 vel=0
+[649251] MIDI ch=1 NoteOff Bb4 vel=0
+[649251] MIDI ch=1 CC Pan val=64
+[649279] MIDI ch=1 NoteOn C3 vel=100
+[649290] MIDI ch=1 NoteOn G3 vel=100
+[649312] MIDI ch=1 NoteOn Eb4 vel=100
+[649386] LED usage=0x1 on=1 ok=1
+[649418] LED COMPLETE dev=1 len=1
+[649428] LED usage=0x1 on=0 ok=1
+[649459] LED COMPLETE dev=1 len=1
+[649854] LED usage=0x1 on=1 ok=1
+[649885] LED COMPLETE dev=1 len=1
+[649896] LED usage=0x1 on=0 ok=1
+[649927] LED COMPLETE dev=1 len=1
+[650311] LED usage=0x1 on=1 ok=1
+[650342] LED COMPLETE dev=1 len=1
+[650353] LED usage=0x1 on=0 ok=1
+[650384] LED COMPLETE dev=1 len=1
+[PERF] core0-loop-us n=477 min=153us max=19304us avg=462us
+[PERF] key-to-midi-us n=4 min=140us max=395us avg=253us
+[PERF] clock-jitter-us n=260 min=3us max=1000us avg=492us
+[650769] LED usage=0x1 on=1 ok=1
+[650800] LED COMPLETE dev=1 len=1
+[650811] LED usage=0x1 on=0 ok=1
+[650842] LED COMPLETE dev=1 len=1
+[651237] LED usage=0x1 on=1 ok=1
+[651247] KEY DN usage=0xB mods=0x0
+[651268] LED COMPLETE dev=1 len=1
+[651279] LED usage=0x1 on=0 ok=1
+[651310] LED COMPLETE dev=1 len=1
+[651331] KEY UP usage=0xA mods=0x0
+[651363] MIDI ch=1 NoteOff C3 vel=0
+[651364] MIDI ch=1 NoteOff G3 vel=0
+[651364] MIDI ch=1 NoteOff Eb4 vel=0
+[651364] MIDI ch=1 CC Pan val=64
+[651392] MIDI ch=1 NoteOn G3 vel=100
+[651404] MIDI ch=1 NoteOn D4 vel=100
+[651425] MIDI ch=1 NoteOn Bb4 vel=100
+[651696] LED usage=0x1 on=1 ok=1
+[651728] LED COMPLETE dev=1 len=1
+[651738] LED usage=0x1 on=0 ok=1
+[651770] LED COMPLETE dev=1 len=1
+[652154] LED usage=0x1 on=1 ok=1
+[652185] LED COMPLETE dev=1 len=1
+[652196] LED usage=0x1 on=0 ok=1
+[652227] LED COMPLETE dev=1 len=1
+[652622] LED usage=0x1 on=1 ok=1
+[652653] LED COMPLETE dev=1 len=1
+[652664] LED usage=0x1 on=0 ok=1
+[652695] LED COMPLETE dev=1 len=1
+[653079] LED usage=0x1 on=1 ok=1
+[653110] LED COMPLETE dev=1 len=1
+[653121] LED usage=0x1 on=0 ok=1
+[653152] LED COMPLETE dev=1 len=1
+[653298] KEY DN usage=0xA mods=0x0
+[653329] KEY UP usage=0xB mods=0x0
+[653361] MIDI ch=1 NoteOff G3 vel=0
+[653362] MIDI ch=1 NoteOff D4 vel=0
+[653362] MIDI ch=1 NoteOff Bb4 vel=0
+[653362] MIDI ch=1 CC Pan val=64
+[653390] MIDI ch=1 NoteOn C3 vel=100
+[653402] MIDI ch=1 NoteOn G3 vel=100
+[653424] MIDI ch=1 NoteOn Eb4 vel=100
+[653539] LED usage=0x1 on=1 ok=1
+[653570] LED COMPLETE dev=1 len=1
+[653581] LED usage=0x1 on=0 ok=1
+[653612] LED COMPLETE dev=1 len=1
+[654007] LED usage=0x1 on=1 ok=1
+[654038] LED COMPLETE dev=1 len=1
+[654049] LED usage=0x1 on=0 ok=1
+[654080] LED COMPLETE dev=1 len=1
+[654464] LED usage=0x1 on=1 ok=1
+[654495] LED COMPLETE dev=1 len=1
+[654506] LED usage=0x1 on=0 ok=1
+[654537] LED COMPLETE dev=1 len=1
+[654922] LED usage=0x1 on=1 ok=1
+[654953] LED COMPLETE dev=1 len=1
+[654963] LED usage=0x1 on=0 ok=1
+[654995] LED COMPLETE dev=1 len=1
+[655265] KEY DN usage=0xB mods=0x0
+[655338] KEY UP usage=0xA mods=0x0
+[655369] MIDI ch=1 NoteOff C3 vel=0
+[655370] MIDI ch=1 NoteOff G3 vel=0
+[655370] MIDI ch=1 NoteOff Eb4 vel=0
+[655370] MIDI ch=1 CC Pan val=64
+[655388] LED usage=0x1 on=1 ok=1
+[655398] MIDI ch=1 NoteOn G3 vel=100
+[655410] MIDI ch=1 NoteOn D4 vel=100
+[655410] LED usage=0x1 on=0 ok=0
+[655421] LED COMPLETE dev=1 len=1
+[655422] LED usage=0x1 on=0 ok=1
+[655432] MIDI ch=1 NoteOn Bb4 vel=100
+[655454] LED COMPLETE dev=1 len=1
+[PERF] core0-loop-us n=475 min=156us max=19258us avg=512us
+[PERF] key-to-midi-us n=6 min=157us max=248us avg=199us
+[PERF] clock-jitter-us n=261 min=4us max=1001us avg=508us
+[655849] LED usage=0x1 on=1 ok=1
+[655880] LED COMPLETE dev=1 len=1
+[655891] LED usage=0x1 on=0 ok=1
+[655922] LED COMPLETE dev=1 len=1
+[656306] LED usage=0x1 on=1 ok=1
+[656337] LED COMPLETE dev=1 len=1
+[656348] LED usage=0x1 on=0 ok=1
+[656380] LED COMPLETE dev=1 len=1
+[656774] LED usage=0x1 on=1 ok=1
+[656805] LED COMPLETE dev=1 len=1
+[656816] LED usage=0x1 on=0 ok=1
+[656847] LED COMPLETE dev=1 len=1
+[657158] KEY UP usage=0xB mods=0x0
+[657190] MIDI ch=1 NoteOff G3 vel=0
+[657190] MIDI ch=1 NoteOff D4 vel=0
+[657191] MIDI ch=1 NoteOff Bb4 vel=0
+[657235] LED usage=0x1 on=1 ok=1
+[657266] LED COMPLETE dev=1 len=1
+[657277] LED usage=0x1 on=0 ok=1
+[657308] LED COMPLETE dev=1 len=1
+[657692] LED usage=0x1 on=1 ok=1
+[657723] LED COMPLETE dev=1 len=1
+[657734] LED usage=0x1 on=0 ok=1
+[657765] LED COMPLETE dev=1 len=1
+[658160] LED usage=0x1 on=1 ok=1
+[658191] LED COMPLETE dev=1 len=1
+[658202] LED usage=0x1 on=0 ok=1
+[658233] LED COMPLETE dev=1 len=1
+[658617] LED usage=0x1 on=1 ok=1
+[658648] LED COMPLETE dev=1 len=1
+[658659] LED usage=0x1 on=0 ok=1
+
+- New feature I want in the main screen: tap to set bpm. Tap spacebar key to set bpm. Average out the 8 most recent presses. If there is more than 2 seconds between presses, the next press is a new set of presses (do not average with most recent 7 presses - consider it independent)
+- New bass pattern: walk-no-6th that plays the root for a half note, then the 3rd for a quarter then a 5th for a quarter and back to root
+- I get a little stutter when switching between chords in arp mode. I know this is due to timing of when I switch keys, but I wonder if there is any way to make the transition smoother? Please investigate. Here's an example of what I'm talking about:
+
+[1807338] LED usage=0x1 on=1 ok=1
+[1807368] LED COMPLETE dev=1 len=1
+[1807379] LED usage=0x1 on=0 ok=1
+[1807410] LED COMPLETE dev=1 len=1
+[1807808] LED usage=0x1 on=1 ok=1
+[1807839] LED COMPLETE dev=1 len=1
+[1807849] LED usage=0x1 on=0 ok=1
+[1807880] LED COMPLETE dev=1 len=1
+[1808248] KEY DN usage=0xA mods=0x0
+[1808248] MIDI ch=1 CC Pan val=64
+[1808249] MIDI ch=1 NoteOn C4 vel=100
+[1808266] LED usage=0x1 on=1 ok=1
+[1808297] LED COMPLETE dev=1 len=1
+[1808298] LED usage=0x1 on=0 ok=1
+[1808328] LED COMPLETE dev=1 len=1
+[1808369] MIDI ch=1 NoteOff C4 vel=0
+[1808370] MIDI ch=1 NoteOn G4 vel=100
+[1808494] MIDI ch=1 NoteOff G4 vel=0
+[1808494] MIDI ch=1 NoteOn Eb5 vel=100
+[1808618] MIDI ch=1 NoteOff Eb5 vel=0
+[1808618] MIDI ch=1 NoteOn C4 vel=100
+[1808722] LED usage=0x1 on=1 ok=1
+[1808743] MIDI ch=1 NoteOff C4 vel=0
+[1808743] MIDI ch=1 NoteOn G4 vel=100
+[1808755] LED COMPLETE dev=1 len=1
+[1808766] LED usage=0x1 on=0 ok=1
+[1808797] LED COMPLETE dev=1 len=1
+[1808868] MIDI ch=1 NoteOff G4 vel=0
+[1808868] MIDI ch=1 NoteOn Eb5 vel=100
+[1808993] MIDI ch=1 NoteOff Eb5 vel=0
+[1808993] MIDI ch=1 NoteOn C4 vel=100
+[1809117] MIDI ch=1 NoteOff C4 vel=0
+[1809117] MIDI ch=1 NoteOn G4 vel=100
+[1809191] LED usage=0x1 on=1 ok=1
+[1809222] LED COMPLETE dev=1 len=1
+[1809232] LED usage=0x1 on=0 ok=1
+[1809243] MIDI ch=1 NoteOff G4 vel=0
+[1809243] MIDI ch=1 NoteOn Eb5 vel=100
+[1809265] LED COMPLETE dev=1 len=1
+[1809367] MIDI ch=1 NoteOff Eb5 vel=0
+[1809368] MIDI ch=1 NoteOn C4 vel=100
+[1809492] MIDI ch=1 NoteOff C4 vel=0
+[1809492] MIDI ch=1 NoteOn G4 vel=100
+[1809616] MIDI ch=1 NoteOff G4 vel=0
+[1809616] MIDI ch=1 NoteOn Eb5 vel=100
+[1809649] LED usage=0x1 on=1 ok=1
+[1809680] LED COMPLETE dev=1 len=1
+[1809691] LED usage=0x1 on=0 ok=1
+[1809721] LED COMPLETE dev=1 len=1
+[1809732] MIDI ch=1 NoteOff Eb5 vel=0
+[1809732] MIDI ch=1 NoteOn C4 vel=100
+[1809856] MIDI ch=1 NoteOff C4 vel=0
+[1809856] MIDI ch=1 NoteOn G4 vel=100
+[1809981] MIDI ch=1 NoteOff G4 vel=0
+[1809981] MIDI ch=1 NoteOn Eb5 vel=100
+[1810105] MIDI ch=1 NoteOff Eb5 vel=0
+[1810105] MIDI ch=1 NoteOn C4 vel=100
+[1810106] LED usage=0x1 on=1 ok=1
+[1810138] LED COMPLETE dev=1 len=1
+[1810149] LED usage=0x1 on=0 ok=1
+[1810179] LED COMPLETE dev=1 len=1
+[1810190] KEY DN usage=0xB mods=0x0
+[1810221] KEY UP usage=0xA mods=0x0
+[1810221] MIDI ch=1 NoteOff C4 vel=0
+[1810221] MIDI ch=1 NoteOn G4 vel=100
+[1810254] MIDI ch=1 NoteOff G4 vel=0
+[1810255] MIDI ch=1 CC Pan val=64
+[1810255] MIDI ch=1 NoteOn G4 vel=100
+[1810374] MIDI ch=1 NoteOff G4 vel=0
+[1810375] MIDI ch=1 NoteOn D5 vel=100
+[1810499] MIDI ch=1 NoteOff D5 vel=0
+[1810499] MIDI ch=1 NoteOn Bb5 vel=100
+[1810572] LED usage=0x1 on=1 ok=1
+[1810603] LED COMPLETE dev=1 len=1
+[1810614] LED usage=0x1 on=0 ok=1
+[1810624] MIDI ch=1 NoteOff Bb5 vel=0
+[1810624] MIDI ch=1 NoteOn G4 vel=100
+[1810647] LED COMPLETE dev=1 len=1
+[1810749] MIDI ch=1 NoteOff G4 vel=0
+[1810749] MIDI ch=1 NoteOn D5 vel=100
+[1810873] MIDI ch=1 NoteOff D5 vel=0
+[1810873] MIDI ch=1 NoteOn Bb5 vel=100
+[1810998] MIDI ch=1 NoteOff Bb5 vel=0
+[1810998] MIDI ch=1 NoteOn G4 vel=100
+[1811030] LED usage=0x1 on=1 ok=1
+[1811061] LED COMPLETE dev=1 len=1
+[1811072] LED usage=0x1 on=0 ok=1
+[1811103] LED COMPLETE dev=1 len=1
+[1811123] MIDI ch=1 NoteOff G4 vel=0
+[1811123] MIDI ch=1 NoteOn D5 vel=100
+[1811248] MIDI ch=1 NoteOff D5 vel=0
+[1811248] MIDI ch=1 NoteOn Bb5 vel=100
+[1811372] MIDI ch=1 NoteOff Bb5 vel=0
+[1811372] MIDI ch=1 NoteOn G4 vel=100
+[1811496] MIDI ch=1 NoteOff G4 vel=0
+[1811497] MIDI ch=1 NoteOn D5 vel=100
+[1811497] LED usage=0x1 on=1 ok=1
+[1811529] LED COMPLETE dev=1 len=1
+[1811540] LED usage=0x1 on=0 ok=1
+[1811571] LED COMPLETE dev=1 len=1
+[1811622] MIDI ch=1 NoteOff D5 vel=0
+[1811622] MIDI ch=1 NoteOn Bb5 vel=100
+[1811746] MIDI ch=1 NoteOff Bb5 vel=0
+[1811746] MIDI ch=1 NoteOn G4 vel=100
+[1811871] MIDI ch=1 NoteOff G4 vel=0
+[1811871] MIDI ch=1 NoteOn D5 vel=100
+[1811954] LED usage=0x1 on=1 ok=1
+[1811985] LED COMPLETE dev=1 len=1
+[1811996] MIDI ch=1 NoteOff D5 vel=0
+[1811996] MIDI ch=1 NoteOn Bb5 vel=100
+[1811996] LED usage=0x1 on=0 ok=1
+[1812028] LED COMPLETE dev=1 len=1
+[PERF] core0-loop-us n=480 min=157us max=18896us avg=405us
+[PERF] key-to-midi-us n=3 min=168us max=1179us avg=535us
+[PERF] clock-jitter-us n=260 min=2us max=997us avg=499us
+[1812121] MIDI ch=1 NoteOff Bb5 vel=0
+[1812121] MIDI ch=1 NoteOn G4 vel=100
+[1812225] KEY DN usage=0xA mods=0x0
+[1812246] MIDI ch=1 NoteOff G4 vel=0
+[1812246] MIDI ch=1 NoteOn D5 vel=100
+[1812268] KEY UP usage=0xB mods=0x0
+[1812300] MIDI ch=1 NoteOff D5 vel=0
+[1812300] MIDI ch=1 CC Pan val=64
+[1812300] MIDI ch=1 NoteOn C4 vel=100
+[1812420] MIDI ch=1 NoteOff C4 vel=0
+[1812420] MIDI ch=1 NoteOn G4 vel=100
+[1812421] LED usage=0x1 on=1 ok=1
+[1812452] LED COMPLETE dev=1 len=1
+[1812463] LED usage=0x1 on=0 ok=1
+[1812494] LED COMPLETE dev=1 len=1
+[1812545] MIDI ch=1 NoteOff G4 vel=0
+[1812545] MIDI ch=1 NoteOn Eb5 vel=100
+[1812669] MIDI ch=1 NoteOff Eb5 vel=0
+[1812670] MIDI ch=1 NoteOn C4 vel=100
+[1812794] MIDI ch=1 NoteOff C4 vel=0
+[1812794] MIDI ch=1 NoteOn G4 vel=100
+[1812878] LED usage=0x1 on=1 ok=1
+[1812908] LED COMPLETE dev=1 len=1
+[1812919] MIDI ch=1 NoteOff G4 vel=0
+[1812919] MIDI ch=1 NoteOn Eb5 vel=100
+[1812920] LED usage=0x1 on=0 ok=1
+[1812952] LED COMPLETE dev=1 len=1
+[1813044] MIDI ch=1 NoteOff Eb5 vel=0
+[1813044] MIDI ch=1 NoteOn C4 vel=100
+[1813168] MIDI ch=1 NoteOff C4 vel=0
+[1813168] MIDI ch=1 NoteOn G4 vel=100
+[1813292] MIDI ch=1 NoteOff G4 vel=0
+[1813292] MIDI ch=1 NoteOn Eb5 vel=100
+[1813345] LED usage=0x1 on=1 ok=1
+[1813376] LED COMPLETE dev=1 len=1
+[1813387] LED usage=0x1 on=0 ok=1
+[1813418] LED COMPLETE dev=1 len=1
+[1813418] MIDI ch=1 NoteOff Eb5 vel=0
+[1813418] MIDI ch=1 NoteOn C4 vel=100
+[1813543] MIDI ch=1 NoteOff C4 vel=0
+[1813543] MIDI ch=1 NoteOn G4 vel=100
+[1813667] MIDI ch=1 NoteOff G4 vel=0
+[1813667] MIDI ch=1 NoteOn Eb5 vel=100
+[1813791] MIDI ch=1 NoteOff Eb5 vel=0
+[1813792] MIDI ch=1 NoteOn C4 vel=100
+[1813804] LED usage=0x1 on=1 ok=1
+[1813835] LED COMPLETE dev=1 len=1
+[1813845] LED usage=0x1 on=0 ok=1
+[1813876] LED COMPLETE dev=1 len=1
+[1813907] MIDI ch=1 NoteOff C4 vel=0
+[1813907] MIDI ch=1 NoteOn G4 vel=100
+[1814031] MIDI ch=1 NoteOff G4 vel=0
+[1814031] MIDI ch=1 NoteOn Eb5 vel=100
+[1814156] MIDI ch=1 NoteOff Eb5 vel=0
+[1814156] MIDI ch=1 NoteOn C4 vel=100
+[1814219] KEY DN usage=0xB mods=0x0
+[1814240] KEY UP usage=0xA mods=0x0
+[1814261] LED usage=0x1 on=1 ok=1
+[1814271] MIDI ch=1 NoteOff C4 vel=0
+[1814272] MIDI ch=1 CC Pan val=64
+[1814272] MIDI ch=1 NoteOn G4 vel=100
+[1814310] LED COMPLETE dev=1 len=1
+[1814311] LED usage=0x1 on=0 ok=1
+[1814341] LED COMPLETE dev=1 len=1
+[1814393] MIDI ch=1 NoteOff G4 vel=0
+[1814393] MIDI ch=1 NoteOn D5 vel=100
+[1814517] MIDI ch=1 NoteOff D5 vel=0
+[1814517] MIDI ch=1 NoteOn Bb5 vel=100
+[1814642] MIDI ch=1 NoteOff Bb5 vel=0
+[1814642] MIDI ch=1 NoteOn G4 vel=100
+[1814725] LED usage=0x1 on=1 ok=1
+[1814756] LED COMPLETE dev=1 len=1
+[1814767] MIDI ch=1 NoteOff G4 vel=0
+[1814767] MIDI ch=1 NoteOn D5 vel=100
+[1814767] LED usage=0x1 on=0 ok=1
+[1814799] LED COMPLETE dev=1 len=1
+[1814891] MIDI ch=1 NoteOff D5 vel=0
+[1814892] MIDI ch=1 NoteOn Bb5 vel=100
+[1815016] MIDI ch=1 NoteOff Bb5 vel=0
+[1815016] MIDI ch=1 NoteOn G4 vel=100
+[1815140] MIDI ch=1 NoteOff G4 vel=0
+[1815141] MIDI ch=1 NoteOn D5 vel=100
+[1815183] LED usage=0x1 on=1 ok=1
+[1815214] LED COMPLETE dev=1 len=1
+[1815225] LED usage=0x1 on=0 ok=1
+[1815256] LED COMPLETE dev=1 len=1
+[1815266] MIDI ch=1 NoteOff D5 vel=0
+[1815266] MIDI ch=1 NoteOn Bb5 vel=100
+[1815390] MIDI ch=1 NoteOff Bb5 vel=0
+[1815391] MIDI ch=1 NoteOn G4 vel=100
+[1815515] MIDI ch=1 NoteOff G4 vel=0
+[1815515] MIDI ch=1 NoteOn D5 vel=100
+[1815639] MIDI ch=1 NoteOff D5 vel=0
+[1815639] MIDI ch=1 NoteOn Bb5 vel=100
+[1815651] LED usage=0x1 on=1 ok=1
+[1815682] LED COMPLETE dev=1 len=1
+[1815693] LED usage=0x1 on=0 ok=1
+[1815724] LED COMPLETE dev=1 len=1
+[1815755] MIDI ch=1 NoteOff Bb5 vel=0
+[1815755] MIDI ch=1 NoteOn G4 vel=100
+[1815879] MIDI ch=1 NoteOff G4 vel=0
+[1815879] MIDI ch=1 NoteOn D5 vel=100
+[1816004] MIDI ch=1 NoteOff D5 vel=0
+[1816004] MIDI ch=1 NoteOn Bb5 vel=100
+[1816108] LED usage=0x1 on=1 ok=1
+[1816128] MIDI ch=1 NoteOff Bb5 vel=0
+[1816129] MIDI ch=1 NoteOn G4 vel=100
+[1816140] LED COMPLETE dev=1 len=1
+[1816151] LED usage=0x1 on=0 ok=1
+[1816182] LED COMPLETE dev=1 len=1
+[1816182] KEY DN usage=0xA mods=0x0
+[1816223] KEY UP usage=0xB mods=0x0
+[1816244] MIDI ch=1 NoteOff G4 vel=0
+[1816244] MIDI ch=1 NoteOn D5 vel=100
+[1816257] MIDI ch=1 NoteOff D5 vel=0
+[1816257] MIDI ch=1 CC Pan val=64
+[1816257] MIDI ch=1 NoteOn C4 vel=100
+[1816377] MIDI ch=1 NoteOff C4 vel=0
+[1816377] MIDI ch=1 NoteOn G4 vel=100
+[1816501] MIDI ch=1 NoteOff G4 vel=0
+[1816501] MIDI ch=1 NoteOn Eb5 vel=100
+[1816575] LED usage=0x1 on=1 ok=1
+[1816606] LED COMPLETE dev=1 len=1
+[1816616] LED usage=0x1 on=0 ok=1
+[1816627] MIDI ch=1 NoteOff Eb5 vel=0
+[1816627] MIDI ch=1 NoteOn C4 vel=100
+[1816649] LED COMPLETE dev=1 len=1
+[1816751] MIDI ch=1 NoteOff C4 vel=0
+[1816752] MIDI ch=1 NoteOn G4 vel=100
+[1816876] MIDI ch=1 NoteOff G4 vel=0
+[1816876] MIDI ch=1 NoteOn Eb5 vel=100
+[1817000] MIDI ch=1 NoteOff Eb5 vel=0
+[1817000] MIDI ch=1 NoteOn C4 vel=100
+[1817033] LED usage=0x1 on=1 ok=1
+[1817064] LED COMPLETE dev=1 len=1
+[PERF] core0-loop-us n=476 min=159us max=18707us avg=485us
+[PERF] key-to-midi-us n=6 min=162us max=384us avg=236us
+[PERF] clock-jitter-us n=260 min=2us max=1000us avg=501us
+[1817075] LED usage=0x1 on=0 ok=1
+[1817105] LED COMPLETE dev=1 len=1
+[1817116] MIDI ch=1 NoteOff C4 vel=0
+[1817116] MIDI ch=1 NoteOn G4 vel=100
+[1817240] MIDI ch=1 NoteOff G4 vel=0
+[1817240] MIDI ch=1 NoteOn Eb5 vel=100
+[1817364] MIDI ch=1 NoteOff Eb5 vel=0
+[1817365] MIDI ch=1 NoteOn C4 vel=100
+[1817489] MIDI ch=1 NoteOff C4 vel=0
+[1817489] MIDI ch=1 NoteOn G4 vel=100
+[1817490] LED usage=0x1 on=1 ok=1
+[1817522] LED COMPLETE dev=1 len=1
+[1817532] LED usage=0x1 on=0 ok=1
+[1817563] LED COMPLETE dev=1 len=1
+[1817614] MIDI ch=1 NoteOff G4 vel=0
+[1817614] MIDI ch=1 NoteOn Eb5 vel=100
+[1817739] MIDI ch=1 NoteOff Eb5 vel=0
+[1817739] MIDI ch=1 NoteOn C4 vel=100
+[1817863] MIDI ch=1 NoteOff C4 vel=0
+[1817863] MIDI ch=1 NoteOn G4 vel=100
+[1817957] LED usage=0x1 on=1 ok=1
+[1817988] LED COMPLETE dev=1 len=1
+[1817988] MIDI ch=1 NoteOff G4 vel=0
+[1817988] MIDI ch=1 NoteOn Eb5 vel=100
+[1818000] LED usage=0x1 on=0 ok=1
+[1818031] LED COMPLETE dev=1 len=1
+[1818113] MIDI ch=1 NoteOff Eb5 vel=0
+[1818113] MIDI ch=1 NoteOn C4 vel=100
+[1818217] KEY DN usage=0xB mods=0x0
+[1818238] MIDI ch=1 NoteOff C4 vel=0
+[1818238] MIDI ch=1 NoteOn G4 vel=100
+[1818260] KEY UP usage=0xA mods=0x0
+[1818292] MIDI ch=1 NoteOff G4 vel=0
+[1818292] MIDI ch=1 CC Pan val=64
+[1818292] MIDI ch=1 NoteOn G4 vel=100
+[1818412] MIDI ch=1 NoteOff G4 vel=0
+[1818412] MIDI ch=1 NoteOn D5 vel=100
+[1818413] LED usage=0x1 on=1 ok=1
+[1818445] LED COMPLETE dev=1 len=1
+[1818455] LED usage=0x1 on=0 ok=1
+[1818486] LED COMPLETE dev=1 len=1
+[1818527] MIDI ch=1 NoteOff D5 vel=0
+[1818527] MIDI ch=1 NoteOn Bb5 vel=100
+[1818652] MIDI ch=1 NoteOff Bb5 vel=0
+[1818652] MIDI ch=1 NoteOn G4 vel=100
+[1818776] MIDI ch=1 NoteOff G4 vel=0
+[1818776] MIDI ch=1 NoteOn D5 vel=100
+[1818881] LED usage=0x1 on=1 ok=1
+[1818901] MIDI ch=1 NoteOff D5 vel=0
+[1818901] MIDI ch=1 NoteOn Bb5 vel=100
+[1818913] LED COMPLETE dev=1 len=1
+[1818924] LED usage=0x1 on=0 ok=1
+[1818955] LED COMPLETE dev=1 len=1
+[1819026] MIDI ch=1 NoteOff Bb5 vel=0
+[1819027] MIDI ch=1 NoteOn G4 vel=100
+[1819151] MIDI ch=1 NoteOff G4 vel=0
+[1819151] MIDI ch=1 NoteOn D5 vel=100
+[1819275] MIDI ch=1 NoteOff D5 vel=0
+[1819275] MIDI ch=1 NoteOn Bb5 vel=100
+[1819339] LED usage=0x1 on=1 ok=1
+[1819369] LED COMPLETE dev=1 len=1
+[1819380] LED usage=0x1 on=0 ok=1
+[1819401] MIDI ch=1 NoteOff Bb5 vel=0
+[1819401] MIDI ch=1 NoteOn G4 vel=100
+[1819413] LED COMPLETE dev=1 len=1
+[1819525] MIDI ch=1 NoteOff G4 vel=0
+[1819525] MIDI ch=1 NoteOn D5 vel=100
+[1819650] MIDI ch=1 NoteOff D5 vel=0
+[1819650] MIDI ch=1 NoteOn Bb5 vel=100
+[1819774] MIDI ch=1 NoteOff Bb5 vel=0
+[1819774] MIDI ch=1 NoteOn G4 vel=100
+[1819807] LED usage=0x1 on=1 ok=1
+[1819838] LED COMPLETE dev=1 len=1
+[1819848] LED usage=0x1 on=0 ok=1
+[1819879] LED COMPLETE dev=1 len=1
+[1819890] MIDI ch=1 NoteOff G4 vel=0
+[1819890] MIDI ch=1 NoteOn D5 vel=100
+[1820014] MIDI ch=1 NoteOff D5 vel=0
+[1820014] MIDI ch=1 NoteOn Bb5 vel=100
+[1820037] KEY UP usage=0xB mods=0x0
+[1820068] MIDI ch=1 NoteOff Bb5 vel=0
+[1820263] LED usage=0x1 on=1 ok=1
+[1820293] LED COMPLETE dev=1 len=1
+[1820304] LED usage=0x1 on=0 ok=1
+[1820335] LED COMPLETE dev=1 len=1
+[1820723] LED usage=0x1 on=1 ok=1
+[1820754] LED COMPLETE dev=1 len=1
+[1820764] LED usage=0x1 on=0 ok=1
+[1820795] LED COMPLETE dev=1 len=1
+[1821183] LED usage=0x1 on=1 ok=1
+[1821214] LED COMPLETE dev=1 len=1
+[1821225] LED usage=0x1 on=0 ok=1
+[1821255] LED COMPLETE dev=1 len=1

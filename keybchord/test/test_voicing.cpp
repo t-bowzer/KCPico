@@ -135,3 +135,49 @@ TEST(Voicing, ManualInversions) {
               (std::vector<uint8_t>{67, 72, 76}));  // G C E
 }
 
+// Regression: inversion bass must come from the interval order (root/3rd/5th),
+// not the sorted pitch-class list. F major's 1st inversion is A in the bass —
+// the old sorted-index code dropped to the root instead.
+TEST(Voicing, InversionUsesIntervalOrderNotSortedPcs) {
+    ResolvedChord f{5, ChordType::Major};  // F major (F A C)
+    VoicingConfig cfg;
+    cfg.inversion = InversionMode::First;
+    EXPECT_EQ(voiceChord(f, 60, -1, 48, 84, cfg, {}),
+              (std::vector<uint8_t>{57, 60, 65}));  // A3 C4 F4
+}
+
+// Inversion bass selection also fixes the min-interval spread for non-C roots:
+// F major 1st inversion + min_interval 4 must put A (pc 9) in the bass.
+TEST(Voicing, MinIntervalInversionUsesIntervalOrder) {
+    ResolvedChord f{5, ChordType::Major};  // F major
+    VoicingConfig cfg;
+    cfg.inversion = InversionMode::First;
+    cfg.min_interval = 4;
+    EXPECT_EQ(voiceChord(f, 60, -1, 48, 84, cfg, {}),
+              (std::vector<uint8_t>{57, 65, 72}));  // A3 F4 C5
+}
+
+// The 3rd inversion of a triad (no 7th) wraps to the next octave instead of
+// collapsing onto the 2nd inversion (which also uses the 5th as the bass).
+TEST(Voicing, ThirdInversionOfTriadDistinct) {
+    ResolvedChord c{0, ChordType::Major};  // C major
+    VoicingConfig cfg;
+    cfg.inversion = InversionMode::Second;
+    auto second = voiceChord(c, 60, 0, 48, 84, cfg, {});
+    EXPECT_EQ(second, (std::vector<uint8_t>{67, 72, 76}));  // G C E
+
+    cfg.inversion = InversionMode::Third;
+    auto third = voiceChord(c, 60, 0, 48, 84, cfg, {});
+    EXPECT_EQ(third, (std::vector<uint8_t>{72, 76, 79}));   // C E G (up an octave)
+    EXPECT_NE(second, third);
+}
+
+// Third inversion of a 7th chord puts the 7th in the bass (no wrap).
+TEST(Voicing, ThirdInversionOfSeventhUsesSeventh) {
+    ResolvedChord c{0, ChordType::Dom7};  // C7 (C E G Bb)
+    VoicingConfig cfg;
+    cfg.inversion = InversionMode::Third;
+    EXPECT_EQ(voiceChord(c, 60, 0, 48, 84, cfg, {}),
+              (std::vector<uint8_t>{70, 72, 76, 79}));  // Bb C E G
+}
+

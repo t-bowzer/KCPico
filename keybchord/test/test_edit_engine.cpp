@@ -320,3 +320,23 @@ TEST_F(EditEngineTest, MenuExitsAfterIdleTimeout) {
     edit_->update(1000 + 10000ULL * 1000);
     EXPECT_EQ(state_.editMenu, EditMenu::None);     // timed out to main screen
 }
+
+TEST_F(EditEngineTest, TapTempoAveragesIntervals) {
+    edit_->handleKeyEvent(key(0x2C, true), 0);
+    edit_->handleKeyEvent(key(0x2C, true), 1000000);   // 1 s interval -> 60 BPM
+    EXPECT_EQ(state_.pendingRhythm.tempo, 60);
+
+    // A gap > 2 s starts a fresh tap set; a single tap does not change the BPM.
+    edit_->handleKeyEvent(key(0x2C, true), 4000000);
+    EXPECT_EQ(state_.pendingRhythm.tempo, 60);
+
+    edit_->handleKeyEvent(key(0x2C, true), 4500000);   // 0.5 s interval -> 120 BPM
+    EXPECT_EQ(state_.pendingRhythm.tempo, 120);
+}
+
+TEST_F(EditEngineTest, TapTempoClampsToBounds) {
+    // 1.9 s interval -> ~32 BPM, clamped up to TEMPO_MIN (40).
+    edit_->handleKeyEvent(key(0x2C, true), 0);
+    edit_->handleKeyEvent(key(0x2C, true), 1900000);
+    EXPECT_EQ(state_.pendingRhythm.tempo, 40);
+}

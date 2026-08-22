@@ -442,7 +442,7 @@ Aligned 1:1 with spec §1.6 / §12. Each milestone ends with a **review stop** f
 
 ### M10 — Chord Engine upgrades & Walking Bass
 **Deliverables (from `Upgrade-Plan.txt`):**
-- **Chord roll** (`chord_roll_ms`, signed ms, step 5): stagger chord note-ons in Held/Press (positive ascends, negative descends); note-offs release together.
+- **Chord roll** (`chord_roll_ms`, signed ms, step 10, −2000..+2000): stagger chord note-ons in Held/Press (positive ascends, negative descends); note-offs release together.
 - **Minimum note count** (`min_notes`, default 3): pad the chord with ascending octave notes to at least this count.
 - **Minimum interval spread** (`min_interval`, semitones, 0 = off): no two adjacent voicing notes closer than this; tightest ascending configuration. Applied as an orthogonal post-voicing layer.
 - **Manual inversions**: `PrtSc`/`ScLk`/`Pause` select 1st/2nd/3rd inversion; composes with smart voice-leading.
@@ -464,6 +464,84 @@ Aligned 1:1 with spec §1.6 / §12. Each milestone ends with a **review stop** f
 > `Ctrl`. `play_mode` legacy int `Rhythm`→`Arpeggio` remap on load. Native suite:
 > **287/287 green**; Pico build SUCCESS (RAM 12.7%, Flash 12.3%).
 
+### M11 — Hardware-test fixes (2026-08-21)
+**Source:** the M10 on-device run (`docs/hardware-test-plan.md`) produced
+`hw-test-feedback.txt`. Fixes + follow-ups implemented this session:
+
+- **Chord roll audible:** range widened `−400..+400` → `−2000..+2000 ms`, step
+  5 → 10 (spec §5.4/§9).
+- **Min-interval + inversion bug:** the inversion bass was indexed into the
+  *sorted* pitch-class list instead of the chord's interval formula, so every
+  non-C root (F, Bb, …) voiced the wrong note under `min_interval`. Fixed in
+  `voiceChord` (spec §6.4 VR-8). The 3rd inversion of a chord with no 7th now
+  wraps into the next octave instead of collapsing onto the 2nd.
+- **Held extensions no longer re-attack:** `Left`/`Down`/`Right` now add/remove
+  only the changed extension note(s) via a voicing diff, leaving the sustained
+  base chord untouched (spec FR-C7).
+- **Walking bass sync:** the bass read the published `step`/`beat` fields (off
+  by one 16th note, early). It now fires on the just-fired beat boundary
+  (`stepAbs % 4 == 1`) in lockstep with the drums (spec FR-B4 / AC-29).
+- **Arp sync:** `followRhythmClock()` now keys off the actual
+  `rhythmClock.running` so the arp locks to the clock and falls back to free-run
+  instead of freezing (spec FR-R4 / AC-6).
+- **Full strum pad:** `Num Lock`, `/`, `*` added to the full numpad layout
+  (14 keys) (spec §5.2 / FR-S2).
+- **All drums editable:** `DrumMap` extended to all 13 percussion instruments
+  used by the shipped rhythms (rimshot, clap, crash, ride, bongo, conga-lo/hi,
+  clave, shaker) with note + velocity editing and preset round-trip (spec FR-R9).
+- **Configurable bass patterns (FR-B5):** `bass.pattern` — `walking` (default),
+  `whole`, `half`, `quarter`, `half_alt`, `quarter_alt`, `three_four_alt`,
+  `hold` — with sustained notes for whole/half and a `hold` mode that tracks the
+  chord's sounding state (spec §6.9 / 5.9).
+- **Spec/Roadmap** updated for the new ranges, drum map, strum keys, and bass
+  patterns; a dedicated `docs/hardware-fix-test-plan.md` added.
+
+**Verify:** native suite **302/302 green**; Pico build SUCCESS (RAM 12.7%,
+Flash 12.7%). Re-run the on-device checklist in `docs/hardware-fix-test-plan.md`.
+
+> **M11 follow-up (2026-08-21).** Second hardware-test pass (see
+> `hw-test-feedback.txt`) fixed:
+>
+> - **Chord roll unit bug:** the stagger was treated as microseconds instead of
+>   milliseconds, so a 2000 ms roll fired notes ~2 ms apart. `scheduleRoll` now
+>   converts `chord_roll_ms` to microseconds.
+> - **Extension + `min_interval` no longer re-structures:** extensions are
+>   voiced as appended tensions above the base chord instead of being folded into
+>   the minimum-interval spread, so adding/removing an extension only ever
+>   touches the extension note — never the held base notes (FR-C7). Arpeggio now
+>   rebuilds its step sequence in place on an extension change rather than
+>   re-attacking the chord.
+> - **Held-mode overlapped chord switch:** pressing a new chord key before
+>   releasing the old one now resolves to the new chord once the stale key is
+>   lifted (a `pendingSwitch_` re-resolve on release).
+> - **Walking bass follows chord changes:** whole/half notes re-articulate on a
+>   new chord mid-measure, the `hold` pattern re-fires its root when the chord
+>   changes without releasing, and whole/half notes release 30 ms early for a
+>   clean attack (FR-B5).
+> - **Drum velocity editing:** velocity params auto-repeat on hold, and a new
+>   **Off** value (`128`, below `Auto`) mutes a drum piece (`mapDrumVelocity`
+>   returns 0 → the rhythm engine skips the note).
+>
+> **Verify:** native suite **312/312 green**; Pico build SUCCESS (RAM 12.7%,
+> Flash 12.8%).
+
+> **M11 follow-up 2 (2026-08-21).** Third hardware-test pass (see
+> `test-findings-2.txt`) addressed:
+>
+> - **Overlapped chord switch in Press/Arp modes:** the release-buffer debounce
+>   delayed an overlapped chord change (new key pressed before the old was
+>   lifted) by ~25 ms and let the old chord step once more. `pendingSwitch_` now
+>   re-resolves immediately on release in *every* play mode, removing the
+>   press-mode delay and the arpeggio transition stutter.
+> - **Tap tempo (Space):** tapping Space averages the intervals of the most
+>   recent taps (up to 8) to set the rhythm tempo; a >2 s gap starts a fresh tap
+>   set. The result is shown on the LCD.
+> - **New bass pattern `walk_no_6th`:** root (half note) → 3rd (quarter) →
+>   5th (quarter) → repeat, on the rhythm beat.
+>
+> **Verify:** native suite **317/317 green**; Pico build SUCCESS (RAM 12.7%,
+> Flash 12.9%).
+
 ### 6.1 Milestone → Acceptance Criteria coverage matrix
 
 | AC | Covered by |
@@ -473,7 +551,7 @@ Aligned 1:1 with spec §1.6 / §12. Each milestone ends with a **review stop** f
 | AC-3 Four play modes / lifecycle | M3 |
 | AC-4 Strum order + layouts + params | M4 |
 | AC-5 Rhythm drums / tempo / swing / mute | M5 |
-| AC-6 Arp/bass follow clock | M5 + M10 (bass) |
+| AC-6 Arp/bass follow clock | M5 + M10 (bass) + M11 (sync fix) |
 | AC-7 80-slot presets + nav + confirm | M7 |
 | AC-8 LCD idle + edits + prompts | M6 |
 | AC-9 DIN output, graceful when unconnected | M2 |
@@ -496,7 +574,7 @@ Aligned 1:1 with spec §1.6 / §12. Each milestone ends with a **review stop** f
 | AC-26 Min interval spread | M10 |
 | AC-27 Manual inversions | M10 |
 | AC-28 Arpeggio modes | M10 |
-| AC-29 Walking bass | M10 |
+| AC-29 Walking bass | M10 (+ M11 patterns/sync) |
 
 ---
 
@@ -525,9 +603,9 @@ Written before/alongside each core module. No Arduino/hardware includes (enforce
 | `test_voicing.cpp` | Root-position within note range; smart voice-leading picks nearest inversion (integer distance); octave shift ±12 clamped to MIDI 0–127 (VR-3); min-note padding (VR-6); min-interval spread (VR-7); manual inversions (VR-8); chord-roll ordering (VR-9). | §6.4 | AC-12, AC-25, AC-26, AC-27, AC-24 |
 | `test_extensions.cpp` | add9 (+14), add11 (+17), add13 (+21) applied as held modifiers; all combinations; left-adjacent add9 sets the flag. | §6.2 | AC-13 |
 | `test_arp_modes.cpp` | Arpeggio index sequencing for Up / Down / Up-Down / Alternating / Random (deterministic seed). | §6.7 | AC-28 |
-| `test_bass.cpp` | Walking-bass interval blueprint for all 11 types; meter adaptation (4/4 vs 3/4); bass note = root −12 + offset; octave/duration/velocity/channel params. | §6.8, §4.7 | AC-29 |
-| `test_strum.cpp` | Note-pool derivation over strum octave range; key→note ordering for full (`1..0`, keypad `0 . 1..9`) and limited (`0 . 2 3 5 6 8 9 / *`) layouts; Silent-mode pool still derived; keypad +/- excluded. | §6.6, FR-S2 | AC-4, AC-18 |
-| `test_rhythm.cpp` | Pattern → scheduled step events; integer BPM→interval math; **fixed-point swing** delay on off-beat steps (0–75); mute suppresses note-ons but keeps timeline; MIDI clock 24 PPQN interval math. | §7.2, §7.3 | AC-5, AC-6, AC-16 |
+| `test_bass.cpp` | Walking-bass interval blueprint for all 11 types; meter adaptation (4/4 vs 3/4); bass note = root −12 + offset; octave/duration/velocity/channel params; configurable bass patterns + sustain (FR-B5). | §6.8, §6.9, §4.7 | AC-29 |
+| `test_strum.cpp` | Note-pool derivation over strum octave range; key→note ordering for full (`1..0`, keypad `0 . 1..9 NumLock / *`) and limited (`0 . 2 3 5 6 8 9 / *`) layouts; Silent-mode pool still derived; keypad +/- excluded. | §6.6, FR-S2 | AC-4, AC-18 |
+| `test_rhythm.cpp` | Pattern → scheduled step events; integer BPM→interval math; **fixed-point swing** delay on off-beat steps (0–75); mute suppresses note-ons but keeps timeline; MIDI clock 24 PPQN interval math; drum-map remap/velocity for all 13 pieces (FR-R9). | §7.2, §7.3 | AC-5, AC-6, AC-16 |
 | `test_latching.cpp` | Held-mode: snapshot on trigger; editing any chord param or loading a preset does NOT mutate active notes; applies on next trigger; other modes apply per timing (FR-C9/VR-5). | FR-C9 | AC-15 |
 | `test_keymap.cpp` | HID usage + modifier byte → action mapping; Shift/Caps/Tab resolve as chord roots; keypad usages Num-Lock-independent; F-key menu/hotkey mapping; Super combos (presets/panic); `+`/`-` context-sensitivity. | §5 | AC-11, AC-18 |
 | `test_naming.cpp` | `<Root><quality>` flat spelling across all qualities/extensions and 12 roots (`Eb`, `Ebm`, `Eb7`, `Ebmaj7`, `Ebm7`, `Ebdim`, `Ebaug`, `Ebsus4`, `Ebadd9`). | §6.5 | AC-8 |
@@ -554,10 +632,10 @@ Executed on assembled hardware with an external synth/DAW and optional DIN monit
 - **AC-9 / NFR-5:** unplug/replug keyboard (hot-plug re-enumeration); remove LCD; disconnect DIN — app keeps running; DIN resumes when reconnected.
 - **AC-11:** confirm Tab/Caps/Shift×2/`[`/`'` act as chord roots (HID report parsing).
 - **AC-17:** stuck-note recovery via panic.
-- **AC-18:** numpad strum identical with Num Lock on and off.
+- **AC-18:** numpad strum identical with Num Lock on and off; `Num Lock` `/` `*` all strum in the Full layout.
 - **AC-23:** configured LED flashes in time (accented downbeat); `F4` (or Beat LED in the Rhythm menu) toggles it; removing the keyboard/LED does not affect timing or MIDI.
-- **AC-27:** `PrtSc`/`ScLk`/`Pause` select 1st/2nd/3rd inversion.
-- **AC-29:** walking bass cycles on the beat across meters; own channel/octave/velocity/duration honored.
+- **AC-27:** `PrtSc`/`ScLk`/`Pause` select 1st/2nd/3rd inversion; correct bass for every root (play F major 1st inversion — A in the bass, not the root).
+- **AC-29:** walking bass cycles on the beat in lockstep with the drums (never early); own channel/octave/velocity/duration/pattern honored; each `bass.pattern` behaves per spec §6.9.
 - **NFR-6:** simultaneous chord + strum key presses (document keyboard rollover limits; try a full-NKRO keyboard vs a boot-protocol one).
 
 ### 7.4 Test gates
@@ -618,10 +696,12 @@ Items 2–4 are isolated to data/display files and do not block implementation.
 
 ### 8.5 Next steps
 
-1. User reviews this addendum against the Pico spec; confirm architecture, layout, and milestone plan.
-2. On approval, begin **M1 — Scaffolding** (PlatformIO project, git init, `platformio.ini` with pinned deps, `src/main.cpp` dual-core entry, LittleFS config loader with first-boot defaults, adapter interfaces + null/stub fallbacks, GoogleTest skeleton), then stop for review.
-3. **Validate the USB-host keyboard path and N-key rollover early** (during/right after M2) with the actual target keyboard — this is the highest-risk item.
-4. Proceed through M3–M10, stopping after each for user testing/feedback.
+1. Re-run the M11 on-device checklist (`docs/hardware-fix-test-plan.md`) on
+   assembled hardware to confirm each fix from `hw-test-feedback.txt`.
+2. Revisit the remaining post-hardware open items from spec §14: LCD line-2
+   layout, and the final rhythm list (both deferred to post-hardware testing).
+3. Any further feedback from the M11 run is folded into the next milestone,
+   stopping after each for user testing/feedback per §8.4.
 
 ---
 

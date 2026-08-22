@@ -53,6 +53,7 @@ enum class ActionType : uint8_t {
     PresetSave,     // Insert -> save prompt (FR-P6)
     PresetClear,    // Delete -> clear prompt (FR-P7)
     Panic,          // Super+Esc -> all-sound/notes-off all channels (FR-C11)
+    TapTempo,       // Space -> tap tempo (sets rhythm tempo)
     COUNT
 };
 

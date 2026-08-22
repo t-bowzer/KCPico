@@ -17,8 +17,8 @@ TEST(ParamEdit, MenuParamLists) {
     EXPECT_EQ(menuParamCount(EditMenu::Chord), 11);
     EXPECT_EQ(menuParamCount(EditMenu::Strum), 7);
     EXPECT_EQ(menuParamCount(EditMenu::Rhythm), 7);
-    EXPECT_EQ(menuParamCount(EditMenu::Bass), 5);
-    EXPECT_EQ(menuParamCount(EditMenu::Drum), 8);
+    EXPECT_EQ(menuParamCount(EditMenu::Bass), 6);
+    EXPECT_EQ(menuParamCount(EditMenu::Drum), 26);
 
     EXPECT_EQ(menuParamAt(EditMenu::Chord, 0), ParamId::ChordOctave);
     EXPECT_EQ(menuParamAt(EditMenu::Chord, 1), ParamId::ChordMode);
@@ -102,9 +102,9 @@ TEST(ParamEdit, StepIntClamps) {
     paramStep(s, ParamId::ChordDuration, +1);
     EXPECT_EQ(s.pendingChord.note_duration_ms, 550);
 
-    // Chord roll steps by 5.
+    // Chord roll steps by 10.
     paramStep(s, ParamId::ChordRoll, +1);
-    EXPECT_EQ(s.pendingChord.chord_roll_ms, 5);
+    EXPECT_EQ(s.pendingChord.chord_roll_ms, 10);
     paramStep(s, ParamId::ChordRoll, -1);
     EXPECT_EQ(s.pendingChord.chord_roll_ms, 0);
 
@@ -162,6 +162,33 @@ TEST(ParamEdit, StepPatternWraps) {
     EXPECT_EQ(s.pendingRhythm.pattern, 11);
 }
 
+TEST(ParamEdit, DrumVelocityStepsThroughAutoOff) {
+    StateManager s;
+    // Auto (0) -> Off (128) when stepping down.
+    paramStep(s, ParamId::DrumKickVel, -1);
+    EXPECT_EQ(s.pendingRhythm.drums.kick_vel, 128);
+    paramStep(s, ParamId::DrumKickVel, -1);
+    EXPECT_EQ(s.pendingRhythm.drums.kick_vel, 127);
+
+    // Off (128) -> Auto (0) when stepping up.
+    s.pendingRhythm.drums.kick_vel = 128;
+    paramStep(s, ParamId::DrumKickVel, +1);
+    EXPECT_EQ(s.pendingRhythm.drums.kick_vel, 0);
+
+    // Auto (0) -> 1 when stepping up.
+    paramStep(s, ParamId::DrumKickVel, +1);
+    EXPECT_EQ(s.pendingRhythm.drums.kick_vel, 1);
+}
+
+TEST(ParamEdit, DrumVelocityStrings) {
+    StateManager s;
+    EXPECT_EQ(paramValueString(s, ParamId::DrumKickVel), "Auto");
+    s.pendingRhythm.drums.kick_vel = 128;
+    EXPECT_EQ(paramValueString(s, ParamId::DrumKickVel), "Off");
+    s.pendingRhythm.drums.kick_vel = 100;
+    EXPECT_EQ(paramValueString(s, ParamId::DrumKickVel), "100");
+}
+
 TEST(ParamEdit, CycleToggles) {
     StateManager s;
 
@@ -201,6 +228,9 @@ TEST(ParamEdit, AutoRepeatableParams) {
     EXPECT_TRUE(isAutoRepeatable(ParamId::RhythmTempo));
     EXPECT_TRUE(isAutoRepeatable(ParamId::RhythmSwing));
     EXPECT_TRUE(isAutoRepeatable(ParamId::BassDuration));
+    EXPECT_TRUE(isAutoRepeatable(ParamId::DrumKickVel));
+    EXPECT_TRUE(isAutoRepeatable(ParamId::DrumSnareVel));
+    EXPECT_TRUE(isAutoRepeatable(ParamId::DrumShakerVel));
 
     EXPECT_FALSE(isAutoRepeatable(ParamId::ChordOctave));
     EXPECT_FALSE(isAutoRepeatable(ParamId::ChordMinNotes));

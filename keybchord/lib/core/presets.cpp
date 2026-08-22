@@ -51,6 +51,7 @@ bool PresetSlot::sameParams(const PresetSlot& other) const {
         && bass.note_duration_ms  == other.bass.note_duration_ms
         && bass.velocity          == other.bass.velocity
         && bass.channel           == other.bass.channel
+        && bass.pattern           == other.bass.pattern
         && rhythm.enabled == other.rhythm.enabled
         && rhythm.tempo   == other.rhythm.tempo
         && rhythm.swing   == other.rhythm.swing
@@ -182,6 +183,32 @@ ScaleType parseScaleType(const std::string& s) {
     return ScaleType::Ionian;
 }
 
+BassPattern parseBassPattern(const std::string& s) {
+    if (s == "whole")          return BassPattern::Whole;
+    if (s == "half")           return BassPattern::Half;
+    if (s == "quarter")        return BassPattern::Quarter;
+    if (s == "half_alt")       return BassPattern::HalfAlt;
+    if (s == "quarter_alt")    return BassPattern::QuarterAlt;
+    if (s == "three_four_alt") return BassPattern::ThreeFourAlt;
+    if (s == "hold")           return BassPattern::Hold;
+    if (s == "walk_no_6th")    return BassPattern::WalkNoSixth;
+    return BassPattern::Walking;
+}
+
+const char* bassPatternName(BassPattern p) {
+    switch (p) {
+        case BassPattern::Whole:        return "whole";
+        case BassPattern::Half:         return "half";
+        case BassPattern::Quarter:      return "quarter";
+        case BassPattern::HalfAlt:      return "half_alt";
+        case BassPattern::QuarterAlt:   return "quarter_alt";
+        case BassPattern::ThreeFourAlt: return "three_four_alt";
+        case BassPattern::Hold:         return "hold";
+        case BassPattern::WalkNoSixth:  return "walk_no_6th";
+        default:                        return "walking";
+    }
+}
+
 } // namespace
 
 PresetSlot loadPreset(StorageAdapter& storage, int bank, int slot) {
@@ -238,7 +265,7 @@ PresetSlot loadPreset(StorageAdapter& storage, int bank, int slot) {
             if (vm == "smart") p.chord.voicing_mode = VoicingMode::Smart;
         }
         if (c.containsKey("chord_roll_ms") && c["chord_roll_ms"].is<int>())
-            p.chord.chord_roll_ms = static_cast<int16_t>(clamp<int>(c["chord_roll_ms"].as<int>(), -400, 400));
+            p.chord.chord_roll_ms = static_cast<int16_t>(clamp<int>(c["chord_roll_ms"].as<int>(), -2000, 2000));
         if (c.containsKey("min_notes") && c["min_notes"].is<int>())
             p.chord.min_notes = static_cast<uint8_t>(clamp<int>(c["min_notes"].as<int>(), 2, 6));
         if (c.containsKey("min_interval") && c["min_interval"].is<int>())
@@ -293,6 +320,8 @@ PresetSlot loadPreset(StorageAdapter& storage, int bank, int slot) {
             p.bass.velocity = static_cast<uint8_t>(clamp<int>(b["velocity"].as<int>(), 1, 127));
         if (b.containsKey("enabled") && b["enabled"].is<bool>())
             p.bass.enabled = b["enabled"].as<bool>();
+        if (b.containsKey("pattern") && b["pattern"].is<const char*>())
+            p.bass.pattern = parseBassPattern(b["pattern"].as<std::string>());
     }
 
     if (obj.containsKey("rhythm")) {
@@ -316,19 +345,55 @@ PresetSlot loadPreset(StorageAdapter& storage, int bank, int slot) {
             if (d.containsKey("kick") && d["kick"].is<int>())
                 p.rhythm.drums.kick = static_cast<uint8_t>(clamp<int>(d["kick"].as<int>(), 0, 127));
             if (d.containsKey("kick_vel") && d["kick_vel"].is<int>())
-                p.rhythm.drums.kick_vel = static_cast<uint8_t>(clamp<int>(d["kick_vel"].as<int>(), 0, 127));
+                p.rhythm.drums.kick_vel = static_cast<uint8_t>(clamp<int>(d["kick_vel"].as<int>(), 0, 128));
             if (d.containsKey("snare") && d["snare"].is<int>())
                 p.rhythm.drums.snare = static_cast<uint8_t>(clamp<int>(d["snare"].as<int>(), 0, 127));
             if (d.containsKey("snare_vel") && d["snare_vel"].is<int>())
-                p.rhythm.drums.snare_vel = static_cast<uint8_t>(clamp<int>(d["snare_vel"].as<int>(), 0, 127));
+                p.rhythm.drums.snare_vel = static_cast<uint8_t>(clamp<int>(d["snare_vel"].as<int>(), 0, 128));
             if (d.containsKey("hihat") && d["hihat"].is<int>())
                 p.rhythm.drums.hihat = static_cast<uint8_t>(clamp<int>(d["hihat"].as<int>(), 0, 127));
             if (d.containsKey("hihat_vel") && d["hihat_vel"].is<int>())
-                p.rhythm.drums.hihat_vel = static_cast<uint8_t>(clamp<int>(d["hihat_vel"].as<int>(), 0, 127));
+                p.rhythm.drums.hihat_vel = static_cast<uint8_t>(clamp<int>(d["hihat_vel"].as<int>(), 0, 128));
             if (d.containsKey("open_hat") && d["open_hat"].is<int>())
                 p.rhythm.drums.open_hat = static_cast<uint8_t>(clamp<int>(d["open_hat"].as<int>(), 0, 127));
             if (d.containsKey("open_hat_vel") && d["open_hat_vel"].is<int>())
-                p.rhythm.drums.open_hat_vel = static_cast<uint8_t>(clamp<int>(d["open_hat_vel"].as<int>(), 0, 127));
+                p.rhythm.drums.open_hat_vel = static_cast<uint8_t>(clamp<int>(d["open_hat_vel"].as<int>(), 0, 128));
+            if (d.containsKey("rimshot") && d["rimshot"].is<int>())
+                p.rhythm.drums.rimshot = static_cast<uint8_t>(clamp<int>(d["rimshot"].as<int>(), 0, 127));
+            if (d.containsKey("rimshot_vel") && d["rimshot_vel"].is<int>())
+                p.rhythm.drums.rimshot_vel = static_cast<uint8_t>(clamp<int>(d["rimshot_vel"].as<int>(), 0, 128));
+            if (d.containsKey("clap") && d["clap"].is<int>())
+                p.rhythm.drums.clap = static_cast<uint8_t>(clamp<int>(d["clap"].as<int>(), 0, 127));
+            if (d.containsKey("clap_vel") && d["clap_vel"].is<int>())
+                p.rhythm.drums.clap_vel = static_cast<uint8_t>(clamp<int>(d["clap_vel"].as<int>(), 0, 128));
+            if (d.containsKey("crash") && d["crash"].is<int>())
+                p.rhythm.drums.crash = static_cast<uint8_t>(clamp<int>(d["crash"].as<int>(), 0, 127));
+            if (d.containsKey("crash_vel") && d["crash_vel"].is<int>())
+                p.rhythm.drums.crash_vel = static_cast<uint8_t>(clamp<int>(d["crash_vel"].as<int>(), 0, 128));
+            if (d.containsKey("ride") && d["ride"].is<int>())
+                p.rhythm.drums.ride = static_cast<uint8_t>(clamp<int>(d["ride"].as<int>(), 0, 127));
+            if (d.containsKey("ride_vel") && d["ride_vel"].is<int>())
+                p.rhythm.drums.ride_vel = static_cast<uint8_t>(clamp<int>(d["ride_vel"].as<int>(), 0, 128));
+            if (d.containsKey("bongo") && d["bongo"].is<int>())
+                p.rhythm.drums.bongo = static_cast<uint8_t>(clamp<int>(d["bongo"].as<int>(), 0, 127));
+            if (d.containsKey("bongo_vel") && d["bongo_vel"].is<int>())
+                p.rhythm.drums.bongo_vel = static_cast<uint8_t>(clamp<int>(d["bongo_vel"].as<int>(), 0, 128));
+            if (d.containsKey("conga_lo") && d["conga_lo"].is<int>())
+                p.rhythm.drums.conga_lo = static_cast<uint8_t>(clamp<int>(d["conga_lo"].as<int>(), 0, 127));
+            if (d.containsKey("conga_lo_vel") && d["conga_lo_vel"].is<int>())
+                p.rhythm.drums.conga_lo_vel = static_cast<uint8_t>(clamp<int>(d["conga_lo_vel"].as<int>(), 0, 128));
+            if (d.containsKey("conga_hi") && d["conga_hi"].is<int>())
+                p.rhythm.drums.conga_hi = static_cast<uint8_t>(clamp<int>(d["conga_hi"].as<int>(), 0, 127));
+            if (d.containsKey("conga_hi_vel") && d["conga_hi_vel"].is<int>())
+                p.rhythm.drums.conga_hi_vel = static_cast<uint8_t>(clamp<int>(d["conga_hi_vel"].as<int>(), 0, 128));
+            if (d.containsKey("clave") && d["clave"].is<int>())
+                p.rhythm.drums.clave = static_cast<uint8_t>(clamp<int>(d["clave"].as<int>(), 0, 127));
+            if (d.containsKey("clave_vel") && d["clave_vel"].is<int>())
+                p.rhythm.drums.clave_vel = static_cast<uint8_t>(clamp<int>(d["clave_vel"].as<int>(), 0, 128));
+            if (d.containsKey("shaker") && d["shaker"].is<int>())
+                p.rhythm.drums.shaker = static_cast<uint8_t>(clamp<int>(d["shaker"].as<int>(), 0, 127));
+            if (d.containsKey("shaker_vel") && d["shaker_vel"].is<int>())
+                p.rhythm.drums.shaker_vel = static_cast<uint8_t>(clamp<int>(d["shaker_vel"].as<int>(), 0, 128));
         }
     }
 
@@ -396,6 +461,7 @@ bool savePreset(StorageAdapter& storage, int bank, int slot, const PresetSlot& p
     bass["note_duration_ms"] = preset.bass.note_duration_ms;
     bass["velocity"]         = preset.bass.velocity;
     bass["enabled"]          = preset.bass.enabled;
+    bass["pattern"]          = bassPatternName(preset.bass.pattern);
 
     auto rhythm = obj["rhythm"].to<JsonObject>();
     rhythm["channel"] = preset.rhythm.channel;
@@ -413,6 +479,24 @@ bool savePreset(StorageAdapter& storage, int bank, int slot, const PresetSlot& p
     drums["hihat_vel"]    = preset.rhythm.drums.hihat_vel;
     drums["open_hat"]     = preset.rhythm.drums.open_hat;
     drums["open_hat_vel"] = preset.rhythm.drums.open_hat_vel;
+    drums["rimshot"]      = preset.rhythm.drums.rimshot;
+    drums["rimshot_vel"]  = preset.rhythm.drums.rimshot_vel;
+    drums["clap"]         = preset.rhythm.drums.clap;
+    drums["clap_vel"]     = preset.rhythm.drums.clap_vel;
+    drums["crash"]        = preset.rhythm.drums.crash;
+    drums["crash_vel"]    = preset.rhythm.drums.crash_vel;
+    drums["ride"]         = preset.rhythm.drums.ride;
+    drums["ride_vel"]     = preset.rhythm.drums.ride_vel;
+    drums["bongo"]        = preset.rhythm.drums.bongo;
+    drums["bongo_vel"]    = preset.rhythm.drums.bongo_vel;
+    drums["conga_lo"]     = preset.rhythm.drums.conga_lo;
+    drums["conga_lo_vel"] = preset.rhythm.drums.conga_lo_vel;
+    drums["conga_hi"]     = preset.rhythm.drums.conga_hi;
+    drums["conga_hi_vel"] = preset.rhythm.drums.conga_hi_vel;
+    drums["clave"]        = preset.rhythm.drums.clave;
+    drums["clave_vel"]    = preset.rhythm.drums.clave_vel;
+    drums["shaker"]       = preset.rhythm.drums.shaker;
+    drums["shaker_vel"]   = preset.rhythm.drums.shaker_vel;
 
     std::string out;
     serializeJsonPretty(doc, out);

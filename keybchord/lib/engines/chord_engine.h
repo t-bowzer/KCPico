@@ -23,6 +23,10 @@ public:
     // latched chord is released when leaving Held with no key held.
     void onModeChanged();
 
+    // True while a chord is currently sounding (Held/Press/Arp). Used by the
+    // walking bass `Hold` pattern.
+    bool isSounding() const { return sounding_; }
+
 private:
     StateManager& state_;
     MidiRouter&   router_;
@@ -36,9 +40,9 @@ private:
 
     bool sounding_ = false;
     uint8_t activeChannel_ = 1;
-    std::vector<uint8_t> voicing_;       // full chord note set (for arp stepping)
+    std::vector<uint8_t> voicing_;       // full chord note set (base + extensions)
     std::vector<uint8_t> activeNotes_;   // notes currently note-on'd (for release)
-    std::vector<uint8_t> prevVoicing_;
+    std::vector<uint8_t> prevVoicing_;   // previous *base* voicing (voice-leading)
 
     // Base chord resolved from held grid keys + backtick (no held ext flags);
     // currentChord_ is the merged (base + held extensions) sounding chord.
@@ -51,6 +55,12 @@ private:
     // so a multi-key chord released "at once" sustains instead of glitching.
     bool releaseBufferPending_ = false;
     uint64_t releaseBufferDeadlineUs_ = 0;
+
+    // Set when a key press lands on an invalid combination while a Held chord is
+    // latched. The pending switch re-resolves once the stale key(s) are released,
+    // so an overlapped chord change (new key pressed before the old is lifted)
+    // still lands on the new chord.
+    bool pendingSwitch_ = false;
 
     // Arpeggio state.
     bool arpActive_ = false;
@@ -72,6 +82,11 @@ private:
     void onRelease(uint64_t now_us);
     void resolveAndTriggerIfChanged(uint64_t now_us, bool force);
     void triggerChord(const ResolvedChord& chord, uint64_t now_us);
+    void computeVoicing(const ResolvedChord& chord,
+                        std::vector<uint8_t>& base,
+                        std::vector<uint8_t>& combined);
+    void applyExtensionMerge(const ResolvedChord& chord, uint64_t now_us);
+    void applyArpExtension(const ResolvedChord& chord, uint64_t now_us);
     void releaseChord();
     void stopSound();
 

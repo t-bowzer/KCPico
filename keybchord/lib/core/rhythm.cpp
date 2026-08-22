@@ -104,6 +104,15 @@ uint8_t mapDrumNote(uint8_t note, const DrumMap& drums) {
         case 38: return drums.snare;     // Acoustic Snare
         case 42: return drums.hihat;     // Closed Hi-Hat
         case 46: return drums.open_hat;  // Open Hi-Hat
+        case 37: return drums.rimshot;   // Side Stick
+        case 39: return drums.clap;      // Hand Clap
+        case 49: return drums.crash;     // Crash Cymbal 1
+        case 51: return drums.ride;      // Ride Cymbal 1
+        case 61: return drums.bongo;     // Low Bongo
+        case 62: return drums.conga_lo;  // Mute Hi Conga
+        case 63: return drums.conga_hi;  // Open Hi Conga
+        case 75: return drums.clave;     // Claves
+        case 82: return drums.shaker;    // Shaker
         default: return note;
     }
 }
@@ -111,12 +120,22 @@ uint8_t mapDrumNote(uint8_t note, const DrumMap& drums) {
 uint8_t mapDrumVelocity(uint8_t note, const DrumMap& drums, uint8_t patternVelocity) {
     uint8_t v = 0;
     switch (note) {
-        case 36: v = drums.kick_vel;     break;
-        case 38: v = drums.snare_vel;    break;
-        case 42: v = drums.hihat_vel;    break;
-        case 46: v = drums.open_hat_vel; break;
+        case 36: v = drums.kick_vel;      break;
+        case 38: v = drums.snare_vel;     break;
+        case 42: v = drums.hihat_vel;     break;
+        case 46: v = drums.open_hat_vel;  break;
+        case 37: v = drums.rimshot_vel;   break;
+        case 39: v = drums.clap_vel;      break;
+        case 49: v = drums.crash_vel;     break;
+        case 51: v = drums.ride_vel;      break;
+        case 61: v = drums.bongo_vel;     break;
+        case 62: v = drums.conga_lo_vel;  break;
+        case 63: v = drums.conga_hi_vel;  break;
+        case 75: v = drums.clave_vel;     break;
+        case 82: v = drums.shaker_vel;    break;
         default: return patternVelocity;
     }
+    if (v == param_bounds::DRUM_VELOCITY_OFF) return 0;  // muted piece
     return (v == 0) ? patternVelocity : v;
 }
 

@@ -172,3 +172,55 @@ TEST(Rhythm, DrumMapDefaultsAreStandardGm) {
     // With default mapping, notes are unchanged.
     EXPECT_EQ(mapDrumNote(38, d), 38);
 }
+
+// All instruments used across the shipped rhythms are remappable (FR-R9).
+TEST(Rhythm, DrumMapRemapsExtendedInstruments) {
+    DrumMap m;
+    m.rimshot = 40;
+    m.clap = 41;
+    m.crash = 50;
+    m.ride = 52;
+    m.bongo = 60;
+    m.conga_lo = 65;
+    m.conga_hi = 66;
+    m.clave = 76;
+    m.shaker = 83;
+
+    EXPECT_EQ(mapDrumNote(37, m), 40);  // rimshot
+    EXPECT_EQ(mapDrumNote(39, m), 41);  // clap
+    EXPECT_EQ(mapDrumNote(49, m), 50);  // crash
+    EXPECT_EQ(mapDrumNote(51, m), 52);  // ride
+    EXPECT_EQ(mapDrumNote(61, m), 60);  // bongo
+    EXPECT_EQ(mapDrumNote(62, m), 65);  // conga_lo
+    EXPECT_EQ(mapDrumNote(63, m), 66);  // conga_hi
+    EXPECT_EQ(mapDrumNote(75, m), 76);  // clave
+    EXPECT_EQ(mapDrumNote(82, m), 83);  // shaker
+}
+
+TEST(Rhythm, DrumMapExtendedDefaultsAreIdentity) {
+    DrumMap d;
+    EXPECT_EQ(mapDrumNote(37, d), 37);
+    EXPECT_EQ(mapDrumNote(39, d), 39);
+    EXPECT_EQ(mapDrumNote(49, d), 49);
+    EXPECT_EQ(mapDrumNote(51, d), 51);
+    EXPECT_EQ(mapDrumNote(61, d), 61);
+    EXPECT_EQ(mapDrumNote(62, d), 62);
+    EXPECT_EQ(mapDrumNote(63, d), 63);
+    EXPECT_EQ(mapDrumNote(75, d), 75);
+    EXPECT_EQ(mapDrumNote(82, d), 82);
+}
+
+TEST(Rhythm, DrumVelocityExtended) {
+    DrumMap m;
+    m.conga_lo_vel = 90;
+    m.shaker_vel = 0;
+    EXPECT_EQ(mapDrumVelocity(62, m, 100), 90);  // override
+    EXPECT_EQ(mapDrumVelocity(82, m, 100), 100); // no override -> pattern
+}
+
+TEST(Rhythm, DrumVelocityOffMutesPiece) {
+    DrumMap m;
+    m.kick_vel = 128;  // off
+    EXPECT_EQ(mapDrumVelocity(36, m, 100), 0);   // muted -> velocity 0
+    EXPECT_EQ(mapDrumVelocity(38, m, 100), 100); // other pieces unaffected
+}

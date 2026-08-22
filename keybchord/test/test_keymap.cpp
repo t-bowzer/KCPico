@@ -134,12 +134,17 @@ TEST(Keymap, TempoKeys) {
     KeymapResolver r;
     EXPECT_EQ(r.resolve(0x4B, 0).type, ActionType::TempoUp);   // Page Up
     EXPECT_EQ(r.resolve(0x4E, 0).type, ActionType::TempoDown); // Page Down
+    EXPECT_EQ(r.resolve(0x2C, 0).type, ActionType::TapTempo);  // Space
 }
 
 TEST(Keymap, UnmappedKeysAreNone) {
     KeymapResolver r;
     EXPECT_EQ(r.resolve(0x28, 0).type, ActionType::None);  // Enter
-    EXPECT_EQ(r.resolve(0x53, 0).type, ActionType::None);  // Num Lock
+}
+
+TEST(Keymap, NumLockIsStrumKey) {
+    KeymapResolver r;
+    EXPECT_EQ(r.resolve(0x53, 0).type, ActionType::StrumKey);  // Num Lock
 }
 
 TEST(Keymap, IsChordKey) {

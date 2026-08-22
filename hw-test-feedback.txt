@@ -1,0 +1,223 @@
+Testing notes:
+- Chord mode updates:
+  - Roll isn't large enough, units are too small. Right now the range is -400 to +400 (what are the units?) but I can barely hear the roll when it's all the way at the end of the range
+  - Something is messed up with the minimum interval logic. Playing with minimum distance >= 1 sounds good when I press T, but horrible when I press E the chord is all wrong. Here is a snippet of the output from pressing T (which sounds correct), R (which sounds off), and E (which sounds even more off). Note that during this test I had minimum distance set to either 4 or 5, and was playing with 1st inversion, but I have confirmed that the notes are wrong on lower min intervals and with no inversion present.
+  
+  [554760] LED usage=0x1 on=1 ok=1
+[554790] LED COMPLETE dev=1 len=1
+[554801] LED usage=0x1 on=0 ok=1
+[554832] LED COMPLETE dev=1 len=1
+[555221] LED usage=0x1 on=1 ok=1
+[555252] LED COMPLETE dev=1 len=1
+[555263] LED usage=0x1 on=0 ok=1
+[555293] LED COMPLETE dev=1 len=1
+[PERF] core0-loop-us n=489 min=182us max=496us avg=220us
+[PERF] key-to-midi-us n=0 min=0us max=0us avg=0us
+[PERF] clock-jitter-us n=260 min=1us max=993us avg=499us
+[555683] LED usage=0x1 on=1 ok=1
+[555714] LED COMPLETE dev=1 len=1
+[555725] LED usage=0x1 on=0 ok=1
+[555755] LED COMPLETE dev=1 len=1
+[556144] LED usage=0x1 on=1 ok=1
+[556175] LED COMPLETE dev=1 len=1
+[556186] LED usage=0x1 on=0 ok=1
+[556217] LED COMPLETE dev=1 len=1
+[556606] LED usage=0x1 on=1 ok=1
+[556637] LED COMPLETE dev=1 len=1
+[556647] LED usage=0x1 on=0 ok=1
+[556678] LED COMPLETE dev=1 len=1
+[557067] LED usage=0x1 on=1 ok=1
+[557098] LED COMPLETE dev=1 len=1
+[557109] LED usage=0x1 on=0 ok=1
+[557140] LED COMPLETE dev=1 len=1
+[557529] LED usage=0x1 on=1 ok=1
+[557560] LED COMPLETE dev=1 len=1
+[557570] LED usage=0x1 on=0 ok=1
+[557601] LED COMPLETE dev=1 len=1
+[557898] KEY DN usage=0x17 mods=0x0
+[557899] MIDI ch=1 CC Pan val=64
+[557899] MIDI ch=1 NoteOn E3 vel=100
+[557899] MIDI ch=1 NoteOn C4 vel=100
+[557899] MIDI ch=1 NoteOn G4 vel=100
+[557989] LED usage=0x1 on=1 ok=1
+[558020] LED COMPLETE dev=1 len=1
+[558030] LED usage=0x1 on=0 ok=1
+[558061] LED COMPLETE dev=1 len=1
+[558450] LED usage=0x1 on=1 ok=1
+[558481] LED COMPLETE dev=1 len=1
+[558492] LED usage=0x1 on=0 ok=1
+[558523] LED COMPLETE dev=1 len=1
+[558912] LED usage=0x1 on=1 ok=1
+[558943] LED COMPLETE dev=1 len=1
+[558953] LED usage=0x1 on=0 ok=1
+[558984] LED COMPLETE dev=1 len=1
+[559373] LED usage=0x1 on=1 ok=1
+[559404] LED COMPLETE dev=1 len=1
+[559415] LED usage=0x1 on=0 ok=1
+[559446] LED COMPLETE dev=1 len=1
+[559712] KEY UP usage=0x17 mods=0x0
+[559743] MIDI ch=1 NoteOff E3 vel=0
+[559743] MIDI ch=1 NoteOff C4 vel=0
+[559743] MIDI ch=1 NoteOff G4 vel=0
+[559838] LED usage=0x1 on=1 ok=1
+[559869] LED COMPLETE dev=1 len=1
+[559880] LED usage=0x1 on=0 ok=1
+[559911] LED COMPLETE dev=1 len=1
+[560300] LED usage=0x1 on=1 ok=1
+[560331] LED COMPLETE dev=1 len=1
+[560341] LED usage=0x1 on=0 ok=1
+[560372] LED COMPLETE dev=1 len=1
+[PERF] core0-loop-us n=486 min=182us max=18970us avg=272us
+[PERF] key-to-midi-us n=2 min=168us max=853us avg=510us
+[PERF] clock-jitter-us n=260 min=3us max=1001us avg=521us
+[560762] LED usage=0x1 on=1 ok=1
+[560782] KEY DN usage=0x15 mods=0x0
+[560783] MIDI ch=1 CC Pan val=64
+[560783] MIDI ch=1 NoteOn Bb3 vel=100
+[560783] MIDI ch=1 NoteOn C5 vel=100
+[560784] MIDI ch=1 NoteOn A5 vel=100
+[560811] LED COMPLETE dev=1 len=1
+[560812] LED usage=0x1 on=0 ok=1
+[560843] LED COMPLETE dev=1 len=1
+[561222] LED usage=0x1 on=1 ok=1
+[561252] LED COMPLETE dev=1 len=1
+[561263] LED usage=0x1 on=0 ok=1
+[561294] LED COMPLETE dev=1 len=1
+[561683] LED usage=0x1 on=1 ok=1
+[561714] LED COMPLETE dev=1 len=1
+[561725] LED usage=0x1 on=0 ok=1
+[561755] LED COMPLETE dev=1 len=1
+[562145] LED usage=0x1 on=1 ok=1
+[562175] LED COMPLETE dev=1 len=1
+[562186] LED usage=0x1 on=0 ok=1
+[562217] LED COMPLETE dev=1 len=1
+[562401] KEY UP usage=0x15 mods=0x0
+[562432] MIDI ch=1 NoteOff Bb3 vel=0
+[562433] MIDI ch=1 NoteOff C5 vel=0
+[562433] MIDI ch=1 NoteOff A5 vel=0
+[562599] LED usage=0x1 on=1 ok=1
+[562630] LED COMPLETE dev=1 len=1
+[562641] LED usage=0x1 on=0 ok=1
+[562672] LED COMPLETE dev=1 len=1
+[563061] LED usage=0x1 on=1 ok=1
+[563092] LED COMPLETE dev=1 len=1
+[563102] LED usage=0x1 on=0 ok=1
+[563133] LED COMPLETE dev=1 len=1
+[563358] KEY DN usage=0x17 mods=0x0
+[563359] MIDI ch=1 CC Pan val=64
+[563359] MIDI ch=1 NoteOn E3 vel=100
+[563359] MIDI ch=1 NoteOn C4 vel=100
+[563360] MIDI ch=1 NoteOn G4 vel=100
+[563531] LED usage=0x1 on=1 ok=1
+[563562] LED COMPLETE dev=1 len=1
+[563573] LED usage=0x1 on=0 ok=1
+[563603] LED COMPLETE dev=1 len=1
+[563992] LED usage=0x1 on=1 ok=1
+[564023] LED COMPLETE dev=1 len=1
+[564034] LED usage=0x1 on=0 ok=1
+[564065] LED COMPLETE dev=1 len=1
+[564454] LED usage=0x1 on=1 ok=1
+[564485] LED COMPLETE dev=1 len=1
+[564495] LED usage=0x1 on=0 ok=1
+[564526] LED COMPLETE dev=1 len=1
+[564537] KEY UP usage=0x17 mods=0x0
+[564568] MIDI ch=1 NoteOff E3 vel=0
+[564568] MIDI ch=1 NoteOff C4 vel=0
+[564568] MIDI ch=1 NoteOff G4 vel=0
+[564908] LED usage=0x1 on=1 ok=1
+[564939] LED COMPLETE dev=1 len=1
+[564950] LED usage=0x1 on=0 ok=1
+[564981] LED COMPLETE dev=1 len=1
+[565196] KEY DN usage=0x15 mods=0x0
+[565196] MIDI ch=1 CC Pan val=64
+[565197] MIDI ch=1 NoteOn Bb3 vel=100
+[565197] MIDI ch=1 NoteOn C5 vel=100
+[565197] MIDI ch=1 NoteOn A5 vel=100
+[565368] LED usage=0x1 on=1 ok=1
+[565399] LED COMPLETE dev=1 len=1
+[565410] LED usage=0x1 on=0 ok=1
+[565441] LED COMPLETE dev=1 len=1
+[PERF] core0-loop-us n=482 min=179us max=19138us avg=358us
+[PERF] key-to-midi-us n=5 min=167us max=918us avg=593us
+[PERF] clock-jitter-us n=261 min=20us max=996us avg=490us
+[565830] LED usage=0x1 on=1 ok=1
+[565861] LED COMPLETE dev=1 len=1
+[565872] LED usage=0x1 on=0 ok=1
+[565903] LED COMPLETE dev=1 len=1
+[566292] LED usage=0x1 on=1 ok=1
+[566323] LED COMPLETE dev=1 len=1
+[566333] LED usage=0x1 on=0 ok=1
+[566364] LED COMPLETE dev=1 len=1
+[566620] KEY UP usage=0x15 mods=0x0
+[566651] MIDI ch=1 NoteOff Bb3 vel=0
+[566651] MIDI ch=1 NoteOff C5 vel=0
+[566652] MIDI ch=1 NoteOff A5 vel=0
+[566757] LED usage=0x1 on=1 ok=1
+[566788] LED COMPLETE dev=1 len=1
+[566798] LED usage=0x1 on=0 ok=1
+[566829] LED COMPLETE dev=1 len=1
+[567218] LED usage=0x1 on=1 ok=1
+[567229] KEY DN usage=0x8 mods=0x0
+[567229] MIDI ch=1 CC Pan val=64
+[567229] MIDI ch=1 NoteOn Db4 vel=100
+[567230] MIDI ch=1 NoteOn D5 vel=100
+[567230] MIDI ch=1 NoteOn Bb5 vel=100
+[567268] LED COMPLETE dev=1 len=1
+[567269] LED usage=0x1 on=0 ok=1
+[567299] LED COMPLETE dev=1 len=1
+[567678] LED usage=0x1 on=1 ok=1
+[567709] LED COMPLETE dev=1 len=1
+[567720] LED usage=0x1 on=0 ok=1
+[567751] LED COMPLETE dev=1 len=1
+[568140] LED usage=0x1 on=1 ok=1
+[568171] LED COMPLETE dev=1 len=1
+[568182] LED usage=0x1 on=0 ok=1
+[568212] LED COMPLETE dev=1 len=1
+[568602] LED usage=0x1 on=1 ok=1
+[568632] LED COMPLETE dev=1 len=1
+[568643] LED usage=0x1 on=0 ok=1
+[568674] LED COMPLETE dev=1 len=1
+[569063] LED usage=0x1 on=1 ok=1
+[569094] LED COMPLETE dev=1 len=1
+[569105] KEY UP usage=0x8 mods=0x0
+[569105] LED usage=0x1 on=0 ok=1
+[569136] LED COMPLETE dev=1 len=1
+[569136] MIDI ch=1 NoteOff Db4 vel=0
+[569136] MIDI ch=1 NoteOff D5 vel=0
+[569136] MIDI ch=1 NoteOff Bb5 vel=0
+[569528] LED usage=0x1 on=1 ok=1
+[569559] LED COMPLETE dev=1 len=1
+[569570] LED usage=0x1 on=0 ok=1
+[569600] LED COMPLETE dev=1 len=1
+[569990] LED usage=0x1 on=1 ok=1
+[570020] LED COMPLETE dev=1 len=1
+[570031] LED usage=0x1 on=0 ok=1
+[570062] LED COMPLETE dev=1 len=1
+[570451] LED usage=0x1 on=1 ok=1
+[570482] LED COMPLETE dev=1 len=1
+[570493] LED usage=0x1 on=0 ok=1
+[570523] LED COMPLETE dev=1 len=1
+[PERF] core0-loop-us n=485 min=182us max=19029us avg=281us
+[PERF] key-to-midi-us n=3 min=169us max=794us avg=397us
+[PERF] clock-jitter-us n=260 min=0us max=999us avg=522us
+[570913] LED usage=0x1 on=1 ok=1
+[570944] LED COMPLETE dev=1 len=1
+[570955] LED usage=0x1 on=0 ok=1
+[570985] LED COMPLETE dev=1 len=1
+
+- Something is wrong with inversion logic - 2nd and 3rd inversions are the same. Maybe there is some boundary holding the chord within a certain range?
+- For held extensions (add9/11/13), we shouldn't retrigger the whole chord if the extension button is pressed or released
+- The only editable drums are kick, snare, hi hat, and open hi hat, but there are several other instruments used in some of the rhythms (rhumba, tango, bossa, march) - all of them should be editable
+- For full strum mode, let's add num lock, /, and * at the top of the numpad to the strum pad
+- Walking bass is out of sync with the rhythm - sounds like the bass notes are playing slightly before the drum beats 
+- Arpeggio chord mode should also be synced to clock/rhythm so it's always playing in time
+
+Upgrades:
+- Bass should be configurable, and user patterns should be allowed just like drum patterns can be added. Here are some patterns we can add right now:
+  - Root note plays whole notes (whole)
+  - Root note plays half notes (half)
+  - Root note plays quarter notes (quarter)
+  - Half notes alternating between root and 5th (half alt)
+  - Quarter notes alternating root/5th (quarter alt)
+  - Root plays on beat 1 and 5th on beat 4 (3/4 alt)
+  - Hold - root plays when chord is held (when key is pressed in press mode or arp mode, or indefinitely in held mode) (hold)

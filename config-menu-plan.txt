@@ -1,0 +1,16 @@
+** FUTURE WORK **
+- I want to rework the menu buttons, they feel confusing. 
+  - In order to make it easier to change button layout in the future, is it possible for all the main menu shortcuts to be configurable? I would like to load a JSON file at boot that maps keys to functions. It doesn't need to be editable from within the LCD interface, it can just be a file modified on the PC. 
+    - In the configuration the user should be able to assign any key or key combo with super/left ctrl/left alt to a) open a menu (such as how F9 works currently), b) cycle a setting (such as how F1 works currently), c) set a specific setting to a specific value (such as how PrtSc works now), d) increment or decrement the value of a setting (such as how PgUp/PgDn work now), or e) perform some other function such as moving the preset cursor (how Home/End work now) or saving/clearing a preset (ins/del)
+    - JSON should be validated on load. All keys currently used for chords and strum, along with esc and the three lower left keys (ctrl/super/alt), which can only be used in combos, are reserved. Any other keys can be mapped.
+	- Valid JSON must have each menu accessible by button combo, as well as preset navigation and saving/loading
+	- Two different functions cannot be mapped to the same key (though two different keys may be mapped to the same function)
+	- If validation fails, generate error log and save as file, prompt the user on LCD to remount the device to access the error log
+  - Changes to defaults: 
+    - I like having each engine under F9-F12, so lets keep that. But within the menus, I think up/down should be to select a setting and left/right should be for changing values (inverse of what it is now)
+    - Remap on/off toggles: F5=Rhythm on/off, F6=Rhythm mute on/off, F7=Bass on/off, F8=Clock on/off
+    - Preset navigation/save/clear, chord octave keys, strum octave keys, inversion keys, and extension keys can all stay as-is.
+	- I want to rework F1-F4 to present access to the most commonly used settings, with separate common but not as common settings accessible via button combo (ctrl, super, alt)
+	  - Non-combo settings should be chord mode, arp mode, bass mode, and rhythm pattern
+	  - Suggest combo settings 
+	- Drum menu should be accessible by pressing super+F11

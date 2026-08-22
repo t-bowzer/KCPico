@@ -38,6 +38,15 @@ bool isDrumNoteParam(ParamId id) {
         case ParamId::DrumSnareNote:
         case ParamId::DrumHihatNote:
         case ParamId::DrumOpenHatNote:
+        case ParamId::DrumRimshotNote:
+        case ParamId::DrumClapNote:
+        case ParamId::DrumCrashNote:
+        case ParamId::DrumRideNote:
+        case ParamId::DrumBongoNote:
+        case ParamId::DrumCongaLoNote:
+        case ParamId::DrumCongaHiNote:
+        case ParamId::DrumClaveNote:
+        case ParamId::DrumShakerNote:
             return true;
         default:
             return false;
@@ -50,6 +59,15 @@ uint8_t drumNoteValue(const StateManager& state, ParamId id) {
         case ParamId::DrumSnareNote:   return state.pendingRhythm.drums.snare;
         case ParamId::DrumHihatNote:   return state.pendingRhythm.drums.hihat;
         case ParamId::DrumOpenHatNote: return state.pendingRhythm.drums.open_hat;
+        case ParamId::DrumRimshotNote: return state.pendingRhythm.drums.rimshot;
+        case ParamId::DrumClapNote:    return state.pendingRhythm.drums.clap;
+        case ParamId::DrumCrashNote:   return state.pendingRhythm.drums.crash;
+        case ParamId::DrumRideNote:    return state.pendingRhythm.drums.ride;
+        case ParamId::DrumBongoNote:   return state.pendingRhythm.drums.bongo;
+        case ParamId::DrumCongaLoNote: return state.pendingRhythm.drums.conga_lo;
+        case ParamId::DrumCongaHiNote: return state.pendingRhythm.drums.conga_hi;
+        case ParamId::DrumClaveNote:   return state.pendingRhythm.drums.clave;
+        case ParamId::DrumShakerNote:  return state.pendingRhythm.drums.shaker;
         default:                       return 0;
     }
 }
@@ -235,9 +253,48 @@ void EditEngine::applyDirect(uint8_t usage, const KeyAction& a, uint64_t now_us)
             show(ParamId::RhythmTempo);
             armRepeat(usage, -1, ParamId::RhythmTempo, false, now_us);
             break;
+        case ActionType::TapTempo:
+            handleTapTempo(now_us);
+            break;
         default:
             break;
     }
+}
+
+void EditEngine::handleTapTempo(uint64_t now_us) {
+    constexpr uint64_t TAP_RESET_US = 2000000ULL;  // 2 s gap starts a fresh set
+    constexpr int MAX_TAPS = 8;
+
+    // A gap longer than 2 s between presses starts a new tap sequence.
+    if (tapCount_ > 0 && now_us - tapTimes_[tapCount_ - 1] > TAP_RESET_US) {
+        tapCount_ = 0;
+    }
+
+    if (tapCount_ < MAX_TAPS) {
+        tapTimes_[tapCount_++] = now_us;
+    } else {
+        for (int i = 1; i < MAX_TAPS; i++) tapTimes_[i - 1] = tapTimes_[i];
+        tapTimes_[MAX_TAPS - 1] = now_us;
+    }
+
+    if (tapCount_ >= 2) {
+        uint64_t sum = 0;
+        for (int i = 1; i < tapCount_; i++) {
+            sum += tapTimes_[i] - tapTimes_[i - 1];
+        }
+        uint64_t avgUs = sum / static_cast<uint64_t>(tapCount_ - 1);
+        if (avgUs > 0) {
+            uint64_t bpm = 60000000ULL / avgUs;
+            bpm = clamp<uint64_t>(bpm,
+                static_cast<uint64_t>(param_bounds::TEMPO_MIN),
+                static_cast<uint64_t>(param_bounds::TEMPO_MAX));
+            state_.pendingRhythm.tempo = static_cast<uint16_t>(bpm);
+        }
+    }
+
+    if (anyEdit_) anyEdit_();
+    display_.showValue("Tempo", std::to_string(state_.pendingRhythm.tempo),
+                       false, now_us);
 }
 
 bool EditEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {

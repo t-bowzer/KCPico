@@ -52,6 +52,11 @@ private:
 
     uint64_t menuDeadlineUs_ = 0;
 
+    // Tap-tempo state (Space key): average the intervals of the most recent taps
+    // (up to 8) to set the rhythm tempo.
+    uint64_t tapTimes_[8] = {0};
+    int      tapCount_ = 0;
+
     ParamId currentParam() const;
     void enterOrSwitch(EditMenu menu, uint64_t now_us);
     void exitMenu();
@@ -61,4 +66,5 @@ private:
     void armRepeat(uint8_t usage, int delta, ParamId id, bool inMenu, uint64_t now_us);
     void clearRepeat();
     void applyDirect(uint8_t usage, const KeyAction& a, uint64_t now_us);
+    void handleTapTempo(uint64_t now_us);
 };

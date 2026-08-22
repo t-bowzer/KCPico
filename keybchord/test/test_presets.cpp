@@ -194,6 +194,7 @@ TEST(Presets, BassBlockRoundTrip) {
     orig.bass.note_duration_ms = 200;
     orig.bass.velocity = 110;
     orig.bass.channel = 5;
+    orig.bass.pattern = BassPattern::QuarterAlt;
     EXPECT_TRUE(savePreset(storage, 3, 0, orig));
 
     PresetSlot loaded = loadPreset(storage, 3, 0);
@@ -202,6 +203,52 @@ TEST(Presets, BassBlockRoundTrip) {
     EXPECT_EQ(loaded.bass.note_duration_ms, 200);
     EXPECT_EQ(loaded.bass.velocity, 110);
     EXPECT_EQ(loaded.bass.channel, 5);
+    EXPECT_EQ(loaded.bass.pattern, BassPattern::QuarterAlt);
+}
+
+TEST(Presets, BassPatternNameFallback) {
+    StorageStub storage;
+    storage.writeFile("/presets/bank1.json",
+        "[{\"bass\":{\"pattern\":\"not_a_pattern\"}}]");
+    PresetSlot p = loadPreset(storage, 0, 0);
+    EXPECT_EQ(p.bass.pattern, BassPattern::Walking);
+}
+
+TEST(Presets, WalkNoSixthPatternRoundTrip) {
+    StorageStub storage;
+    storage.writeFile("/presets/bank1.json",
+        "[{\"bass\":{\"pattern\":\"walk_no_6th\"}}]");
+    PresetSlot p = loadPreset(storage, 0, 0);
+    EXPECT_EQ(p.bass.pattern, BassPattern::WalkNoSixth);
+}
+
+TEST(Presets, ExtendedDrumMapRoundTrip) {
+    StorageStub storage;
+
+    PresetSlot orig = PresetSlot::defaults();
+    orig.rhythm.drums.rimshot = 40;
+    orig.rhythm.drums.clap = 41;
+    orig.rhythm.drums.crash = 50;
+    orig.rhythm.drums.ride = 52;
+    orig.rhythm.drums.bongo = 60;
+    orig.rhythm.drums.conga_lo = 65;
+    orig.rhythm.drums.conga_hi = 66;
+    orig.rhythm.drums.clave = 76;
+    orig.rhythm.drums.shaker = 83;
+    orig.rhythm.drums.shaker_vel = 100;
+    EXPECT_TRUE(savePreset(storage, 2, 3, orig));
+
+    PresetSlot loaded = loadPreset(storage, 2, 3);
+    EXPECT_EQ(loaded.rhythm.drums.rimshot, 40);
+    EXPECT_EQ(loaded.rhythm.drums.clap, 41);
+    EXPECT_EQ(loaded.rhythm.drums.crash, 50);
+    EXPECT_EQ(loaded.rhythm.drums.ride, 52);
+    EXPECT_EQ(loaded.rhythm.drums.bongo, 60);
+    EXPECT_EQ(loaded.rhythm.drums.conga_lo, 65);
+    EXPECT_EQ(loaded.rhythm.drums.conga_hi, 66);
+    EXPECT_EQ(loaded.rhythm.drums.clave, 76);
+    EXPECT_EQ(loaded.rhythm.drums.shaker, 83);
+    EXPECT_EQ(loaded.rhythm.drums.shaker_vel, 100);
 }
 
 TEST(Presets, ChordUpgradesRoundTrip) {

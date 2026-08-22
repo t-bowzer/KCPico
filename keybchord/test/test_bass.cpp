@@ -42,3 +42,57 @@ TEST(Bass, NoteMath) {
     EXPECT_EQ(bassOffsetForBeat(ChordType::Major, 5, 4), 9);
     EXPECT_EQ(bassOffsetForBeat(ChordType::Major, -1, 4), 0);
 }
+
+// Configurable bass patterns (Upgrade-Plan): offsets and rests.
+TEST(Bass, PatternOffsets) {
+    // Whole: root only on beat 1 (index 0).
+    EXPECT_EQ(bassOffsetForPattern(BassPattern::Whole, ChordType::Major, 0, 4), 0);
+    EXPECT_EQ(bassOffsetForPattern(BassPattern::Whole, ChordType::Major, 1, 4), -1);
+
+    // Half: root on even beats.
+    EXPECT_EQ(bassOffsetForPattern(BassPattern::Half, ChordType::Major, 0, 4), 0);
+    EXPECT_EQ(bassOffsetForPattern(BassPattern::Half, ChordType::Major, 2, 4), 0);
+    EXPECT_EQ(bassOffsetForPattern(BassPattern::Half, ChordType::Major, 1, 4), -1);
+
+    // Quarter: root on every beat.
+    EXPECT_EQ(bassOffsetForPattern(BassPattern::Quarter, ChordType::Major, 1, 4), 0);
+
+    // HalfAlt: root on the first half, 5th on the second.
+    EXPECT_EQ(bassOffsetForPattern(BassPattern::HalfAlt, ChordType::Major, 0, 4), 0);
+    EXPECT_EQ(bassOffsetForPattern(BassPattern::HalfAlt, ChordType::Major, 2, 4), 7);
+    EXPECT_EQ(bassOffsetForPattern(BassPattern::HalfAlt, ChordType::Major, 1, 4), -1);
+
+    // QuarterAlt: root/5th alternating quarter notes.
+    EXPECT_EQ(bassOffsetForPattern(BassPattern::QuarterAlt, ChordType::Major, 0, 4), 0);
+    EXPECT_EQ(bassOffsetForPattern(BassPattern::QuarterAlt, ChordType::Major, 1, 4), 7);
+    EXPECT_EQ(bassOffsetForPattern(BassPattern::QuarterAlt, ChordType::Major, 2, 4), 0);
+
+    // ThreeFourAlt: root on beat 1, 5th on the last beat.
+    EXPECT_EQ(bassOffsetForPattern(BassPattern::ThreeFourAlt, ChordType::Major, 0, 4), 0);
+    EXPECT_EQ(bassOffsetForPattern(BassPattern::ThreeFourAlt, ChordType::Major, 3, 4), 7);
+    EXPECT_EQ(bassOffsetForPattern(BassPattern::ThreeFourAlt, ChordType::Major, 1, 4), -1);
+
+    // Walking still delegates to the interval blueprint.
+    EXPECT_EQ(bassOffsetForPattern(BassPattern::Walking, ChordType::Major, 1, 4), 4);
+
+    // WalkNoSixth: root (half) -> rest -> 3rd (quarter) -> 5th (quarter).
+    EXPECT_EQ(bassOffsetForPattern(BassPattern::WalkNoSixth, ChordType::Major, 0, 4), 0);
+    EXPECT_EQ(bassOffsetForPattern(BassPattern::WalkNoSixth, ChordType::Major, 1, 4), -1);
+    EXPECT_EQ(bassOffsetForPattern(BassPattern::WalkNoSixth, ChordType::Major, 2, 4), 4);   // 3rd
+    EXPECT_EQ(bassOffsetForPattern(BassPattern::WalkNoSixth, ChordType::Major, 3, 4), 7);   // 5th
+    EXPECT_EQ(bassOffsetForPattern(BassPattern::WalkNoSixth, ChordType::Minor, 2, 4), 3);   // minor 3rd
+}
+
+TEST(Bass, SustainBeats) {
+    EXPECT_EQ(bassSustainBeats(BassPattern::Whole, 0, 4), 4);
+    EXPECT_EQ(bassSustainBeats(BassPattern::Whole, 0, 3), 3);
+    EXPECT_EQ(bassSustainBeats(BassPattern::Half, 0, 4), 2);
+    EXPECT_EQ(bassSustainBeats(BassPattern::HalfAlt, 0, 4), 2);
+    EXPECT_EQ(bassSustainBeats(BassPattern::Quarter, 0, 4), 0);
+    EXPECT_EQ(bassSustainBeats(BassPattern::Walking, 0, 4), 0);
+
+    // WalkNoSixth: root sustains a half note on beat 0; 3rd/5th are percussive.
+    EXPECT_EQ(bassSustainBeats(BassPattern::WalkNoSixth, 0, 4), 2);
+    EXPECT_EQ(bassSustainBeats(BassPattern::WalkNoSixth, 2, 4), 0);
+    EXPECT_EQ(bassSustainBeats(BassPattern::WalkNoSixth, 3, 4), 0);
+}

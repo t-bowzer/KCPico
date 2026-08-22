@@ -167,7 +167,7 @@ The system is a set of cooperating modules coordinated by a central state manage
 ### 4.2 Strum Plate
 - **FR-S1** Number keys simulate the strum plate, playing the notes of the currently selected chord spread across octaves.
 - **FR-S2** Two layouts:
-  - *Full:* number row (top-of-keyboard number keys `1 2 3 4 5 6 7 8 9 0`) and/or full numpad. The numpad strum set is the digit/decimal keys only — `0 . 1 2 3 4 5 6 7 8 9`. The numpad `Keypad +` / `Keypad -` keys are **NOT** part of the strum plate; they adjust the strum octave (see 5.5).
+  - *Full:* number row (top-of-keyboard number keys `1 2 3 4 5 6 7 8 9 0`) and/or full numpad. The numpad strum set is `Num Lock / * 0 . 1 2 3 4 5 6 7 8 9` (the top-row keys `Num Lock`, `/`, `*` are included). The numpad `Keypad +` / `Keypad -` keys are **NOT** part of the strum plate; they adjust the strum octave (see 5.5).
   - *Limited strum keys* (toggle): numpad center path `0 → . → 2 → 3 → 5 → 6 → 8 → 9 → / → *` for a more realistic feel.
 - **FR-S3** Strum parameters (via the Strum Edit menu, 5.5): octave, note duration, note velocity, layout, strum mode, strum root, scale. Shown on LCD when edited.
 - **FR-S7** Strum mode selects the note-pool source: **follow-chord** (default; the active chord's pitch classes, 6.6), **scale** (a selectable root pitch class + scale/mode — the standard major/minor/harmonic/melodic scales, the 7 modes, and pentatonic/blues), or **piano** (a selectable root; each strum key is one semitone higher than the last).
@@ -183,7 +183,7 @@ The system is a set of cooperating modules coordinated by a central state manage
 - **FR-R4** When rhythm is enabled, the Chord Engine's Arpeggio mode follows rhythm step timing, and the walking bass (4.7) follows rhythm beat timing.
 - **FR-R5** Tempo adjust via `Page Up` / `Page Down`; swing (and other rhythm parameters) adjust in the Rhythm Edit menu (`F11`, see 5.6).
 - **FR-R6** Rhythm patterns are defined as step sequences in JSON on LittleFS (Section 7.2).
-- **FR-R9** Per-drum-piece **note code** and **velocity** are editable (Drum sub-menu of the Rhythm Edit menu, 5.6): each of kick/snare/hi-hat/open-hat can be remapped to a different GM percussion note and given a fixed velocity (or "Auto" to follow the pattern's authored step velocity). Cycling a code auditions the selected sound once.
+- **FR-R9** Per-drum-piece **note code** and **velocity** are editable (Drum sub-menu of the Rhythm Edit menu, 5.6): every percussion instrument used by the shipped rhythms — kick, snare, hi-hat, open-hat, rimshot, clap, crash, ride, bongo, conga-lo, conga-hi, clave, and shaker — can be remapped to a different GM percussion note and given a fixed velocity (or "Auto" to follow the pattern's authored step velocity, or "Off" to mute the piece). Cycling a code auditions the selected sound once. Velocity parameters auto-repeat while the step key is held.
 - **FR-R7** MIDI clock transmission (24 PPQN) can be toggled on/off in the Rhythm Edit menu (Clock Out, see 5.6); when on, clock is sent to the DIN output.
 - **FR-R8** **Keyboard-LED BPM indicator:** the keyboard's **Scroll Lock** LED can flash in time with the Rhythm Engine clock as a visual tempo indicator. Default behavior: a short quarter-note flash on every beat, with a longer accented flash on beat 1 of the bar. The LED is driven by sending a **HID Output Report (SET_REPORT)** to the hosted keyboard. It blinks only while the Rhythm Engine is enabled (follows the active clock), and is disabled if `led.bpm_indicator` is off. Scroll Lock is used because it is not mapped to any chord/strum/function key; Caps Lock and Num Lock LEDs are left untouched to avoid confusion (Caps is a chord root; numpad state is irrelevant per FR-S6). This is best-effort visual feedback and must degrade gracefully if the LED is unavailable (missing keyboard, keyboard that rejects the output report, USB write failure) without affecting timing or MIDI output.
 
@@ -220,8 +220,9 @@ The system is a set of cooperating modules coordinated by a central state manage
 ### 4.7 Bass Function (Walking Bass)
 - **FR-B1** A **walking bass** line plays alongside the chord, following the Rhythm Engine's beat. It is a **separate engine** with its own parameters and edit menu (5.9); it is toggleable on/off (default off) and usable in Held, Press-to-play, and Arpeggio chord modes (silent in Silent mode).
 - **FR-B2** The bass plays a fixed looping **interval cycle** on each beat of the bar (see 6.8): root → 3rd → 5th → 6th/7th → (repeat). The cycle length adapts to the pattern's meter (`beats_per_bar`; a 3/4 waltz cycles over root–3rd–5th only).
-- **FR-B3** Bass voice parameters (5.9): enable, octave (whole-octave transpose from the base root, default −1), note duration, velocity, and MIDI channel (default 3; may equal any other function's channel). The bass follows the currently-selected chord's root and type (including in Held mode after key release).
+- **FR-B3** Bass voice parameters (5.9): enable, octave (whole-octave transpose from the base root, default −1), note duration, velocity, pattern, and MIDI channel (default 3; may equal any other function's channel). The bass follows the currently-selected chord's root and type (including in Held mode after key release).
 - **FR-B4** The bass note is short/percussive (note-on with rapid note-off after `note_duration_ms`), mimicking the Omnichord's plucked double-bass "thump". It is driven by the rhythm clock's beat edges and is silent when the rhythm is not running.
+- **FR-B5** **Configurable bass pattern** (`bass.pattern`, 5.9): in addition to the default walking cycle, the bass supports `whole` (root, whole note), `half` (root, half note), `quarter` (root, quarter note), `half_alt` (root/5th alternating half notes), `quarter_alt` (root/5th alternating quarter notes), `three_four_alt` (root on beat 1, 5th on the last beat), `walk_no_6th` (root half note, then 3rd and 5th quarter notes), and `hold` (root sustains while the chord is sounding — a held key in Press/Arp, indefinitely in Held). Whole/half patterns sustain their notes (not `note_duration_ms`); the beat-driven patterns fire in lockstep with the rhythm beat so they are never early relative to the drums.
 
 ---
 
@@ -253,7 +254,7 @@ The three main letter rows plus their bounding modifiers are fully consumed by t
 | Keys | Function |
 |------|----------|
 | Number row `1 2 3 4 5 6 7 8 9 0` | Strum across chord notes (Full layout) |
-| Numpad digits + decimal `0 . 1 2 3 4 5 6 7 8 9` | Strum (Full layout). `Keypad +`/`Keypad -` are excluded — they adjust the strum octave (5.5). |
+| Numpad digits + decimal `0 . 1 2 3 4 5 6 7 8 9` + `Num Lock` `/` `*` | Strum (Full layout). `Keypad +`/`Keypad -` are excluded — they adjust the strum octave (5.5). `Num Lock`, `/` and `*` (the numpad top row) extend the full strum plate. |
 | Limited strum path `0 . 2 3 5 6 8 9 / *` | Strum (Limited layout, when enabled) |
 
 ### 5.3 Function Modifier Convention
@@ -295,7 +296,7 @@ Main-menu single-key shortcuts (no menu):
 | `F4` | Duration | 50..4000 ms (step 50) |
 | `F5` | Velocity | 1..127 |
 | `F6` | Pan | 0..127 |
-| `F7` | Roll | −400..+400 ms (step 5; positive = up, negative = down) |
+| `F7` | Roll | −2000..+2000 ms (step 10; positive = up, negative = down) |
 | `F8` | Min Notes | 2..6 (default 3) |
 | `F9` | Min Interval | 0..12 semitones (0 = off) |
 | `F10` | Inversion | Root / 1st / 2nd / 3rd |
@@ -348,7 +349,9 @@ Main-menu single-key shortcuts (no menu):
 | `F8` | Drums | Opens the **Drum Edit** sub-menu (FR-R9) |
 
 **Drum Edit sub-menu** (opened by `F8` from the Rhythm Edit menu). F-keys select a
-piece; `+` / `-` change its code/velocity (cycling a code auditions it once):
+piece; `+` / `-` change its code/velocity (cycling a code auditions it once).
+Beyond the eight F-keys, `Left`/`Right`/`Up`/`Down` step through the remaining
+pieces (see 5.6):
 
 | F-key | Parameter | Range / cycle |
 |-------|-----------|----------------|
@@ -360,6 +363,15 @@ piece; `+` / `-` change its code/velocity (cycling a code auditions it once):
 | `F6` | Hi-Hat velocity | Auto / 1..127 |
 | `F7` | Open-Hat note | 0..127 (default 46) |
 | `F8` | Open-Hat velocity | Auto / 1..127 |
+| (arrows) | Rimshot note/vel | 0..127 (default 37) |
+| (arrows) | Clap note/vel | 0..127 (default 39) |
+| (arrows) | Crash note/vel | 0..127 (default 49) |
+| (arrows) | Ride note/vel | 0..127 (default 51) |
+| (arrows) | Bongo note/vel | 0..127 (default 61) |
+| (arrows) | Conga-Lo note/vel | 0..127 (default 62) |
+| (arrows) | Conga-Hi note/vel | 0..127 (default 63) |
+| (arrows) | Clave note/vel | 0..127 (default 75) |
+| (arrows) | Shaker note/vel | 0..127 (default 82) |
 
 **Inside any edit menu,** `Left`/`Right` arrows step between parameters (wrapping)
 and `Up`/`Down` arrows change the selected value, in addition to `+`/`-`/`Page
@@ -389,6 +401,7 @@ the cursor open. The cursor auto-resets after 5 s of idleness.
 | Key | Action |
 |-----|--------|
 | `F4` | Toggle the beat LED on/off (main-menu single-key, FR-R8) |
+| `Space` | **Tap tempo:** average the intervals of the most recent taps (up to 8) to set the rhythm tempo; a >2 s gap starts a fresh set |
 | `Ctrl` (held at power-on) | Also present the USB Mass Storage drive (M9); no runtime function |
 | `Super + Esc` | **Panic:** All-Sound-Off + All-Notes-Off on all channels/DIN output (FR-C11) |
 | `Esc` | Exit the current edit menu / cancel the current prompt |
@@ -412,6 +425,7 @@ Main-menu single-key shortcut:
 | `F3` | Duration | 50..4000 ms (step 50; default 150) |
 | `F4` | Velocity | 1..127 (default 90) |
 | `F5` | Channel | 1..16 (default 3) |
+| `F6` | Pattern | Walking / Whole / Half / Quarter / Half-Alt / Quarter-Alt / 3/4-Alt / Hold (default Walking, FR-B5) |
 
 ---
 
@@ -476,7 +490,7 @@ Voicing behavior is controlled by a **chord voicing-mode parameter** (`root_posi
 - **VR-4** Pan is applied as CC10 on the chord channel; velocity from the chord velocity param.
 - **VR-6 Minimum note count (`min_notes`):** if the chord has fewer distinct notes than `min_notes`, extra octave notes are appended (root +12, then 5th +12, …) in ascending order until the count is met. Default 3 (e.g. C major with `min_notes`=4 → `C E G C`; Cmaj7 with `min_notes`=5 → `C E G B C`).
 - **VR-7 Minimum interval spread (`min_interval`):** no two adjacent notes in the voicing are closer than `min_interval` semitones. Notes are chosen greedily in the tightest ascending configuration — start at the root; each next note is the smallest chord pitch-class ≥ previous + `min_interval`. `0` disables it. (e.g. C major, `min_interval`=5 → `C3 G3 E4`; `min_interval`=4 → `C3 G3 E4`.)
-- **VR-8 Manual inversions:** `PrtSc`/`ScLk`/`Pause` select 1st/2nd/3rd inversion, respectively — determining whether the 1st, 3rd, or 5th of the chord is the bass. The ascending note set is rotated so the chosen tone is lowest, then placed within range. Composes with smart voice-leading (the bass is pinned; the remaining notes minimize movement).
+- **VR-8 Manual inversions:** `PrtSc`/`ScLk`/`Pause` select 1st/2nd/3rd inversion, respectively — determining whether the 1st, 3rd, or 5th of the chord is the bass (3rd inversion uses the 7th when the chord has one). The inversion bass is selected by its position in the chord's **interval formula** (root/3rd/5th/7th), never by the sorted pitch-class list, so it is correct for every root. The ascending note set is rotated so the chosen tone is lowest, then placed within range. When the requested inversion index exceeds the chord's own tones (e.g. the 3rd inversion of a triad with no 7th), the selection wraps into the next octave so it stays distinct from the lower inversions. Composes with smart voice-leading (the bass is pinned; the remaining notes minimize movement).
 - **VR-9 Chord roll (`chord_roll_ms`):** in Held/Press-to-play modes the chord notes are staggered by `|chord_roll_ms|` ms apart (positive = ascending, negative = descending) instead of sounding simultaneously. Note-offs release together.
 - **VR-5 Parameter snapshot on trigger (Held mode):** When a chord is triggered, the engine takes a snapshot of all sounding-relevant chord parameters (voicing mode, octave, note duration, velocity, pan, chord roll, min notes, min interval, inversion, arp mode, channel, and the resolved chord type). The active voice uses this snapshot for its entire lifetime. Subsequent parameter edits (including loading a preset) update only the "pending" parameter state and are applied to the next chord trigger, never mutating an already-sounding held chord (see FR-C9). Implementation: maintain separate `pending_params` (edited live) and `active_params` (snapshot per active chord) structures on the State Manager.
 
@@ -514,6 +528,23 @@ The walking bass (4.7) plays a fixed looping interval cycle per beat, relative t
 | Min7b5 | 0 | 3 | 6 | 10 (b7) |
 
 The cycle length equals the pattern's `beats_per_bar` (`steps_per_bar / 4`); a 3/4 waltz plays only the first three offsets (root–3rd–5th). Bass note = `rootMidi(root_pc, base_root_midi, bass_octave) + offset[beat]`.
+
+### 6.9 Configurable Bass Patterns (FR-B5)
+The bass pattern parameter (`bass.pattern`, 5.9) selects among the walking cycle (6.8) and a set of root/5th patterns. Each pattern returns a semitone offset above the root for a given beat (0-based), or a rest (`−1`):
+
+| Pattern | Beat 0 | Beat 1 | Beat 2 | Beat 3 | Sustain |
+|---------|--------|--------|--------|--------|---------|
+| `walking` (default) | blueprint (6.8) | blueprint | blueprint | blueprint | percussive (`note_duration_ms`) |
+| `whole` | 0 | — | — | — | `beats_per_bar` beats |
+| `half` | 0 | — | 0 | — | 2 beats |
+| `quarter` | 0 | 0 | 0 | 0 | percussive |
+| `half_alt` | 0 | — | 7 | — | 2 beats |
+| `quarter_alt` | 0 | 7 | 0 | 7 | percussive |
+| `three_four_alt` | 0 | — | — | 7* | percussive |
+| `hold` | 0 (sustains) | — | — | — | until chord released |
+| `walk_no_6th` | 0 (half note) | — | 3rd | 5th | 2 beats on beat 0 |
+
+`three_four_alt` places the 5th on the **last** beat of the bar (beat 3 in 4/4, beat 2 in 3/4). `walk_no_6th` plays the root as a half note, then the 3rd and 5th as quarter notes (percussive), then repeats. `hold` is not beat-driven: it sustains the root while the chord is sounding (a held key in Press/Arp mode, indefinitely in Held mode) and is released when the chord stops sounding or the bass is disabled. Whole/half sustained notes re-articulate immediately when the chord changes mid-note (so the bass follows the new root), and they release slightly before the next note's attack for a clean articulation. All beat-driven patterns fire on the rhythm beat boundary in lockstep with the drums (never one 16th-note early).
 
 ---
 
@@ -609,7 +640,8 @@ All config/preset/pattern files live on the Pico's **LittleFS** filesystem in on
     "octave": -1,
     "note_duration_ms": 150,
     "velocity": 90,
-    "channel": 3
+    "channel": 3,
+    "pattern": "walking"
   },
   "rhythm": {
     "enabled": false,
@@ -622,12 +654,21 @@ All config/preset/pattern files live on the Pico's **LittleFS** filesystem in on
       "kick": 36, "kick_vel": 0,
       "snare": 38, "snare_vel": 0,
       "hihat": 42, "hihat_vel": 0,
-      "open_hat": 46, "open_hat_vel": 0
+      "open_hat": 46, "open_hat_vel": 0,
+      "rimshot": 37, "rimshot_vel": 0,
+      "clap": 39, "clap_vel": 0,
+      "crash": 49, "crash_vel": 0,
+      "ride": 51, "ride_vel": 0,
+      "bongo": 61, "bongo_vel": 0,
+      "conga_lo": 62, "conga_lo_vel": 0,
+      "conga_hi": 63, "conga_hi_vel": 0,
+      "clave": 75, "clave_vel": 0,
+      "shaker": 82, "shaker_vel": 0
     }
   }
 }
 ```
-> `rhythm.swing` is a **signed integer −75..+75** (Section 7.3), not a float. The `chord.extensions` object has been removed: add9/add11/add13 are now held modifiers (FR-C7) and are not persisted. `play_mode` is one of `held` / `press_to_play` / `arpeggio` / `silent` (Rhythm mode was replaced by the walking bass, FR-B1).
+> `rhythm.swing` is a **signed integer −75..+75** (Section 7.3), not a float. The `chord.extensions` object has been removed: add9/add11/add13 are now held modifiers (FR-C7) and are not persisted. `play_mode` is one of `held` / `press_to_play` / `arpeggio` / `silent` (Rhythm mode was replaced by the walking bass, FR-B1). `bass.pattern` is one of `walking` / `whole` / `half` / `quarter` / `half_alt` / `quarter_alt` / `three_four_alt` / `walk_no_6th` / `hold` (FR-B5).
 
 ### 8.3 Combination, Chord-Type & Root-Order Tables
 The Omnichord combination matrix (6.3), chord interval formulas (6.2), the circle-of-fifths root order (5.1, `chord_root_order`), the keymap, and per-parameter defaults are stored as editable JSON on LittleFS (shipped from repo `data/`) so behavior/layout can be tuned without recompiling. To minimize flash writes and RAM, large static tables may alternatively be compiled into flash as C++ constants with JSON overrides — see the roadmap for the chosen persistence strategy (default: JSON on LittleFS via ArduinoJson).
@@ -646,7 +687,7 @@ All adjustable parameters, with min/max/default/step. On default initialization 
 | pan | chord | int | 0 | 127 | 64 | 1 | CC10; 64 = center |
 | octave | chord | int | −3 | +3 | 0 | 1 | transpose in octaves |
 | voicing_mode | chord | enum | — | — | `root_position` | toggle | root_position / smart |
-| chord_roll_ms | chord | int | −400 | +400 | 0 | 5 | stagger chord note-ons (positive up / negative down); Held & Press modes |
+| chord_roll_ms | chord | int | −2000 | +2000 | 0 | 10 | stagger chord note-ons (positive up / negative down); Held & Press modes |
 | min_notes | chord | int | 2 | 6 | 3 | 1 | pad chord with octave notes to at least this count |
 | min_interval | chord | int | 0 | 12 | 0 | 1 | min semitones between adjacent voicing notes (0 = off) |
 | inversion | chord | enum | — | — | `root` | cycle | root / first / second / third (also PrtSc/ScLk/Pause) |
@@ -665,6 +706,7 @@ All adjustable parameters, with min/max/default/step. On default initialization 
 | note_duration_ms (bass) | bass | int | 50 | 4000 | 150 | 50 | bass note length |
 | velocity (bass) | bass | int | 1 | 127 | 90 | 1 | |
 | channel (bass) | bass | int | 1 | 16 | 3 | 1 | MIDI channel (may equal any function) |
+| pattern (bass) | bass | enum | — | — | `walking` | cycle | walking / whole / half / quarter / half_alt / quarter_alt / three_four_alt / walk_no_6th / hold (FR-B5) |
 | tempo | rhythm | int | 40 | 260 | 120 | 1 | BPM |
 | swing | rhythm | int | −75 | +75 | 0 | 5 | signed off-beat delay percentage (integer/fixed-point; see 7.3) |
 | enabled | rhythm | bool | off | on | off | toggle | rhythm on/off |
@@ -675,6 +717,15 @@ All adjustable parameters, with min/max/default/step. On default initialization 
 | drum_snare_note | rhythm | int | 0 | 127 | 38 | 1 | snare GM note (FR-R9) |
 | drum_hihat_note | rhythm | int | 0 | 127 | 42 | 1 | hi-hat GM note (FR-R9) |
 | drum_open_hat_note | rhythm | int | 0 | 127 | 46 | 1 | open-hat GM note (FR-R9) |
+| drum_rimshot_note | rhythm | int | 0 | 127 | 37 | 1 | rimshot GM note (FR-R9) |
+| drum_clap_note | rhythm | int | 0 | 127 | 39 | 1 | clap GM note (FR-R9) |
+| drum_crash_note | rhythm | int | 0 | 127 | 49 | 1 | crash GM note (FR-R9) |
+| drum_ride_note | rhythm | int | 0 | 127 | 51 | 1 | ride GM note (FR-R9) |
+| drum_bongo_note | rhythm | int | 0 | 127 | 61 | 1 | bongo GM note (FR-R9) |
+| drum_conga_lo_note | rhythm | int | 0 | 127 | 62 | 1 | mute hi-conga GM note (FR-R9) |
+| drum_conga_hi_note | rhythm | int | 0 | 127 | 63 | 1 | open hi-conga GM note (FR-R9) |
+| drum_clave_note | rhythm | int | 0 | 127 | 75 | 1 | clave GM note (FR-R9) |
+| drum_shaker_note | rhythm | int | 0 | 127 | 82 | 1 | shaker GM note (FR-R9) |
 | drum_*_vel | rhythm | int | 0 | 127 | 0 | 1 | per-piece velocity; 0 = Auto (follow pattern) (FR-R9) |
 | clock_enabled | global | bool | off | on | off | toggle | MIDI clock transmit (FR-R7) |
 | bpm_indicator | global | bool | off | on | on | toggle | keyboard-LED BPM indicator (FR-R8) |
@@ -773,9 +824,9 @@ These milestones align with the Build Sequence (Section 1.6); stop for user feed
 - **AC-24** Chord roll staggers note-ons by `chord_roll_ms` (positive ascending, negative descending) in Held/Press modes; note-offs release together.
 - **AC-25** `min_notes` pads a chord with octave notes to at least the configured count (e.g. C major min 4 → `C E G C`).
 - **AC-26** `min_interval` enforces the minimum semitone spacing between adjacent voicing notes in the tightest ascending configuration.
-- **AC-27** `PrtSc`/`ScLk`/`Pause` select 1st/2nd/3rd inversion; the selected inversion is reflected in the output and persists in the preset.
+- **AC-27** `PrtSc`/`ScLk`/`Pause` select 1st/2nd/3rd inversion; the selected inversion is reflected in the output (correct for every root, with the bass taken from the interval formula) and persists in the preset.
 - **AC-28** The five arpeggio modes (Up/Down/Up-Down/Alternating/Random) step the voicing in the specified order.
-- **AC-29** The walking bass plays the correct interval cycle on each beat (root–3rd–5th–6th/7th), adapts the cycle to the pattern's meter, follows the selected chord's root/type, and respects its own octave/duration/velocity/channel.
+- **AC-29** The walking bass plays the correct interval cycle on each beat (root–3rd–5th–6th/7th), adapts the cycle to the pattern's meter, follows the selected chord's root/type, respects its own octave/duration/velocity/channel, and stays in lockstep with the rhythm beat (never early). The configurable bass patterns (FR-B5) select among the walking cycle and the root/5th patterns.
 
 > **Removed vs. the Pi spec:** the USB-MIDI-gadget acceptance clauses are gone (no USB MIDI in v1). AC-9 is reworded from "both USB and DIN" to DIN-only with graceful behavior when unconnected.
 

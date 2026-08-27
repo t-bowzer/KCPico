@@ -10,4 +10,5 @@ public:
     std::string readFile(const std::string& path) override;
     bool writeFile(const std::string& path, const std::string& data) override;
     bool mkdir(const std::string& path) override;
+    std::vector<std::string> listFiles(const std::string& dir) override;
 };

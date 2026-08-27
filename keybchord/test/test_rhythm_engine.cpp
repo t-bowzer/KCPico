@@ -283,21 +283,42 @@ TEST_F(RhythmEngineTest, OnPatternChangedAdoptsSwing) {
 }
 
 
-TEST(RhythmLoader, LoadsPatternsFromStorage) {
+TEST(RhythmLoader, LoadsBuiltinsAndSelfHealsMissingFiles) {
     StorageStub storage;
     storage.writeFile("/rhythms/rock1.json",
         "{\"name\":\"Rock 1\",\"steps_per_bar\":16,\"swing\":0,"
         "\"tracks\":[{\"note\":36,\"name\":\"kick\",\"pattern\":[1,0]}]}");
 
-    auto patterns = loadRhythmPatterns(storage);
-    ASSERT_EQ(patterns.size(), 1u);
-    EXPECT_EQ(patterns[0].name, "Rock 1");
+    auto lib = loadRhythmPatterns(storage);
+    ASSERT_EQ(lib.patterns.size(), static_cast<size_t>(RHYTHM_COUNT));
+    ASSERT_EQ(lib.names.size(), static_cast<size_t>(RHYTHM_COUNT));
+    EXPECT_EQ(lib.patterns[0].name, "Rock 1");
+    // Missing built-in files were re-provisioned.
+    EXPECT_TRUE(storage.exists("/rhythms/foxtrot.json"));
 }
 
 TEST(RhythmLoader, FallsBackToBuiltinWhenEmpty) {
     StorageStub storage;
-    auto patterns = loadRhythmPatterns(storage);
-    ASSERT_EQ(patterns.size(), 1u);
-    EXPECT_EQ(patterns[0].name, "Rock 1");
-    EXPECT_FALSE(patterns[0].tracks.empty());
+    auto lib = loadRhythmPatterns(storage);
+    ASSERT_EQ(lib.patterns.size(), static_cast<size_t>(RHYTHM_COUNT));
+    EXPECT_EQ(lib.patterns[0].name, "Rock 1");
+    EXPECT_FALSE(lib.patterns[0].tracks.empty());
+}
+
+TEST(RhythmLoader, AppendsUserRhythmsSortedByFilename) {
+    StorageStub storage;
+    loadRhythmPatterns(storage);  // self-heal the 12 built-ins
+
+    storage.writeFile("/rhythms/zz_user.json",
+        "{\"name\":\"Z Groove\",\"steps_per_bar\":8,\"swing\":0,"
+        "\"tracks\":[{\"note\":36,\"name\":\"kick\",\"pattern\":[1,0,0,0,1,0,0,0]}]}");
+    storage.writeFile("/rhythms/aa_user.json",
+        "{\"name\":\"A Groove\",\"steps_per_bar\":8,\"swing\":0,"
+        "\"tracks\":[{\"note\":38,\"name\":\"snare\",\"pattern\":[0,0,1,0,0,0,1,0]}]}");
+
+    auto lib = loadRhythmPatterns(storage);
+    ASSERT_EQ(lib.patterns.size(), static_cast<size_t>(RHYTHM_COUNT + 2));
+    EXPECT_EQ(lib.patterns[RHYTHM_COUNT].name, "A Groove");     // aa sorts first
+    EXPECT_EQ(lib.patterns[RHYTHM_COUNT + 1].name, "Z Groove");
+    EXPECT_EQ(lib.names[RHYTHM_COUNT], "A Groove");
 }

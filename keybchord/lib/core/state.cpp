@@ -13,6 +13,7 @@ void StateManager::loadDefaults() {
     pendingBass   = BassParams::defaults();
     snapshotActive();
     config = AppConfig::defaults();
+    keymap = KeymapConfig::defaults();
     activeNotes.clear();
     currentBank = 0;
     currentSlot = 0;

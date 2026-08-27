@@ -591,21 +591,24 @@ All config/preset/pattern files live on the Pico's **LittleFS** filesystem in on
 ### 8.1 Global Config (`/config.json`)
 ```json
 {
-  "i2c_address": "0x27",
   "midi": { "din_enabled": true, "clock_enabled": false },
-  "modifiers": { "chord_fn": "ctrl", "strum_fn": "alt", "global_fn": "super" },
   "chord": { "base_root_midi": 60, "note_range": [48, 84] },
-  "chord_root_order": ["Db","Ab","Eb","Bb","F","C","G","D","A","E","B","F#"],
-  "display": { "revert_timeout_ms": 1500, "prompt_timeout_ms": 5000, "cursor_timeout_ms": 5000, "menu_timeout_ms": 10000 },
+  "display": {
+    "revert_timeout_ms": 1500,
+    "prompt_timeout_ms": 5000,
+    "cursor_timeout_ms": 5000,
+    "menu_timeout_ms": 10000
+  },
   "led": {
     "bpm_indicator": true,
     "led": "num_lock",
     "flash_ms": 40
   },
-  "startup_preset": "B1:P1"
+  "startup_preset": "B1:P1",
+  "logging": { "debug_log": true, "midi_monitor": true }
 }
 ```
-> Notes vs. the Pi spec: there is **no `usb_enabled`** MIDI flag (DIN only); **no `keyboard_device`** field (the firmware owns the single hosted keyboard, no device path). Any value absent from `config.json` or a preset is filled from the defaults in the Parameter Reference (Section 9). See NFR-9 for validation and first-boot generation.
+> Notes vs. the Pi spec: there is **no `usb_enabled`** MIDI flag (DIN only); **no `keyboard_device`** field (the firmware owns the single hosted keyboard, no device path); **no `i2c_address`/`modifiers`/`chord_root_order`** (removed). Any value absent from `config.json` or a preset is filled from the defaults in the Parameter Reference (Section 9). See NFR-9 for validation and first-boot generation.
 
 ### 8.2 Preset (`/presets/bank<N>.json` → array of 8)
 ```json
@@ -668,7 +671,7 @@ All config/preset/pattern files live on the Pico's **LittleFS** filesystem in on
   }
 }
 ```
-> `rhythm.swing` is a **signed integer −75..+75** (Section 7.3), not a float. The `chord.extensions` object has been removed: add9/add11/add13 are now held modifiers (FR-C7) and are not persisted. `play_mode` is one of `held` / `press_to_play` / `arpeggio` / `silent` (Rhythm mode was replaced by the walking bass, FR-B1). `bass.pattern` is one of `walking` / `whole` / `half` / `quarter` / `half_alt` / `quarter_alt` / `three_four_alt` / `walk_no_6th` / `hold` (FR-B5).
+> `rhythm.swing` is a **signed integer −75..+75** (Section 7.3), not a float. The `chord.extensions` object has been removed: add9/add11/add13 are now held modifiers (FR-C7) and are not persisted. `play_mode` is one of `held` / `press_to_play` / `arpeggio` / `arp_hold` / `silent` (Rhythm mode was replaced by the walking bass, FR-B1). `bass.pattern` is one of `walking` / `whole` / `half` / `quarter` / `half_alt` / `quarter_alt` / `three_four_alt` / `walk_no_6th` / `hold` (FR-B5).
 
 ### 8.3 Combination, Chord-Type & Root-Order Tables
 The Omnichord combination matrix (6.3), chord interval formulas (6.2), the circle-of-fifths root order (5.1, `chord_root_order`), the keymap, and per-parameter defaults are stored as editable JSON on LittleFS (shipped from repo `data/`) so behavior/layout can be tuned without recompiling. To minimize flash writes and RAM, large static tables may alternatively be compiled into flash as C++ constants with JSON overrides — see the roadmap for the chosen persistence strategy (default: JSON on LittleFS via ArduinoJson).
@@ -681,7 +684,7 @@ All adjustable parameters, with min/max/default/step. On default initialization 
 
 | Parameter | Scope | Type | Min | Max | Default | Step | Notes |
 |-----------|-------|------|-----|-----|---------|------|-------|
-| play_mode | chord | enum | — | — | `held` | cycle | held / press_to_play / arpeggio / silent |
+| play_mode | chord | enum | — | — | `held` | cycle | held / press_to_play / arpeggio / arp_hold / silent |
 | note_duration_ms | chord | int | 50 | 4000 | 500 | 50 | note length for press-to-play/arp lifecycles |
 | velocity | chord | int | 1 | 127 | 100 | 1 | MIDI note-on velocity |
 | pan | chord | int | 0 | 127 | 64 | 1 | CC10; 64 = center |

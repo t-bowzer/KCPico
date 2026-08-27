@@ -367,3 +367,47 @@ TEST_F(ChordEngineTest, ArpExtensionDoesNotRetrigger) {
     engine_->update(375000);
     EXPECT_TRUE(state_.isNoteActive(1, 74));       // the added 9th
 }
+
+// Switching arp mode out of Random while an arpeggio is running must rebuild the
+// (empty) step sequence, otherwise stepArpeggio would divide by zero and wedge.
+TEST_F(ChordEngineTest, ArpModeChangeOutOfRandomRebuildsSequence) {
+    state_.pendingChord.play_mode = PlayMode::Arpeggio;
+    state_.pendingChord.arp_mode  = ArpMode::Random;
+    engine_->handleKeyEvent(key(0x17, true), 0);   // C major; Random starts on some note
+    EXPECT_EQ(midi_.noteOnCount(), 1);
+
+    state_.pendingChord.arp_mode = ArpMode::Up;    // simulate an edit-engine change
+    engine_->onArpModeChanged();
+
+    engine_->update(500000);                       // step -> next note (64)
+    EXPECT_TRUE(state_.isNoteActive(1, 64));
+    engine_->update(1000000);                      // -> 67
+    EXPECT_TRUE(state_.isNoteActive(1, 67));
+}
+
+// Voicing reset clears the voice-leading memory: the next chord returns to its
+// root-position voicing instead of voice-leading from the previous chord.
+TEST_F(ChordEngineTest, ResetVoicingReturnsToRootPosition) {
+    state_.pendingChord.voicing_mode = VoicingMode::Smart;
+
+    engine_->handleKeyEvent(key(0x17, true), 0);   // C major -> root {60,64,67}
+    EXPECT_TRUE(state_.isNoteActive(1, 60));
+    EXPECT_TRUE(state_.isNoteActive(1, 64));
+    EXPECT_TRUE(state_.isNoteActive(1, 67));
+
+    engine_->handleKeyEvent(key(0x17, false), 0);  // release (Held latches)
+
+    engine_->handleKeyEvent(key(0x15, true), 0);   // F major -> smart {60,65,69}
+    EXPECT_TRUE(state_.isNoteActive(1, 60));
+    EXPECT_TRUE(state_.isNoteActive(1, 65));
+    EXPECT_TRUE(state_.isNoteActive(1, 69));
+
+    engine_->resetVoicing();
+    engine_->handleKeyEvent(key(0x15, false), 0);
+
+    engine_->handleKeyEvent(key(0x17, true), 0);   // C major -> root again
+    EXPECT_TRUE(state_.isNoteActive(1, 60));
+    EXPECT_TRUE(state_.isNoteActive(1, 64));
+    EXPECT_TRUE(state_.isNoteActive(1, 67));
+    EXPECT_FALSE(state_.isNoteActive(1, 69));
+}

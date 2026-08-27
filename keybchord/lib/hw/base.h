@@ -54,4 +54,9 @@ public:
     virtual std::string readFile(const std::string& path) = 0;
     virtual bool writeFile(const std::string& path, const std::string& data) = 0;
     virtual bool mkdir(const std::string& path) = 0;
+
+    // Lists the entries (basenames, no directory prefix) of a directory, or an
+    // empty vector when the directory does not exist / cannot be read. Used to
+    // discover user-provided rhythm files in /rhythms/.
+    virtual std::vector<std::string> listFiles(const std::string& dir) = 0;
 };

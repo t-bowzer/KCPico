@@ -2,6 +2,7 @@
 
 #include "base.h"
 #include "config.h"
+#include "keymap_config.h"
 #include "presets.h"
 #include "rhythm.h"
 
@@ -171,9 +172,11 @@ const char* const kRhythmJson[RHYTHM_COUNT] = {
 void provisionDefaults(StorageAdapter& storage) {
     storage.mkdir("/presets");
     storage.mkdir("/rhythms");
-
     // Global config (defaults).
     AppConfig::defaults().save(storage);
+
+    // Default keymap (configurable main-menu shortcuts).
+    storage.writeFile("/keymap.json", keymapDefaultJson());
 
     // 10 banks x 8 default preset slots.
     for (int bank = 0; bank < NUM_BANKS; bank++) {
@@ -187,4 +190,9 @@ void provisionDefaults(StorageAdapter& storage) {
         storage.writeFile("/rhythms/" + std::string(rhythmFileName(i)),
                           kRhythmJson[i]);
     }
+}
+
+const char* defaultRhythmJson(int index) {
+    if (index < 0 || index >= RHYTHM_COUNT) return nullptr;
+    return kRhythmJson[index];
 }

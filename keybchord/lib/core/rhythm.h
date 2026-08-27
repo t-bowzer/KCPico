@@ -14,8 +14,13 @@ constexpr int RHYTHM_STEPS_PER_BEAT = 4;
 constexpr int MIDI_PPQN            = 24;
 constexpr int CLOCK_TICKS_PER_STEP = MIDI_PPQN / RHYTHM_STEPS_PER_BEAT;
 
-// Number of shipped rhythm patterns (spec section 7.1).
+// Number of shipped rhythm patterns (spec section 7.1). These are always loaded
+// first (indices 0..RHYTHM_COUNT-1); user-provided /rhythms/*.json files are
+// appended after them.
 constexpr int RHYTHM_COUNT = 12;
+
+// Hard cap on the total number of patterns (built-in + user) kept in memory.
+constexpr int MAX_RHYTHMS = 32;
 
 // Velocity that a `1` in a track's pattern maps to (spec 7.2: "1 = default
 // velocity"). Values 2..127 are literal velocities.
@@ -40,6 +45,15 @@ struct RhythmPattern {
 struct StepEvent {
     uint8_t note;
     uint8_t velocity;
+};
+
+
+// The complete loaded rhythm set: the patterns in play order plus their display
+// names (same order). `names` is installed into the name registry via
+// installRhythmNames() so presets/display resolve index <-> name consistently.
+struct RhythmLibrary {
+    std::vector<RhythmPattern> patterns;
+    std::vector<std::string>  names;
 };
 
 
@@ -72,9 +86,31 @@ uint8_t mapDrumNote(uint8_t note, const DrumMap& drums);
 // velocity; 1..127 forces a fixed velocity. Non-mapped codes pass through.
 uint8_t mapDrumVelocity(uint8_t note, const DrumMap& drums, uint8_t patternVelocity);
 
-// Rhythm list (spec 7.1): index <-> name lookups.
+// Human-readable name for a standard GM percussion note ("Kick", "Snare", ...),
+// or "" for a non-standard note.
+const char* drumNameForNote(uint8_t note);
+
+// Canonical drum index (0 = Kick .. 12 = Shaker) for a standard GM note, or -1
+// for a non-standard note.
+int drumIndexForNote(uint8_t note);
+
+// Pointer to the per-piece velocity-override field for a standard GM note, or
+// nullptr for a non-standard note (which has no override and cannot be muted).
+uint8_t* drumVelocityField(DrumMap& drums, uint8_t note);
+
+// Rhythm list (spec 7.1): index <-> name lookups. These resolve against the
+// runtime name list installed by installRhythmNames(); when no list is installed
+// (the default) they fall back to the built-in table.
 const char* rhythmName(int index);
 int rhythmIndex(const std::string& name);
+int rhythmCount();
 
-// LittleFS file name (no directory) for a rhythm by index.
+// Installs the full runtime rhythm name list (built-ins + user files) used by
+// rhythmName()/rhythmIndex()/rhythmCount(). Pass an empty vector (or call
+// clearRhythmNames()) to revert to the built-in table. The list must stay in
+// sync with the pattern vector passed to RhythmEngine::setPatterns().
+void installRhythmNames(std::vector<std::string> names);
+void clearRhythmNames();
+
+// LittleFS file name (no directory) for a *built-in* rhythm by index.
 const char* rhythmFileName(int index);

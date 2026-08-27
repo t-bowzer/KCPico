@@ -18,6 +18,10 @@ constexpr const char* kRhythmFiles[RHYTHM_COUNT] = {
     "march.json", "samba.json", "disco.json", "foxtrot.json",
 };
 
+// Runtime name list (built-ins + user files). Empty means "use the built-in
+// table". Installed by installRhythmNames() after loading patterns.
+std::vector<std::string> g_names;
+
 } // namespace
 
 
@@ -140,18 +144,97 @@ uint8_t mapDrumVelocity(uint8_t note, const DrumMap& drums, uint8_t patternVeloc
 }
 
 const char* rhythmName(int index) {
+    if (!g_names.empty()) {
+        if (index < 0 || index >= static_cast<int>(g_names.size())) return g_names[0].c_str();
+        return g_names[index].c_str();
+    }
     if (index < 0 || index >= RHYTHM_COUNT) return kRhythmNames[0];
     return kRhythmNames[index];
 }
 
 int rhythmIndex(const std::string& name) {
+    if (!g_names.empty()) {
+        for (size_t i = 0; i < g_names.size(); i++) {
+            if (name == g_names[i]) return static_cast<int>(i);
+        }
+        return -1;
+    }
     for (int i = 0; i < RHYTHM_COUNT; i++) {
         if (name == kRhythmNames[i]) return i;
     }
     return -1;
 }
 
+int rhythmCount() {
+    return g_names.empty() ? RHYTHM_COUNT : static_cast<int>(g_names.size());
+}
+
+void installRhythmNames(std::vector<std::string> names) {
+    g_names = std::move(names);
+}
+
+void clearRhythmNames() {
+    g_names.clear();
+}
+
 const char* rhythmFileName(int index) {
     if (index < 0 || index >= RHYTHM_COUNT) return kRhythmFiles[0];
     return kRhythmFiles[index];
+}
+
+const char* drumNameForNote(uint8_t note) {
+    switch (note) {
+        case 36: return "Kick";
+        case 38: return "Snare";
+        case 42: return "Hi-Hat";
+        case 46: return "Open Hat";
+        case 37: return "Rimshot";
+        case 39: return "Clap";
+        case 49: return "Crash";
+        case 51: return "Ride";
+        case 61: return "Bongo";
+        case 62: return "Conga Lo";
+        case 63: return "Conga Hi";
+        case 75: return "Clave";
+        case 82: return "Shaker";
+        default: return "";
+    }
+}
+
+int drumIndexForNote(uint8_t note) {
+    switch (note) {
+        case 36: return 0;   // kick
+        case 38: return 1;   // snare
+        case 42: return 2;   // hihat
+        case 46: return 3;   // open_hat
+        case 37: return 4;   // rimshot
+        case 39: return 5;   // clap
+        case 49: return 6;   // crash
+        case 51: return 7;   // ride
+        case 61: return 8;   // bongo
+        case 62: return 9;   // conga_lo
+        case 63: return 10;  // conga_hi
+        case 75: return 11;  // clave
+        case 82: return 12;  // shaker
+        default: return -1;
+    }
+}
+
+uint8_t* drumVelocityField(DrumMap& drums, uint8_t note) {
+    switch (note) {
+        case 36: return &drums.kick_vel;
+        case 38: return &drums.snare_vel;
+        case 42: return &drums.hihat_vel;
+        case 46: return &drums.open_hat_vel;
+        case 37: return &drums.rimshot_vel;
+        case 39: return &drums.clap_vel;
+        case 49: return &drums.crash_vel;
+        case 51: return &drums.ride_vel;
+        case 61: return &drums.bongo_vel;
+        case 62: return &drums.conga_lo_vel;
+        case 63: return &drums.conga_hi_vel;
+        case 75: return &drums.clave_vel;
+        case 82: return &drums.shaker_vel;
+        default: return nullptr;
+    }
 }

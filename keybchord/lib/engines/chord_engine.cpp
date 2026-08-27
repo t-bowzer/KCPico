@@ -19,26 +19,26 @@ constexpr uint64_t RELEASE_BUFFER_US = 25000;
 
 
 ChordEngine::ChordEngine(StateManager& state, MidiRouter& router)
-    : state_(state), router_(router) {}
+    : state_(state), router_(router), keymap_(&state.keymap) {}
 
 void ChordEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
     KeyAction a = keymap_.resolve(ev.hid_usage, ev.modifiers);
 
-    switch (a.type) {
-        case ActionType::ChordKey:
+    switch (a.cmd) {
+        case KeyCmd::ChordKey:
             if (ev.pressed) { addCell(a.cell); onPress(now_us); }
             else            { removeCell(a.cell); onRelease(now_us); }
             break;
 
-        case ActionType::Backtick:
+        case KeyCmd::Backtick:
             backtickHeld_ = ev.pressed;
             if (ev.pressed) onPress(now_us);
             else            onRelease(now_us);
             break;
 
-        case ActionType::Ext9:   setExt(9,  ev.pressed, now_us); break;
-        case ActionType::Ext11:  setExt(11, ev.pressed, now_us); break;
-        case ActionType::Ext13:  setExt(13, ev.pressed, now_us); break;
+        case KeyCmd::Ext9:   setExt(9,  ev.pressed, now_us); break;
+        case KeyCmd::Ext11:  setExt(11, ev.pressed, now_us); break;
+        case KeyCmd::Ext13:  setExt(13, ev.pressed, now_us); break;
 
         default:
             break;
@@ -198,6 +198,19 @@ void ChordEngine::onModeChanged() {
     }
 }
 
+void ChordEngine::onArpModeChanged() {
+    // Adopt the newly-edited mode onto the running arpeggio (the active chord is
+    // a snapshot taken at trigger time, so its arp_mode is otherwise stale).
+    state_.activeChord.arp_mode = state_.pendingChord.arp_mode;
+    if (!arpActive_ || voicing_.empty()) return;
+    arpSeq_ = arpSequence(state_.activeChord.arp_mode, voicing_.size());
+    arpPos_ = 0;
+}
+
+void ChordEngine::resetVoicing() {
+    prevVoicing_.clear();
+}
+
 void ChordEngine::update(uint64_t now_us) {
     // Chord roll (VR-9): fire note-ons as their stagger deadlines pass.
     if (!rollPending_.empty()) {
@@ -229,7 +242,8 @@ void ChordEngine::update(uint64_t now_us) {
 
 bool ChordEngine::followRhythmClock() const {
     return state_.rhythmClock.running &&
-           state_.activeChord.play_mode == PlayMode::Arpeggio;
+           (state_.activeChord.play_mode == PlayMode::Arpeggio ||
+            state_.activeChord.play_mode == PlayMode::ArpHold);
 }
 
 void ChordEngine::allNotesOff() {
@@ -271,7 +285,8 @@ void ChordEngine::onRelease(uint64_t now_us) {
         resolveAndTriggerIfChanged(now_us, false);
         return;
     }
-    if (state_.activeChord.play_mode == PlayMode::Held) {
+    if (state_.activeChord.play_mode == PlayMode::Held ||
+        state_.activeChord.play_mode == PlayMode::ArpHold) {
         return;
     }
     releaseBufferPending_ = true;
@@ -302,8 +317,9 @@ void ChordEngine::resolveAndTriggerIfChanged(uint64_t now_us, bool force) {
     }
 
     if (heldCells_.empty()) {
-        // All keys released. Held sustains; momentary modes release.
-        if (state_.activeChord.play_mode == PlayMode::Held) {
+        // All keys released. Held/ArpHold sustain; momentary modes release.
+        if (state_.activeChord.play_mode == PlayMode::Held ||
+            state_.activeChord.play_mode == PlayMode::ArpHold) {
             return;
         }
         releaseChord();
@@ -319,6 +335,7 @@ void ChordEngine::resolveAndTriggerIfChanged(uint64_t now_us, bool force) {
 
 void ChordEngine::triggerChord(const ResolvedChord& chord, uint64_t now_us) {
     state_.snapshotChord();
+    state_.lastChordUs = now_us;
     const ChordParams& p = state_.activeChord;
 
     std::vector<uint8_t> base, notes;
@@ -343,6 +360,7 @@ void ChordEngine::triggerChord(const ResolvedChord& chord, uint64_t now_us) {
             break;
 
         case PlayMode::Arpeggio:
+        case PlayMode::ArpHold:
             sounding_ = true;
             router_.cc(p.channel, midi::CC_PAN, p.pan);
             beginArp(now_us);
@@ -445,6 +463,14 @@ void ChordEngine::stepArpeggio(uint64_t now_us) {
         rngState_ = rngState_ * 1103515245u + 12345u;
         idx = rngState_ % voicing_.size();
     } else {
+        // The sequence should match the current mode, but a mode switch out of
+        // Random (or an extension edit while in Random) can leave arpSeq_ empty.
+        // Rebuild defensively so the modulo below can never divide by zero.
+        if (arpSeq_.empty()) {
+            arpSeq_ = arpSequence(p.arp_mode, voicing_.size());
+            arpPos_ = 0;
+            if (arpSeq_.empty()) { arpActive_ = false; return; }
+        }
         arpPos_ = (arpPos_ + 1) % arpSeq_.size();
         idx = static_cast<size_t>(arpSeq_[arpPos_]);
     }

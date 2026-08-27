@@ -139,6 +139,28 @@ TEST(ParamEdit, StepEnumCyclesBySign) {
     EXPECT_EQ(s.pendingStrum.mode, StrumMode::Scale);
 }
 
+TEST(ParamEdit, ChordModeCycleIncludesArpHold) {
+    StateManager s;
+
+    // Held -> Press -> Arp -> ArpHold -> Silent -> Held.
+    s.pendingChord.play_mode = PlayMode::Held;
+    paramStep(s, ParamId::ChordMode, +1);
+    EXPECT_EQ(s.pendingChord.play_mode, PlayMode::PressToPlay);
+    paramStep(s, ParamId::ChordMode, +1);
+    EXPECT_EQ(s.pendingChord.play_mode, PlayMode::Arpeggio);
+    paramStep(s, ParamId::ChordMode, +1);
+    EXPECT_EQ(s.pendingChord.play_mode, PlayMode::ArpHold);
+    paramStep(s, ParamId::ChordMode, +1);
+    EXPECT_EQ(s.pendingChord.play_mode, PlayMode::Silent);
+    paramStep(s, ParamId::ChordMode, +1);
+    EXPECT_EQ(s.pendingChord.play_mode, PlayMode::Held);
+
+    // And backwards from Silent.
+    s.pendingChord.play_mode = PlayMode::Silent;
+    paramStep(s, ParamId::ChordMode, -1);
+    EXPECT_EQ(s.pendingChord.play_mode, PlayMode::ArpHold);
+}
+
 TEST(ParamEdit, StepBoolSetBySign) {
     StateManager s;
     paramStep(s, ParamId::RhythmMute, +1);
@@ -198,6 +220,10 @@ TEST(ParamEdit, CycleToggles) {
     paramCycle(s, ParamId::ChordVoicing);
     EXPECT_EQ(s.pendingChord.voicing_mode, VoicingMode::Smart);
     paramCycle(s, ParamId::ChordVoicing);
+    EXPECT_EQ(s.pendingChord.voicing_mode, VoicingMode::Down);
+    paramCycle(s, ParamId::ChordVoicing);
+    EXPECT_EQ(s.pendingChord.voicing_mode, VoicingMode::Up);
+    paramCycle(s, ParamId::ChordVoicing);
     EXPECT_EQ(s.pendingChord.voicing_mode, VoicingMode::RootPosition);
 
     paramCycle(s, ParamId::StrumLayout);
@@ -244,4 +270,13 @@ TEST(ParamEdit, AutoRepeatableParams) {
     EXPECT_FALSE(isAutoRepeatable(ParamId::RhythmEnable));
     EXPECT_FALSE(isAutoRepeatable(ParamId::RhythmClock));
     EXPECT_FALSE(isAutoRepeatable(ParamId::RhythmLed));
+}
+
+TEST(ParamEdit, VoicingValueStrings) {
+    StateManager s;
+    EXPECT_EQ(paramValueString(s, ParamId::ChordVoicing), "Root");
+    s.pendingChord.voicing_mode = VoicingMode::Down;
+    EXPECT_EQ(paramValueString(s, ParamId::ChordVoicing), "Down");
+    s.pendingChord.voicing_mode = VoicingMode::Up;
+    EXPECT_EQ(paramValueString(s, ParamId::ChordVoicing), "Up");
 }

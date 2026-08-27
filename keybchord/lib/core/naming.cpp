@@ -10,6 +10,7 @@ const char* playModeShort(PlayMode mode) {
         case PlayMode::Held:        return "Held";
         case PlayMode::PressToPlay: return "Press";
         case PlayMode::Arpeggio:    return "Arp";
+        case PlayMode::ArpHold:     return "ArpHld";
         case PlayMode::Silent:      return "Silent";
         default:                    return "Held";
     }
@@ -19,6 +20,8 @@ const char* voicingModeName(VoicingMode mode) {
     switch (mode) {
         case VoicingMode::RootPosition: return "Root";
         case VoicingMode::Smart:        return "Smart";
+        case VoicingMode::Down:         return "Down";
+        case VoicingMode::Up:           return "Up";
         default:                        return "Root";
     }
 }

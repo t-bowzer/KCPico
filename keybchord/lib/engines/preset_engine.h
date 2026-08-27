@@ -32,6 +32,9 @@ public:
     // to distinguish Esc-as-cancel-sound from Esc-as-cancel-prompt).
     bool promptActive() const { return op_ != PendingOp::None; }
 
+    // True while the preset name-edit text entry is active.
+    bool nameEditing() const { return nameEditing_; }
+
     // Auto-cancel the prompt after display_prompt_ms and reset the cursor after
     // cursor_timeout_ms of idleness.
     void update(uint64_t now_us);
@@ -55,6 +58,9 @@ private:
     uint64_t    promptDeadlineUs_ = 0;
     std::string promptText_;
 
+    bool        nameEditing_ = false;
+    std::string nameBuffer_;
+
     uint64_t cursorDeadlineUs_ = 0;
 
     void enterCursor();
@@ -67,6 +73,13 @@ private:
     void beginPrompt(PendingOp op, uint64_t now_us);
     void confirmPrompt(uint64_t now_us);
     void cancelPrompt();
+
+    void beginNameEdit();
+    void commitName();
+    void cancelNameEdit();
+    bool handleNameEdit(const KeyEvent& ev);
+    std::string nameEditText() const;
+    void peekCursorName();
 
     std::string locationString(int bank, int slot) const;
 };

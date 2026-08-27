@@ -63,5 +63,23 @@ bool StorageFatFs::mkdir(const std::string& path) {
     return true;
 }
 
+std::vector<std::string> StorageFatFs::listFiles(const std::string& dir) {
+    std::vector<std::string> out;
+
+    fatfs::DIR dp;
+    if (fatfs::f_opendir(&dp, dir.c_str()) != fatfs::FR_OK) {
+        return out;
+    }
+
+    fatfs::FILINFO info;
+    while (fatfs::f_readdir(&dp, &info) == fatfs::FR_OK && info.fname[0] != '\0') {
+        if (info.fattrib & AM_DIR) continue;  // skip subdirectories
+        out.push_back(std::string(info.fname));
+    }
+    fatfs::f_closedir(&dp);
+
+    return out;
+}
+
 
 #endif // !KEYBCHORD_NATIVE

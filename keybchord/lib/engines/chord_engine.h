@@ -23,6 +23,16 @@ public:
     // latched chord is released when leaving Held with no key held.
     void onModeChanged();
 
+    // Called after the arp-mode parameter changes (via the EditEngine): rebuilds
+    // the active arpeggio step sequence so a mode switch (e.g. out of Random)
+    // never leaves a stale/empty sequence behind.
+    void onArpModeChanged();
+
+    // Clears the voice-leading memory (prevVoicing_) so the next triggered chord
+    // is voiced from root position at the configured octave. A currently-held or
+    // sounding chord is left untouched.
+    void resetVoicing();
+
     // True while a chord is currently sounding (Held/Press/Arp). Used by the
     // walking bass `Hold` pattern.
     bool isSounding() const { return sounding_; }

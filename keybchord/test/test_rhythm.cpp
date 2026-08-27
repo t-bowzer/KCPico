@@ -147,6 +147,23 @@ TEST(Rhythm, FileNameMapping) {
     EXPECT_STREQ(rhythmFileName(11), "foxtrot.json");
 }
 
+TEST(Rhythm, NameRegistryOverridesAndResets) {
+    std::vector<std::string> names;
+    for (int i = 0; i < RHYTHM_COUNT; i++) names.push_back(rhythmName(i));
+    names.push_back("My Groove");
+    installRhythmNames(names);
+
+    EXPECT_EQ(rhythmCount(), RHYTHM_COUNT + 1);
+    EXPECT_STREQ(rhythmName(RHYTHM_COUNT), "My Groove");
+    EXPECT_EQ(rhythmIndex("My Groove"), RHYTHM_COUNT);
+    EXPECT_EQ(rhythmIndex("Rock 1"), 0);
+
+    clearRhythmNames();
+    EXPECT_EQ(rhythmCount(), RHYTHM_COUNT);
+    EXPECT_EQ(rhythmIndex("My Groove"), -1);
+    EXPECT_STREQ(rhythmName(RHYTHM_COUNT), "Rock 1");  // clamp back to built-in
+}
+
 TEST(Rhythm, DrumMapRemapsStandardCodes) {
     DrumMap m;
     m.kick = 35;      // Bass Drum 2

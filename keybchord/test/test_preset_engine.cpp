@@ -292,8 +292,8 @@ TEST_F(PresetEngineTest, ClearResetsLiveParamsAndWritesDefaults) {
 TEST_F(PresetEngineTest, DirtyAppearsOnEditAndClearsOnSave) {
     EXPECT_FALSE(state_.dirty);
 
-    route(key(0x3B, true));   // F2 -> voicing Smart (differs from default)
-    EXPECT_EQ(state_.pendingChord.voicing_mode, VoicingMode::Smart);
+    route(key(0x3A, true));   // F1 -> chord mode PressToPlay (differs from default)
+    EXPECT_EQ(state_.pendingChord.play_mode, PlayMode::PressToPlay);
     EXPECT_TRUE(state_.dirty);
 
     route(key(INSERT, true));   // save
@@ -302,16 +302,16 @@ TEST_F(PresetEngineTest, DirtyAppearsOnEditAndClearsOnSave) {
 }
 
 TEST_F(PresetEngineTest, DirtyClearsOnLoad) {
-    route(key(0x3B, true));   // voicing Smart -> dirty
+    route(key(0x3A, true));   // chord mode -> dirty
     EXPECT_TRUE(state_.dirty);
 
     route(key(0x1E, true, SUPER));   // Super+1 -> reload slot 0 (default)
     EXPECT_FALSE(state_.dirty);
-    EXPECT_EQ(state_.pendingChord.voicing_mode, VoicingMode::RootPosition);
+    EXPECT_EQ(state_.pendingChord.play_mode, PlayMode::Held);
 }
 
 TEST_F(PresetEngineTest, DirtyUnaffectedByCursorMovement) {
-    route(key(0x3B, true));   // dirty
+    route(key(0x3A, true));   // dirty
     EXPECT_TRUE(state_.dirty);
 
     route(key(END, true));    // browse cursor
@@ -341,4 +341,58 @@ TEST_F(PresetEngineTest, StartupPresetFallsBackToB1P1) {
 
     EXPECT_EQ(state_.currentBank, 0);
     EXPECT_EQ(state_.currentSlot, 0);
+}
+
+TEST_F(PresetEngineTest, SaveThenNameEditCommitsName) {
+    route(key(INSERT, true));
+    route(key(ENTER, true));   // save -> enters name-edit
+    EXPECT_TRUE(engine_->nameEditing());
+
+    route(key(0x04, true));   // A -> 'a'
+    route(key(0x05, true));   // B -> 'b'
+    route(key(0x06, true));   // C -> 'c'
+    route(key(ENTER, true));  // commit
+
+    EXPECT_FALSE(engine_->nameEditing());
+    PresetSlot saved = loadPreset(storage_, 0, 0);
+    EXPECT_EQ(saved.name, "abc");
+}
+
+TEST_F(PresetEngineTest, SaveNameEditEscKeepsDefaultName) {
+    route(key(INSERT, true));
+    route(key(ENTER, true));   // save -> name-edit
+    route(key(0x04, true));    // type 'a'
+    route(key(ESC, true));     // cancel
+
+    EXPECT_FALSE(engine_->nameEditing());
+    PresetSlot saved = loadPreset(storage_, 0, 0);
+    EXPECT_EQ(saved.name, "Default");
+}
+
+TEST_F(PresetEngineTest, SaveNameEditBackspaceDeletes) {
+    route(key(INSERT, true));
+    route(key(ENTER, true));   // save -> name-edit
+    route(key(0x04, true));    // 'a'
+    route(key(0x05, true));    // 'b'
+    route(key(BACKSPACE, true));  // delete 'b'
+    route(key(ENTER, true));   // commit
+
+    PresetSlot saved = loadPreset(storage_, 0, 0);
+    EXPECT_EQ(saved.name, "a");
+}
+
+TEST_F(PresetEngineTest, SaveNameEditTypesNumbersShiftAndSymbols) {
+    route(key(INSERT, true));
+    route(key(ENTER, true));   // save -> name-edit
+
+    constexpr uint8_t SHIFT = 0x02;
+    route(key(0x04, true, SHIFT));   // A -> 'A'
+    route(key(0x1E, true));          // 1 -> '1'
+    route(key(0x2D, true, SHIFT));   // Shift+- -> '_'
+    route(key(0x2D, true));          // - -> '-'
+    route(key(0x2C, true));          // Space -> ' '
+    route(key(ENTER, true));         // commit
+
+    PresetSlot saved = loadPreset(storage_, 0, 0);
+    EXPECT_EQ(saved.name, "A1_- ");
 }

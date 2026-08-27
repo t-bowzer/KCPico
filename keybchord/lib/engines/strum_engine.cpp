@@ -7,7 +7,7 @@
 
 
 StrumEngine::StrumEngine(StateManager& state, MidiRouter& router)
-    : state_(state), router_(router) {}
+    : state_(state), router_(router), keymap_(&state.keymap) {}
 
 StrumLayout StrumEngine::activeLayout() const {
     return state_.pendingStrum.limited_keys ? StrumLayout::Limited
@@ -38,8 +38,8 @@ std::vector<uint8_t> StrumEngine::notePool(StrumLayout layout, size_t count) con
 void StrumEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
     KeyAction a = keymap_.resolve(ev.hid_usage, ev.modifiers);
 
-    switch (a.type) {
-        case ActionType::StrumKey:
+    switch (a.cmd) {
+        case KeyCmd::StrumKey:
             if (ev.pressed) playStrum(ev.hid_usage, now_us);
             else            releaseStrum(ev.hid_usage, now_us);
             break;

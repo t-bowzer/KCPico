@@ -28,7 +28,7 @@
 
 static Adapters        g_adapters;
 static StateManager    g_state;
-static KeymapResolver  g_keymap;
+static KeymapResolver  g_keymap(&g_state.keymap);
 static MidiRouter*     g_router = nullptr;
 static ChordEngine*    g_chordEngine = nullptr;
 static StrumEngine*    g_strumEngine = nullptr;
@@ -39,6 +39,7 @@ static DisplayManager* g_display = nullptr;
 static EditEngine*     g_editEngine = nullptr;
 static PresetEngine*   g_presetEngine = nullptr;
 static MscFatFs*       g_msc = nullptr;
+static bool            g_keymapError = false;  // set when keymap.json fails validation
 
 static inline uint64_t nowUs() {
 #if defined(ARDUINO_ARCH_RP2040)
@@ -166,6 +167,23 @@ void setup() {
     auto& storage = *g_adapters.storage;
     g_state.config = AppConfig::load(storage);
 
+    // Load the configurable keymap; on validation failure, write an error log,
+    // show a persistent LCD message, and refuse to process input (halt).
+    {
+        KeymapLoadResult kmr = KeymapConfig::load(storage);
+        g_state.keymap = kmr.config;
+        if (!kmr.ok) {
+            g_keymapError = true;
+            std::string log;
+            for (const auto& e : kmr.errors) {
+                log += e;
+                log += "\n";
+            }
+            storage.writeFile("/keymap_error.log", log);
+            logError("Invalid keymap.json (see /keymap_error.log)");
+        }
+    }
+
     // Apply the run-time logging toggles (NFR-8) from config before anything logs.
     g_debugLogEnabled = g_state.config.debug_log_enabled;
     g_midiMonitorEnabled = g_state.config.midi_monitor_enabled;
@@ -176,14 +194,21 @@ void setup() {
     g_bassEngine  = new BassEngine(g_state, *g_router);
     g_bassEngine->setChordEngine(g_chordEngine);
     g_rhythmEngine = new RhythmEngine(g_state, g_rhythmQueue);
-    g_rhythmEngine->setPatterns(loadRhythmPatterns(storage));
+    {
+        RhythmLibrary lib = loadRhythmPatterns(storage);
+        installRhythmNames(lib.names);
+        g_rhythmEngine->setPatterns(std::move(lib.patterns));
+    }
 
     g_display = new DisplayManager(g_state, *g_adapters.lcd);
     g_display->update(nowUs());
 
     g_editEngine = new EditEngine(g_state, *g_display);
     g_editEngine->setModeChangedCallback([]() { g_chordEngine->onModeChanged(); });
+    g_editEngine->setArpModeChangedCallback([]() { g_chordEngine->onArpModeChanged(); });
     g_editEngine->setPatternChangedCallback([]() { g_rhythmEngine->onPatternChanged(); });
+    g_editEngine->setPatternProvider(
+        [](int idx) -> const RhythmPattern* { return g_rhythmEngine->patternAt(idx); });
     g_editEngine->setDrumAuditionCallback([](uint8_t note) {
         uint8_t ch = g_state.pendingRhythm.channel;
         g_router->noteOn(ch, note, 100);
@@ -198,6 +223,11 @@ void setup() {
 
     g_presetEngine->loadStartupPreset();
     g_display->update(nowUs());
+
+    if (g_keymapError) {
+        g_display->showError("Keymap error", "Remount to fix");
+        g_display->update(nowUs());
+    }
 
     logInfo("KeybChord Pico ready");
 
@@ -232,6 +262,17 @@ void loop() {
 
     uint64_t now_us = nowUs();
 
+    // Halt when the keymap failed validation: keep the error screen up and do
+    // not process any input until the file is fixed and the device rebooted.
+    if (g_keymapError) {
+        if (g_display) g_display->update(now_us);
+        delay(10);
+#if defined(ARDUINO_ARCH_RP2040)
+        rp2040.wdt_reset();
+#endif
+        return;
+    }
+
     // NFR-5 hot-plug: detect a keyboard disconnect and release any stuck notes.
     // Prevents the beat-LED SET_REPORT retry from spinning while unmounted.
     bool inputConnected = g_adapters.input->connected();
@@ -252,27 +293,43 @@ void loop() {
         logKeyEvent(ev.hid_usage, ev.pressed, ev.modifiers);
 
         if (ev.pressed) {
-            ActionType t = g_keymap.resolve(ev.hid_usage, ev.modifiers).type;
+            KeyCmd t = g_keymap.resolve(ev.hid_usage, ev.modifiers).cmd;
             // Super+Esc: full panic, works from any state (prompt, cursor, menu).
-            if (t == ActionType::Panic) {
+            if (t == KeyCmd::Panic) {
                 handlePanic();
                 continue;
             }
             // Esc (no super) in the plain main menu cancels chord+strum sounds;
             // in an edit menu / cursor / prompt it keeps its existing meaning
             // (exit menu, exit cursor, cancel prompt) via the engines below.
-            if (t == ActionType::ClearEdit &&
+            if (t == KeyCmd::ClearEdit &&
                 g_state.editMenu == EditMenu::None &&
                 !g_state.cursorActive &&
-                !g_presetEngine->promptActive()) {
+                !g_presetEngine->promptActive() &&
+                !g_presetEngine->nameEditing()) {
                 cancelChordStrum();
                 logInfo("Esc: chord/strum cancelled");
+                continue;
+            }
+            // Backspace from the main screen resets the voice-leading memory so
+            // the next chord returns to its root-position voicing at the
+            // configured octave. A held/sounding chord is left untouched.
+            if (ev.hid_usage == 0x2A /* Backspace */ &&
+                g_state.editMenu == EditMenu::None &&
+                !g_state.cursorActive &&
+                !g_presetEngine->promptActive() &&
+                !g_presetEngine->nameEditing()) {
+                g_chordEngine->resetVoicing();
+                if (g_display) {
+                    g_display->showValue("Voicing Reset", "", false, now_us);
+                }
+                logInfo("Voicing reset");
                 continue;
             }
             // While the Mass Storage drive is presented the host owns the
             // filesystem: suppress preset save/clear to avoid FAT corruption.
             if (g_msc && g_msc->driveEnabled() &&
-                (t == ActionType::PresetSave || t == ActionType::PresetClear)) {
+                (t == KeyCmd::PresetSave || t == KeyCmd::PresetClear)) {
                 logWarn("Preset save/clear disabled while MSC drive is active");
                 if (g_display) {
                     g_display->showValue("USB drive active", "Save/Clear off",

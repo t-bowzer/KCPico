@@ -46,4 +46,8 @@ PresetSlot makePreset(const ChordParams& chord, const StrumParams& strum,
 // Returns false on malformed input or out-of-range values (1..10 / 1..8).
 bool parsePresetLocation(const std::string& loc, int& bank, int& slot);
 
+// Display name for a preset: its custom name, or "B<bank>:P<slot>" (1-based)
+// when the name is empty or still the default "Default".
+std::string presetDisplayName(const std::string& name, int bank, int slot);
+
 

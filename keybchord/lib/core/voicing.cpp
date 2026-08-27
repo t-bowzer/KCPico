@@ -151,6 +151,88 @@ std::vector<uint8_t> voiceSmart(const ResolvedChord& chord,
     return clamp127(bestNotes);
 }
 
+std::vector<uint8_t> voiceDirectional(const ResolvedChord& chord,
+                                      uint8_t base_root_midi,
+                                      int octave,
+                                      uint8_t low,
+                                      uint8_t high,
+                                      const std::vector<uint8_t>& previous,
+                                      int dir) {
+    std::vector<int> tones = chordPitchClasses(chord);
+    int n = static_cast<int>(tones.size());
+
+    if (previous.empty() || static_cast<int>(previous.size()) != n) {
+        return voiceRootPosition(chord, base_root_midi, octave, low, high);
+    }
+
+    // Anchor on the previous voicing's lowest note and walk a few octaves each
+    // way so the voicing can keep stepping in the requested direction.
+    long bestScore = -1;
+    std::vector<int> bestNotes;
+    bool found = false;
+
+    for (int octShift = -3; octShift <= 3; octShift++) {
+        int anchor = static_cast<int>(previous[0]) + 12 * octShift;
+        for (int r = 0; r < n; r++) {
+            std::vector<int> notes(n);
+            notes[0] = nearestPc(tones[r], anchor);
+            for (int j = 1; j < n; j++) {
+                int tone = tones[(r + j) % n];
+                int base = notes[0] + (((tone - tones[r]) % 12 + 12) % 12);
+                while (base <= notes[j - 1]) base += 12;
+                notes[j] = base;
+            }
+
+            bool ok = true;
+            bool strict = false;
+            for (int j = 0; j < n; j++) {
+                if (dir < 0) {
+                    if (notes[j] > static_cast<int>(previous[j])) ok = false;
+                    if (notes[j] < static_cast<int>(previous[j])) strict = true;
+                } else {
+                    if (notes[j] < static_cast<int>(previous[j])) ok = false;
+                    if (notes[j] > static_cast<int>(previous[j])) strict = true;
+                }
+            }
+            if (!ok || !strict) continue;
+
+            long score = 0;
+            for (int j = 0; j < n; j++) {
+                score += std::abs(notes[j] - static_cast<int>(previous[j]));
+            }
+            if (!found || score < bestScore) {
+                found = true;
+                bestScore = score;
+                bestNotes = notes;
+            }
+        }
+    }
+
+    if (found) return clamp127(bestNotes);
+
+    // No candidate in the requested direction (e.g. already at the range edge):
+    // fall back to the nearest overall voicing.
+    return voiceSmart(chord, base_root_midi, octave, low, high, previous);
+}
+
+std::vector<uint8_t> voiceDown(const ResolvedChord& chord,
+                               uint8_t base_root_midi,
+                               int octave,
+                               uint8_t low,
+                               uint8_t high,
+                               const std::vector<uint8_t>& previous) {
+    return voiceDirectional(chord, base_root_midi, octave, low, high, previous, -1);
+}
+
+std::vector<uint8_t> voiceUp(const ResolvedChord& chord,
+                             uint8_t base_root_midi,
+                             int octave,
+                             uint8_t low,
+                             uint8_t high,
+                             const std::vector<uint8_t>& previous) {
+    return voiceDirectional(chord, base_root_midi, octave, low, high, previous, +1);
+}
+
 std::vector<uint8_t> voiceChord(const ResolvedChord& chord,
                                 uint8_t base_root_midi,
                                 int octave,
@@ -192,9 +274,16 @@ std::vector<uint8_t> voiceChord(const ResolvedChord& chord,
         }
         notes = tightestSpread(pcs, bassPcIdx, bassNote, cfg.min_interval);
     } else {
-        std::vector<uint8_t> base = (cfg.voicing_mode == VoicingMode::Smart)
-            ? voiceSmart(chord, base_root_midi, octave, low, high, previous)
-            : voiceRootPosition(chord, base_root_midi, octave, low, high);
+        std::vector<uint8_t> base;
+        if (cfg.voicing_mode == VoicingMode::Smart) {
+            base = voiceSmart(chord, base_root_midi, octave, low, high, previous);
+        } else if (cfg.voicing_mode == VoicingMode::Down) {
+            base = voiceDown(chord, base_root_midi, octave, low, high, previous);
+        } else if (cfg.voicing_mode == VoicingMode::Up) {
+            base = voiceUp(chord, base_root_midi, octave, low, high, previous);
+        } else {
+            base = voiceRootPosition(chord, base_root_midi, octave, low, high);
+        }
 
         notes.reserve(base.size());
         for (uint8_t b : base) notes.push_back(static_cast<int>(b));

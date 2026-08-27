@@ -84,13 +84,14 @@ TEST_F(DisplayManagerTest, IdleShowsCursorLocationWhileBrowsing) {
     state_.cursorActive = true;
     state_.cursorBank   = 2;
     state_.cursorSlot   = 4;
+    state_.cursorPresetName = "Groove";
     state_.dirty        = true;   // hidden while browsing
 
     DisplayManager dm(state_, lcd_);
     dm.update(0);
 
     ASSERT_EQ(lcd_.frames().size(), 1u);
-    EXPECT_EQ(lcd_.frames()[0].l1, pad("--" + sp(7) + ">B3:P5"));
+    EXPECT_EQ(lcd_.frames()[0].l1, pad("Groove" + sp(3) + ">B3:P5"));
 }
 
 TEST_F(DisplayManagerTest, ShowMenuRendersTitleAndParam) {
@@ -170,7 +171,7 @@ TEST_F(DisplayManagerTest, ShowPromptAndAutoCancel) {
     lcd_.reset();
     dm.update(1000 + 5000UL * 1000);
     ASSERT_EQ(lcd_.frames().size(), 1u);
-    EXPECT_EQ(lcd_.frames()[0].l1, pad("--" + sp(8) + "B1:P1"));
+    EXPECT_EQ(lcd_.frames()[0].l1, pad("B1:P1" + sp(4) + " " + "B1:P1"));
 }
 
 TEST_F(DisplayManagerTest, NoRedundantWritesWhenIdleUnchanged) {
@@ -205,4 +206,29 @@ TEST_F(DisplayManagerTest, NullLcdDoesNotCrash) {
     EXPECT_NO_THROW(dm.showPrompt("Save?", 0));
     EXPECT_NO_THROW(dm.update(1));
     EXPECT_NO_THROW(dm.cancel());
+}
+
+TEST_F(DisplayManagerTest, IdleShowsPresetNameAfterThreeSeconds) {
+    state_.currentPresetName = "MySong";
+    DisplayManager dm(state_, lcd_);
+    dm.update(0);   // no chord yet -> chord placeholder
+    ASSERT_EQ(lcd_.frames().size(), 1u);
+    EXPECT_EQ(lcd_.frames()[0].l1, pad("--" + sp(8) + "B1:P1"));
+
+    lcd_.reset();
+    dm.update(3000000);   // 3 s idle -> preset name
+    ASSERT_EQ(lcd_.frames().size(), 1u);
+    EXPECT_EQ(lcd_.frames()[0].l1, pad("MySong" + sp(3) + " " + "B1:P1"));
+}
+
+TEST_F(DisplayManagerTest, RecentChordKeepsChordName) {
+    state_.currentPresetName = "MySong";
+    state_.selectedChord = {3, ChordType::Major};
+    state_.selectedChordValid = true;
+    state_.lastChordUs = 2000000;
+
+    DisplayManager dm(state_, lcd_);
+    dm.update(2500000);   // only 0.5 s since last chord -> chord name
+    ASSERT_EQ(lcd_.frames().size(), 1u);
+    EXPECT_EQ(lcd_.frames()[0].l1, pad("Eb" + sp(7) + " B1:P1"));
 }

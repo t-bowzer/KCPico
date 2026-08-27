@@ -181,3 +181,41 @@ TEST(Voicing, ThirdInversionOfSeventhUsesSeventh) {
               (std::vector<uint8_t>{70, 72, 76, 79}));  // Bb C E G
 }
 
+// Down: nearest voicing strictly below the previous (note-wise).
+TEST(Voicing, DownWalksBelow) {
+    ResolvedChord g{7, ChordType::Major};       // G major
+    std::vector<uint8_t> prev = {60, 64, 67};   // C major
+    auto v = voiceDown(g, 60, 0, 48, 84, prev);
+    EXPECT_EQ(v, (std::vector<uint8_t>{59, 62, 67}));  // B3 D4 G4
+}
+
+// Up: nearest voicing strictly above the previous (note-wise).
+TEST(Voicing, UpWalksAbove) {
+    ResolvedChord g{7, ChordType::Major};
+    std::vector<uint8_t> prev = {60, 64, 67};
+    auto v = voiceUp(g, 60, 0, 48, 84, prev);
+    EXPECT_EQ(v, (std::vector<uint8_t>{62, 67, 71}));  // D4 G4 B4
+}
+
+// With no previous voicing, both directions fall back to root position.
+TEST(Voicing, DirectionalFallsBackToRootWhenEmpty) {
+    ResolvedChord c{0, ChordType::Major};
+    EXPECT_EQ(voiceDown(c, 60, 0, 48, 84, {}), (std::vector<uint8_t>{60, 64, 67}));
+    EXPECT_EQ(voiceUp(c, 60, 0, 48, 84, {}), (std::vector<uint8_t>{60, 64, 67}));
+}
+
+// voiceChord dispatches to the directional modes.
+TEST(Voicing, VoiceChordDownUpModes) {
+    ResolvedChord g{7, ChordType::Major};
+    VoicingConfig cfg;
+    std::vector<uint8_t> prev = {60, 64, 67};
+
+    cfg.voicing_mode = VoicingMode::Down;
+    EXPECT_EQ(voiceChord(g, 60, 0, 48, 84, cfg, prev),
+              (std::vector<uint8_t>{59, 62, 67}));
+
+    cfg.voicing_mode = VoicingMode::Up;
+    EXPECT_EQ(voiceChord(g, 60, 0, 48, 84, cfg, prev),
+              (std::vector<uint8_t>{62, 67, 71}));
+}
+

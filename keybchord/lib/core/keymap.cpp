@@ -1,4 +1,6 @@
 #include "keymap.h"
+
+#include "keymap_config.h"
 #include "presets.h"
 
 
@@ -59,44 +61,21 @@ constexpr ChordKeyEntry kSeventhKeys[12] = {
 };
 
 constexpr uint8_t HID_USAGE_BACKTICK   = 0x35;
-constexpr uint8_t HID_USAGE_F1         = 0x3A;
-constexpr uint8_t HID_USAGE_F2         = 0x3B;
-constexpr uint8_t HID_USAGE_F3         = 0x3C;
-constexpr uint8_t HID_USAGE_F4         = 0x3D;
-constexpr uint8_t HID_USAGE_F5         = 0x3E;
-constexpr uint8_t HID_USAGE_F6         = 0x3F;
-constexpr uint8_t HID_USAGE_F7         = 0x40;
-constexpr uint8_t HID_USAGE_F8         = 0x41;
-constexpr uint8_t HID_USAGE_F9         = 0x42;
-constexpr uint8_t HID_USAGE_F10        = 0x43;
-constexpr uint8_t HID_USAGE_F11        = 0x44;
-constexpr uint8_t HID_USAGE_F12        = 0x45;
-constexpr uint8_t HID_USAGE_PRTSC      = 0x46;  // Print Screen
-constexpr uint8_t HID_USAGE_SCLK       = 0x47;  // Scroll Lock
-constexpr uint8_t HID_USAGE_PAUSE      = 0x48;  // Pause
 constexpr uint8_t HID_USAGE_ESC        = 0x29;
+constexpr uint8_t HID_USAGE_ENTER      = 0x28;
+constexpr uint8_t HID_USAGE_BACKSPACE  = 0x2A;
 constexpr uint8_t HID_USAGE_LEFT       = 0x50;
 constexpr uint8_t HID_USAGE_DOWN       = 0x51;
 constexpr uint8_t HID_USAGE_RIGHT      = 0x4F;
-constexpr uint8_t HID_USAGE_PAGE_UP    = 0x4B;
-constexpr uint8_t HID_USAGE_PAGE_DOWN  = 0x4E;
-constexpr uint8_t HID_USAGE_MINUS      = 0x2D;  // number-row -
-constexpr uint8_t HID_USAGE_EQUALS     = 0x2E;  // number-row =
-constexpr uint8_t HID_USAGE_KP_SLASH   = 0x54;
-constexpr uint8_t HID_USAGE_KP_STAR    = 0x55;
-constexpr uint8_t HID_USAGE_NUM_LOCK   = 0x53;
-constexpr uint8_t HID_USAGE_KP_MINUS   = 0x56;
-constexpr uint8_t HID_USAGE_KP_PLUS    = 0x57;
-constexpr uint8_t HID_USAGE_HOME       = 0x4A;
-constexpr uint8_t HID_USAGE_END        = 0x4D;
-constexpr uint8_t HID_USAGE_INSERT     = 0x49;
-constexpr uint8_t HID_USAGE_DELETE     = 0x4C;
-constexpr uint8_t HID_USAGE_SPACE      = 0x2C;
+constexpr uint8_t HID_USAGE_UP         = 0x52;
 
 constexpr uint8_t NUMBER_ROW_STRUM_LO  = 0x1E;  // 1
 constexpr uint8_t NUMBER_ROW_STRUM_HI  = 0x27;  // 0
 constexpr uint8_t KEYPAD_STRUM_LO      = 0x59;  // Keypad 1
 constexpr uint8_t KEYPAD_STRUM_HI      = 0x63;  // Keypad .
+constexpr uint8_t HID_USAGE_KP_SLASH   = 0x54;
+constexpr uint8_t HID_USAGE_KP_STAR    = 0x55;
+constexpr uint8_t HID_USAGE_NUM_LOCK   = 0x53;
 
 bool isNumberRowStrum(uint8_t usage) {
     return usage >= NUMBER_ROW_STRUM_LO && usage <= NUMBER_ROW_STRUM_HI;
@@ -125,6 +104,16 @@ bool lookupChordKey(uint8_t usage, GridCell& out) {
 } // namespace
 
 
+uint8_t keymapComboMask(uint8_t hid_modifiers) {
+    uint8_t out = 0;
+    if (hid_modifiers & 0x01) out |= KMOD_CTRL;   // LCtrl
+    if (hid_modifiers & 0x04) out |= KMOD_ALT;    // LAlt
+    if (hid_modifiers & 0x88) out |= KMOD_SUPER;  // LGui | RGui
+    return out;
+}
+
+KeymapResolver::KeymapResolver(const KeymapConfig* keymap) : keymap_(keymap) {}
+
 bool KeymapResolver::isChordKey(uint8_t hid_usage) {
     GridCell cell;
     return lookupChordKey(hid_usage, cell);
@@ -135,76 +124,110 @@ bool KeymapResolver::isSuper(uint8_t modifiers) {
     return (modifiers & SUPER) != 0;
 }
 
+bool keymapIsReserved(uint8_t hid_usage) {
+    if (KeymapResolver::isChordKey(hid_usage)) return true;
+    if (isNumberRowStrum(hid_usage) || isKeypadStrum(hid_usage)) return true;
+    switch (hid_usage) {
+        case HID_USAGE_BACKTICK:
+        case HID_USAGE_ESC:
+        case HID_USAGE_ENTER:
+        case HID_USAGE_BACKSPACE:
+        case HID_USAGE_LEFT:
+        case HID_USAGE_DOWN:
+        case HID_USAGE_RIGHT:
+        case HID_USAGE_UP:
+            return true;
+        default:
+            return false;
+    }
+}
+
+char keymapCharForUsage(uint8_t hid_usage, uint8_t modifiers) {
+    constexpr uint8_t SHIFT_MASK = 0x22;  // LShift 0x02 | RShift 0x20
+    bool shift = (modifiers & SHIFT_MASK) != 0;
+
+    switch (hid_usage) {
+        // Letters a..z (0x04..0x1D) -> lowercase / uppercase with Shift.
+        case 0x04 ... 0x1D:
+            return static_cast<char>((shift ? 'A' : 'a') + (hid_usage - 0x04));
+        // Number row 1..9,0 (0x1E..0x27) -> digits / ! @ # $ % ^ & * ( ).
+        case 0x1E ... 0x27: {
+            static const char kNumShift[10] = {
+                '!', '@', '#', '$', '%', '^', '&', '*', '(', ')',
+            };
+            int idx = hid_usage - 0x1E;  // 0..9
+            char digit = (idx == 9) ? '0' : static_cast<char>('1' + idx);
+            return shift ? kNumShift[idx] : digit;
+        }
+        case 0x2B: return ' ';          // Tab -> space
+        case 0x2C: return ' ';          // Spacebar -> space
+        case 0x2D: return shift ? '_' : '-';   // -/_
+        case 0x2E: return shift ? '+' : '=';   // =/+
+        case 0x2F: return shift ? '{' : '[';   // [/{
+        case 0x30: return shift ? '}' : ']';   // ]/}
+        case 0x31: return shift ? '|' : '\\';  // \/|
+        case 0x33: return shift ? ':' : ';';   // ;/:
+        case 0x34: return shift ? '"' : '\'';  // '/"
+        case 0x35: return shift ? '~' : '`';   // `/~
+        case 0x36: return shift ? '<' : ',';   // ,/<
+        case 0x37: return shift ? '>' : '.';   // ./>
+        case 0x38: return shift ? '?' : '/';   // /?
+        default:   return '\0';
+    }
+}
+
 KeyAction KeymapResolver::resolve(uint8_t hid_usage, uint8_t modifiers) const {
     KeyAction a;
+    uint8_t combo = keymapComboMask(modifiers);
+    bool super = (combo & KMOD_SUPER) != 0;
 
-    // Super is the global preset/panic modifier (spec 5.7/5.8). While Super is
-    // held only preset bindings resolve; everything else is inert.
-    if (isSuper(modifiers)) {
-        switch (hid_usage) {
-            case HID_USAGE_HOME:   a.type = ActionType::PresetBankPrev; return a;
-            case HID_USAGE_END:    a.type = ActionType::PresetBankNext; return a;
-            case HID_USAGE_ESC:    a.type = ActionType::Panic;          return a;
-            default:
-                if (isNumberRowStrum(hid_usage)) {
-                    int idx = static_cast<int>(hid_usage - NUMBER_ROW_STRUM_LO); // 0..9
-                    if (idx < NUM_SLOTS) {
-                        a.type  = ActionType::PresetLoad;
-                        a.index = static_cast<uint8_t>(idx);
-                        return a;
-                    }
-                }
-                return a;  // None
+    // Hardcoded safety combos on reserved keys (always win).
+    if (super && hid_usage == HID_USAGE_ESC) {
+        a.cmd = KeyCmd::Panic;
+        return a;
+    }
+    if (super && isNumberRowStrum(hid_usage)) {
+        int idx = static_cast<int>(hid_usage - NUMBER_ROW_STRUM_LO);  // 0..9
+        if (idx < NUM_SLOTS) {
+            a.cmd  = KeyCmd::PresetLoad;
+            a.slot = static_cast<uint8_t>(idx);
+            return a;
         }
+        return a;  // Super+9/0 -> None
     }
 
+    // Reserved play keys: chord grid, backtick, strum keys, held-extension
+    // arrows, and Esc. These must resolve to their action even while Ctrl/Alt
+    // is held, otherwise a chord/strum key released mid-combo would be dropped
+    // and leave the chord engine latched. Super is the preset/panic modifier
+    // where play keys stay inert (and the Super+Esc/Num combos above win).
     GridCell cell;
     if (lookupChordKey(hid_usage, cell)) {
-        a.type = ActionType::ChordKey;
+        if (super) return a;                 // Super+chord -> None
+        a.cmd  = KeyCmd::ChordKey;
         a.cell = cell;
         return a;
     }
-
-    switch (hid_usage) {
-        case HID_USAGE_BACKTICK: a.type = ActionType::Backtick;         break;
-        case HID_USAGE_F1:       a.type = ActionType::PlayModeCycle;    break;
-        case HID_USAGE_F2:       a.type = ActionType::VoicingToggle;    break;
-        case HID_USAGE_F3:       a.type = ActionType::BassToggle;       break;
-        case HID_USAGE_F4:       a.type = ActionType::RhythmLedToggle;  break;
-        case HID_USAGE_F5:       a.type = ActionType::RhythmToggle;     break;
-        case HID_USAGE_F6:       a.type = ActionType::RhythmClockToggle; break;
-        case HID_USAGE_F7:       a.type = ActionType::RhythmPatternCycle; break;
-        case HID_USAGE_F8:       a.type = ActionType::RhythmMute;       break;
-        case HID_USAGE_F9:       a.type = ActionType::MenuChord;        break;
-        case HID_USAGE_F10:      a.type = ActionType::MenuStrum;        break;
-        case HID_USAGE_F11:      a.type = ActionType::MenuRhythm;       break;
-        case HID_USAGE_F12:      a.type = ActionType::MenuBass;         break;
-        case HID_USAGE_LEFT:     a.type = ActionType::Ext9;             break;
-        case HID_USAGE_DOWN:     a.type = ActionType::Ext11;            break;
-        case HID_USAGE_RIGHT:    a.type = ActionType::Ext13;            break;
-        case HID_USAGE_PRTSC:    a.type = ActionType::Inversion1;       break;
-        case HID_USAGE_SCLK:     a.type = ActionType::Inversion2;       break;
-        case HID_USAGE_PAUSE:    a.type = ActionType::Inversion3;       break;
-        case HID_USAGE_ESC:      a.type = ActionType::ClearEdit;        break;
-        case HID_USAGE_PAGE_UP:   a.type = ActionType::TempoUp;         break;
-        case HID_USAGE_PAGE_DOWN: a.type = ActionType::TempoDown;       break;
-        case HID_USAGE_EQUALS:   a.type = ActionType::ChordOctaveUp;    break;
-        case HID_USAGE_MINUS:    a.type = ActionType::ChordOctaveDown;  break;
-        case HID_USAGE_KP_PLUS:  a.type = ActionType::StrumOctaveUp;    break;
-        case HID_USAGE_KP_MINUS: a.type = ActionType::StrumOctaveDown;  break;
-        case HID_USAGE_HOME:     a.type = ActionType::PresetPrev;       break;
-        case HID_USAGE_END:      a.type = ActionType::PresetNext;       break;
-        case HID_USAGE_INSERT:   a.type = ActionType::PresetSave;       break;
-        case HID_USAGE_DELETE:   a.type = ActionType::PresetClear;      break;
-        case HID_USAGE_SPACE:    a.type = ActionType::TapTempo;         break;
-        default:
-            if (isNumberRowStrum(hid_usage) || isKeypadStrum(hid_usage)) {
-                a.type = ActionType::StrumKey;
-            } else {
-                a.type = ActionType::None;
-            }
-            break;
+    if (hid_usage == HID_USAGE_BACKTICK) {
+        if (super) return a;
+        a.cmd = KeyCmd::Backtick;
+        return a;
+    }
+    if (hid_usage == HID_USAGE_LEFT)  { if (!super) a.cmd = KeyCmd::Ext9;  return a; }
+    if (hid_usage == HID_USAGE_DOWN)  { if (!super) a.cmd = KeyCmd::Ext11; return a; }
+    if (hid_usage == HID_USAGE_RIGHT) { if (!super) a.cmd = KeyCmd::Ext13; return a; }
+    if (hid_usage == HID_USAGE_ESC)   { if (!super) a.cmd = KeyCmd::ClearEdit; return a; }
+    if (isNumberRowStrum(hid_usage) || isKeypadStrum(hid_usage)) {
+        if (super) return a;
+        a.cmd = KeyCmd::StrumKey;
+        return a;
     }
 
-    return a;
+    // Configurable: lookup the (combo, usage) in the keymap table.
+    if (keymap_) {
+        const KeyAction* found = keymap_->find(combo, hid_usage);
+        if (found) return *found;
+    }
+
+    return a;  // None
 }

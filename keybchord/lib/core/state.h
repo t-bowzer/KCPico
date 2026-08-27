@@ -7,6 +7,7 @@
 #include "presets.h"
 #include "config.h"
 #include "chords.h"
+#include "keymap_config.h"
 
 
 struct ActiveNote {
@@ -79,6 +80,15 @@ public:
     int  cursorSlot   = 0;
 
     AppConfig config;
+    KeymapConfig keymap;
+
+    // Preset display state: the active slot's name and the cursor slot's name
+    // (peeked while browsing), plus the timestamp of the last chord trigger
+    // (used to switch the LCD's top-left from chord name back to preset name
+    // after 3s of idleness).
+    std::string currentPresetName;
+    std::string cursorPresetName;
+    uint64_t    lastChordUs = 0;
 
     StateManager();
 

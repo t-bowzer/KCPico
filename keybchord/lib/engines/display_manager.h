@@ -32,11 +32,19 @@ public:
     // Prompt (FR-D3), auto-cancelling after display_prompt_ms (FR-P10).
     void showPrompt(const std::string& text, uint64_t now_us);
 
+    // Persistent name-edit screen (preset naming). Shows "Rename" + the current
+    // buffer (with a trailing cursor); cleared by cancel().
+    void showNameEdit(const std::string& text);
+
+    // Persistent error screen: stays until cancel() (used for boot-time config
+    // errors, e.g. an invalid keymap.json).
+    void showError(const std::string& line1, const std::string& line2);
+
     // Return to idle (exiting a menu or cancelling a transient).
     void cancel();
 
 private:
-    enum class Screen : uint8_t { Idle, Menu, Edit, Prompt };
+    enum class Screen : uint8_t { Idle, Menu, Edit, Prompt, NameEdit, Error };
 
     StateManager& state_;
     LcdAdapter&   lcd_;
@@ -50,11 +58,14 @@ private:
     std::string editFullName_;
     std::string editValue_;
     std::string promptText_;
+    std::string nameEditText_;
+    std::string errorLine1_;
+    std::string errorLine2_;
 
     std::string lastLine1_;
     std::string lastLine2_;
 
-    void renderIdle(std::string& l1, std::string& l2) const;
-    void render(std::string& l1, std::string& l2) const;
+    void renderIdle(std::string& l1, std::string& l2, uint64_t now_us) const;
+    void render(std::string& l1, std::string& l2, uint64_t now_us) const;
     void emit(const std::string& l1, const std::string& l2);
 };

@@ -26,6 +26,10 @@ public:
     void setPatterns(std::vector<RhythmPattern> patterns);
     void setPattern(const RhythmPattern& p, int index);
 
+    // The pattern at `index` (null if out of range). Used by the edit engine to
+    // resolve the Alt+F1..F12 drum-mute track list.
+    const RhythmPattern* patternAt(int index) const;
+
     // Called after the pattern parameter changes (via the EditEngine): adopts
     // the new pattern's authored swing default.
     void onPatternChanged();
@@ -66,6 +70,9 @@ private:
     void fireStep(uint64_t now_us);
 };
 
-// Loads all shipped rhythm patterns from storage (best-effort); on total
-// failure, falls back to a built-in pattern so the rhythm still plays.
-std::vector<RhythmPattern> loadRhythmPatterns(StorageAdapter& storage);
+// Loads the full rhythm set from storage: the 12 built-in patterns first (in
+// fixed order, self-healing missing/corrupt files from the embedded templates),
+// then any additional user-provided /rhythms/*.json files (sorted by filename,
+// appended at indices RHYTHM_COUNT..). Falls back to a single built-in pattern
+// on total failure. `names` matches `patterns` in order.
+RhythmLibrary loadRhythmPatterns(StorageAdapter& storage);

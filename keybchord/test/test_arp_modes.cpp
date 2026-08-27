@@ -80,3 +80,47 @@ TEST_F(ChordEngineTest, ArpModeRandomPlaysChordNote) {
         EXPECT_TRUE(n == 60 || n == 64 || n == 67);  // always a chord note
     }
 }
+
+// Arp-hold latches the arpeggio on key release: it keeps stepping until the
+// next chord is pressed or all-sound-off (Esc) fires.
+TEST_F(ChordEngineTest, ArpHoldKeepsArpingAfterRelease) {
+    state_.pendingChord.play_mode = PlayMode::ArpHold;
+    state_.pendingRhythm.enabled  = true;
+    state_.rhythmClock.running    = true;
+    engine_->handleKeyEvent({0x17, true, 0}, 0);   // T = C major
+    EXPECT_EQ(soundingNote(state_, 1), 60);
+
+    engine_->handleKeyEvent({0x17, false, 0}, 0);  // release: latches (no stop)
+    EXPECT_EQ(midi_.noteOffCount(), 0);
+
+    state_.rhythmClock.stepAbs = 1; engine_->update(0);
+    EXPECT_EQ(soundingNote(state_, 1), 64);
+    state_.rhythmClock.stepAbs = 2; engine_->update(0);
+    EXPECT_EQ(soundingNote(state_, 1), 67);
+}
+
+TEST_F(ChordEngineTest, ArpHoldReplacedByNextChord) {
+    state_.pendingChord.play_mode = PlayMode::ArpHold;
+    state_.pendingRhythm.enabled  = true;
+    state_.rhythmClock.running    = true;
+    engine_->handleKeyEvent({0x17, true, 0}, 0);   // C major arp-hold
+    engine_->handleKeyEvent({0x17, false, 0}, 0);  // release, latched
+    EXPECT_EQ(soundingNote(state_, 1), 60);
+
+    engine_->handleKeyEvent({0x1C, true, 0}, 0);   // Y = G major replaces C
+    EXPECT_FALSE(state_.isNoteActive(1, 60));
+    EXPECT_TRUE(state_.isNoteActive(1, 67));       // G major root
+}
+
+TEST_F(ChordEngineTest, ArpHoldStopsOnAllNotesOff) {
+    state_.pendingChord.play_mode = PlayMode::ArpHold;
+    state_.pendingRhythm.enabled  = true;
+    state_.rhythmClock.running    = true;
+    engine_->handleKeyEvent({0x17, true, 0}, 0);   // C major arp-hold
+    engine_->handleKeyEvent({0x17, false, 0}, 0);  // release, latched
+    EXPECT_TRUE(state_.isNoteActive(1, 60));
+
+    engine_->allNotesOff();                        // Esc path
+    EXPECT_FALSE(state_.isNoteActive(1, 60));
+    EXPECT_FALSE(engine_->isSounding());
+}

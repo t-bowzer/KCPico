@@ -25,6 +25,26 @@ std::vector<uint8_t> voiceSmart(const ResolvedChord& chord,
                                 uint8_t high,
                                 const std::vector<uint8_t>& previous);
 
+// Directional voice-leading: the nearest voicing of `chord` in a fixed
+// direction relative to `previous`.
+//   Down: every note <= the corresponding previous note, >=1 strictly lower.
+//   Up:   every note >= the corresponding previous note, >=1 strictly higher.
+// Falls back to `voiceSmart` when no candidate qualifies, and to root position
+// when `previous` is empty.
+std::vector<uint8_t> voiceDown(const ResolvedChord& chord,
+                               uint8_t base_root_midi,
+                               int octave,
+                               uint8_t low,
+                               uint8_t high,
+                               const std::vector<uint8_t>& previous);
+
+std::vector<uint8_t> voiceUp(const ResolvedChord& chord,
+                             uint8_t base_root_midi,
+                             int octave,
+                             uint8_t low,
+                             uint8_t high,
+                             const std::vector<uint8_t>& previous);
+
 // Clamped root MIDI note used by the voicing pipeline (the C1..C7 window, spec
 // VR-3). Extension tensions are appended above this root.
 int voicingRoot(int rootPc, uint8_t base_root_midi, int octave);

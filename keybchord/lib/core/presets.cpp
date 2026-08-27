@@ -74,7 +74,6 @@ PresetSlot makePreset(const ChordParams& chord, const StrumParams& strum,
 }
 
 bool parsePresetLocation(const std::string& loc, int& bank, int& slot) {
-    // Expected form "B<bank>:P<slot>" (1-based, case-insensitive).
     size_t b = loc.find_first_of("bB");
     size_t colon = loc.find(':');
     size_t p = loc.find_first_of("pP");
@@ -99,6 +98,11 @@ bool parsePresetLocation(const std::string& loc, int& bank, int& slot) {
     return true;
 }
 
+std::string presetDisplayName(const std::string& name, int bank, int slot) {
+    if (!name.empty() && name != "Default") return name;
+    return "B" + std::to_string(bank + 1) + ":P" + std::to_string(slot + 1);
+}
+
 static std::string bankPath(int bank) {
     char buf[32];
     snprintf(buf, sizeof(buf), "/presets/bank%d.json", bank + 1);
@@ -106,6 +110,16 @@ static std::string bankPath(int bank) {
 }
 
 namespace {
+
+const char* playModeName(PlayMode m) {
+    switch (m) {
+        case PlayMode::PressToPlay: return "press_to_play";
+        case PlayMode::Arpeggio:    return "arpeggio";
+        case PlayMode::ArpHold:     return "arp_hold";
+        case PlayMode::Silent:      return "silent";
+        default:                    return "held";
+    }
+}
 
 int legacyPlayModeRemap(int pm) {
     // M10: the old `Rhythm` play mode (enum value 3) was removed; the walking
@@ -133,6 +147,22 @@ const char* inversionName(InversionMode m) {
         case InversionMode::Second: return "second";
         case InversionMode::Third:  return "third";
         default:                    return "root";
+    }
+}
+
+VoicingMode parseVoicingMode(const std::string& s) {
+    if (s == "smart") return VoicingMode::Smart;
+    if (s == "down")  return VoicingMode::Down;
+    if (s == "up")    return VoicingMode::Up;
+    return VoicingMode::RootPosition;
+}
+
+const char* voicingModeKey(VoicingMode m) {
+    switch (m) {
+        case VoicingMode::Smart: return "smart";
+        case VoicingMode::Down:  return "down";
+        case VoicingMode::Up:    return "up";
+        default:                 return "root_position";
     }
 }
 
@@ -261,8 +291,7 @@ PresetSlot loadPreset(StorageAdapter& storage, int bank, int slot) {
         if (c.containsKey("pan") && c["pan"].is<int>())
             p.chord.pan = static_cast<uint8_t>(clamp<int>(c["pan"].as<int>(), 0, 127));
         if (c.containsKey("voicing_mode") && c["voicing_mode"].is<const char*>()) {
-            std::string vm = c["voicing_mode"].as<std::string>();
-            if (vm == "smart") p.chord.voicing_mode = VoicingMode::Smart;
+            p.chord.voicing_mode = parseVoicingMode(c["voicing_mode"].as<std::string>());
         }
         if (c.containsKey("chord_roll_ms") && c["chord_roll_ms"].is<int>())
             p.chord.chord_roll_ms = static_cast<int16_t>(clamp<int>(c["chord_roll_ms"].as<int>(), -2000, 2000));
@@ -281,6 +310,7 @@ PresetSlot loadPreset(StorageAdapter& storage, int bank, int slot) {
                 std::string pm = c["play_mode"].as<std::string>();
                 if (pm == "press_to_play")      p.chord.play_mode = PlayMode::PressToPlay;
                 else if (pm == "arpeggio")      p.chord.play_mode = PlayMode::Arpeggio;
+                else if (pm == "arp_hold")      p.chord.play_mode = PlayMode::ArpHold;
                 else if (pm == "rhythm")        p.chord.play_mode = PlayMode::Arpeggio;  // legacy
                 else if (pm == "silent")        p.chord.play_mode = PlayMode::Silent;
                 else                             p.chord.play_mode = PlayMode::Held;
@@ -437,13 +467,13 @@ bool savePreset(StorageAdapter& storage, int bank, int slot, const PresetSlot& p
     chord["note_duration_ms"] = preset.chord.note_duration_ms;
     chord["velocity"]         = preset.chord.velocity;
     chord["pan"]              = preset.chord.pan;
-    chord["voicing_mode"]     = (preset.chord.voicing_mode == VoicingMode::Smart) ? "smart" : "root_position";
+    chord["voicing_mode"]     = voicingModeKey(preset.chord.voicing_mode);
     chord["chord_roll_ms"]    = preset.chord.chord_roll_ms;
     chord["min_notes"]        = preset.chord.min_notes;
     chord["min_interval"]     = preset.chord.min_interval;
     chord["inversion"]        = inversionName(preset.chord.inversion);
     chord["arp_mode"]         = arpModeName(preset.chord.arp_mode);
-    chord["play_mode"]        = static_cast<int>(preset.chord.play_mode);
+    chord["play_mode"]        = playModeName(preset.chord.play_mode);
 
     auto strum = obj["strum"].to<JsonObject>();
     strum["channel"]          = preset.strum.channel;

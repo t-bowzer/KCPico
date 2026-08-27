@@ -2,11 +2,13 @@
 
 #include "chords.h"
 #include "naming.h"
+#include "presets.h"
 
 
 namespace {
 
 constexpr int kCols = 16;
+constexpr uint64_t PRESET_NAME_IDLE_US = 3000000ULL;  // 3 s after last chord
 
 std::string padTrunc(const std::string& s, int width) {
     if (static_cast<int>(s.size()) >= width) return s.substr(0, width);
@@ -29,7 +31,7 @@ void DisplayManager::update(uint64_t now_us) {
     }
 
     std::string l1, l2;
-    render(l1, l2);
+    render(l1, l2, now_us);
     emit(l1, l2);
 }
 
@@ -61,41 +63,59 @@ void DisplayManager::showPrompt(const std::string& text, uint64_t now_us) {
     revertDeadlineUs_ = now_us + static_cast<uint64_t>(state_.config.display_prompt_ms) * 1000ULL;
 }
 
+void DisplayManager::showNameEdit(const std::string& text) {
+    screen_       = Screen::NameEdit;
+    revertToMenu_ = false;
+    nameEditText_ = text;
+}
+
+void DisplayManager::showError(const std::string& line1, const std::string& line2) {
+    screen_      = Screen::Error;
+    revertToMenu_ = false;
+    errorLine1_  = line1;
+    errorLine2_  = line2;
+}
+
 void DisplayManager::cancel() {
     screen_       = Screen::Idle;
     revertToMenu_ = false;
 }
 
-void DisplayManager::renderIdle(std::string& l1, std::string& l2) const {
-    std::string chord = state_.selectedChordValid
-        ? chordName(state_.selectedChord) : "--";
-    chord = padTrunc(chord, 9);
-
-    // While browsing (cursor mode) show the transient cursor location with a
-    // '>' marker; the dirty '*' references the active (last-loaded) preset, so
-    // it is hidden while browsing.
+void DisplayManager::renderIdle(std::string& l1, std::string& l2, uint64_t now_us) const {
     int  bank, slot;
     std::string marker;
+
+    // Top-left slot (9 chars): the preset name while browsing the cursor, or in
+    // the main view once no chord has been played for 3 s; otherwise the chord.
+    std::string top;
     if (state_.cursorActive) {
         bank   = state_.cursorBank;
         slot   = state_.cursorSlot;
         marker = ">";
+        top    = presetDisplayName(state_.cursorPresetName, bank, slot);
     } else {
         bank   = state_.currentBank;
         slot   = state_.currentSlot;
         marker = state_.dirty ? "*" : " ";
+        bool idle = (now_us - state_.lastChordUs) >= PRESET_NAME_IDLE_US;
+        if (idle) {
+            top = presetDisplayName(state_.currentPresetName, bank, slot);
+        } else {
+            top = state_.selectedChordValid ? chordName(state_.selectedChord) : "--";
+        }
     }
+    top = padTrunc(top, 9);
 
     std::string loc = "B" + std::to_string(bank + 1) +
                       ":P" + std::to_string(slot + 1);
-    l1 = chord + marker + loc;
+    l1 = top + marker + loc;
 
     l2 = "q=" + std::to_string(state_.pendingRhythm.tempo) +
          " " + rhythmShortCode(state_.pendingRhythm.pattern) +
          " >" + playModeShort(state_.pendingChord.play_mode);
 }
 
-void DisplayManager::render(std::string& l1, std::string& l2) const {
+void DisplayManager::render(std::string& l1, std::string& l2, uint64_t now_us) const {
     switch (screen_) {
         case Screen::Menu:
             l1 = padTrunc(menuTitle_, kCols);
@@ -109,9 +129,17 @@ void DisplayManager::render(std::string& l1, std::string& l2) const {
             l1 = padTrunc(promptText_, kCols);
             l2 = "Enter=Yes Bk=No";
             break;
+        case Screen::NameEdit:
+            l1 = padTrunc("Rename", kCols);
+            l2 = padTrunc(nameEditText_ + "_", kCols);
+            break;
+        case Screen::Error:
+            l1 = padTrunc(errorLine1_, kCols);
+            l2 = padTrunc(errorLine2_, kCols);
+            break;
         case Screen::Idle:
         default:
-            renderIdle(l1, l2);
+            renderIdle(l1, l2, now_us);
             break;
     }
 }

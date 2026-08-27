@@ -7,6 +7,7 @@ enum class PlayMode : uint8_t {
     Held = 0,
     PressToPlay,
     Arpeggio,
+    ArpHold,   // arpeggio that latches on release (until next chord / Esc)
     Silent,
     COUNT
 };
@@ -14,6 +15,8 @@ enum class PlayMode : uint8_t {
 enum class VoicingMode : uint8_t {
     RootPosition = 0,
     Smart,
+    Down,   // nearest voicing below the previous (note-wise <=, ≥1 strictly lower)
+    Up,     // nearest voicing above the previous (note-wise >=, ≥1 strictly higher)
     COUNT
 };
 
@@ -71,6 +74,75 @@ enum class EditMenu : uint8_t {
     Rhythm,
     Bass,
     Drum,
+    COUNT
+};
+
+// Central registry of editable parameters (spec section 9). The edit engine and
+// display manager use this single source of truth so new parameters can be added
+// without reworking key mappings — just add a ParamId and a menu-table entry.
+enum class ParamId : uint8_t {
+    // Chord
+    ChordOctave = 0,
+    ChordMode,
+    ChordVoicing,
+    ChordDuration,
+    ChordVelocity,
+    ChordPan,
+    ChordRoll,
+    ChordMinNotes,
+    ChordMinInterval,
+    ChordInversion,
+    ChordArpMode,
+    // Strum
+    StrumOctave,
+    StrumDuration,
+    StrumVelocity,
+    StrumLayout,
+    StrumMode,
+    StrumRoot,
+    StrumScale,
+    // Rhythm
+    RhythmTempo,
+    RhythmSwing,
+    RhythmPattern,
+    RhythmMute,
+    RhythmEnable,
+    RhythmClock,
+    RhythmLed,
+    // Bass
+    BassEnable,
+    BassOctave,
+    BassDuration,
+    BassVelocity,
+    BassChannel,
+    BassPattern,
+    // Drum (per-piece note code + velocity)
+    DrumKickNote,
+    DrumKickVel,
+    DrumSnareNote,
+    DrumSnareVel,
+    DrumHihatNote,
+    DrumHihatVel,
+    DrumOpenHatNote,
+    DrumOpenHatVel,
+    DrumRimshotNote,
+    DrumRimshotVel,
+    DrumClapNote,
+    DrumClapVel,
+    DrumCrashNote,
+    DrumCrashVel,
+    DrumRideNote,
+    DrumRideVel,
+    DrumBongoNote,
+    DrumBongoVel,
+    DrumCongaLoNote,
+    DrumCongaLoVel,
+    DrumCongaHiNote,
+    DrumCongaHiVel,
+    DrumClaveNote,
+    DrumClaveVel,
+    DrumShakerNote,
+    DrumShakerVel,
     COUNT
 };
 

@@ -1,5 +1,8 @@
 #include "rhythm_engine.h"
 
+#include <algorithm>
+
+#include "defaults.h"
 #include "midimsg.h"
 #include "params.h"
 
@@ -48,6 +51,11 @@ const RhythmPattern* RhythmEngine::currentPattern() const {
     int idx = state_.pendingRhythm.pattern;
     if (idx < 0 || idx >= static_cast<int>(patterns_.size())) return nullptr;
     return &patterns_[idx];
+}
+
+const RhythmPattern* RhythmEngine::patternAt(int index) const {
+    if (index < 0 || index >= static_cast<int>(patterns_.size())) return nullptr;
+    return &patterns_[index];
 }
 
 void RhythmEngine::onPatternChanged() {
@@ -182,22 +190,55 @@ void RhythmEngine::jitterStats(PerfStats& out, bool reset) {
     if (reset) jitter_.reset();
 }
 
-std::vector<RhythmPattern> loadRhythmPatterns(StorageAdapter& storage) {
-    std::vector<RhythmPattern> patterns;
-    patterns.reserve(RHYTHM_COUNT);
+RhythmLibrary loadRhythmPatterns(StorageAdapter& storage) {
+    RhythmLibrary lib;
+    lib.patterns.reserve(RHYTHM_COUNT + 4);
+    lib.names.reserve(RHYTHM_COUNT + 4);
 
+    // 1. Built-in patterns, in fixed order (indices 0..RHYTHM_COUNT-1). A
+    // missing or unparseable file is re-provisioned from the embedded template
+    // so indices stay stable and presets that store a built-in index keep
+    // pointing at the right pattern.
     for (int i = 0; i < RHYTHM_COUNT; i++) {
         std::string path = "/rhythms/" + std::string(rhythmFileName(i));
-        if (!storage.exists(path)) continue;
-        std::string raw = storage.readFile(path);
+        std::string raw;
+        if (storage.exists(path)) raw = storage.readFile(path);
+
         RhythmPattern p;
-        if (parseRhythmPattern(raw, p)) {
-            patterns.push_back(p);
+        if (!parseRhythmPattern(raw, p)) {
+            const char* tmpl = defaultRhythmJson(i);
+            raw = tmpl ? tmpl : "";
+            storage.writeFile(path, raw);
+            parseRhythmPattern(raw, p);
         }
+        lib.patterns.push_back(p);
+        lib.names.push_back(p.name.empty() ? rhythmName(i) : p.name);
     }
 
-    if (patterns.empty()) {
-        patterns.push_back(builtinRock1());
+    // 2. User-provided rhythms: any other *.json in /rhythms/, sorted by
+    // filename so the order is deterministic. Appended at indices
+    // RHYTHM_COUNT.. up to MAX_RHYTHMS total.
+    auto files = storage.listFiles("/rhythms");
+    std::sort(files.begin(), files.end());
+    for (const auto& f : files) {
+        if (static_cast<int>(lib.patterns.size()) >= MAX_RHYTHMS) break;
+        if (f.size() < 5 || f.compare(f.size() - 5, 5, ".json") != 0) continue;
+        bool builtin = false;
+        for (int i = 0; i < RHYTHM_COUNT; i++) {
+            if (f == rhythmFileName(i)) { builtin = true; break; }
+        }
+        if (builtin) continue;
+
+        std::string raw = storage.readFile("/rhythms/" + f);
+        RhythmPattern p;
+        if (!parseRhythmPattern(raw, p) || p.tracks.empty()) continue;
+        lib.patterns.push_back(p);
+        lib.names.push_back(p.name.empty() ? f.substr(0, f.size() - 5) : p.name);
     }
-    return patterns;
+
+    if (lib.patterns.empty()) {
+        lib.patterns.push_back(builtinRock1());
+        lib.names.push_back("Rock 1");
+    }
+    return lib;
 }

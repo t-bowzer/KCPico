@@ -300,3 +300,41 @@ TEST(Presets, LegacyPlayModeRhythmRemappedToArpeggio) {
     p = loadPreset(storage, 0, 0);
     EXPECT_EQ(p.chord.play_mode, PlayMode::Silent);
 }
+
+TEST(Presets, PlayModeRoundTripsAsString) {
+    StorageStub storage;
+
+    for (auto mode : {PlayMode::Held, PlayMode::PressToPlay, PlayMode::Arpeggio,
+                      PlayMode::ArpHold, PlayMode::Silent}) {
+        PresetSlot orig = PresetSlot::defaults();
+        orig.chord.play_mode = mode;
+        EXPECT_TRUE(savePreset(storage, 0, 0, orig));
+        EXPECT_EQ(loadPreset(storage, 0, 0).chord.play_mode, mode);
+    }
+}
+
+TEST(Presets, ArpHoldStringParses) {
+    StorageStub storage;
+    storage.writeFile("/presets/bank1.json",
+        "[{\"chord\":{\"play_mode\":\"arp_hold\"}}]");
+    EXPECT_EQ(loadPreset(storage, 0, 0).chord.play_mode, PlayMode::ArpHold);
+}
+
+TEST(Presets, VoicingModeDownUpRoundTrip) {
+    StorageStub storage;
+
+    PresetSlot orig = PresetSlot::defaults();
+    orig.chord.voicing_mode = VoicingMode::Down;
+    EXPECT_TRUE(savePreset(storage, 0, 0, orig));
+    EXPECT_EQ(loadPreset(storage, 0, 0).chord.voicing_mode, VoicingMode::Down);
+
+    orig.chord.voicing_mode = VoicingMode::Up;
+    EXPECT_TRUE(savePreset(storage, 0, 0, orig));
+    EXPECT_EQ(loadPreset(storage, 0, 0).chord.voicing_mode, VoicingMode::Up);
+}
+
+TEST(Presets, PresetDisplayNameFallsBackToLocation) {
+    EXPECT_EQ(presetDisplayName("", 2, 4), "B3:P5");
+    EXPECT_EQ(presetDisplayName("Default", 0, 0), "B1:P1");
+    EXPECT_EQ(presetDisplayName("Groove", 2, 4), "Groove");
+}

@@ -289,8 +289,9 @@ void paramStep(StateManager& state, ParamId id, int delta) {
                           static_cast<int>(PlayMode::COUNT), dir));
             break;
         case ParamId::ChordVoicing:
-            state.pendingChord.voicing_mode =
-                (delta > 0) ? VoicingMode::Smart : VoicingMode::RootPosition;
+            state.pendingChord.voicing_mode = static_cast<VoicingMode>(
+                cycleEnum(static_cast<int>(state.pendingChord.voicing_mode),
+                          static_cast<int>(VoicingMode::COUNT), dir));
             break;
         case ParamId::ChordDuration:
             state.pendingChord.note_duration_ms = static_cast<int16_t>(clampInt(
@@ -373,7 +374,7 @@ void paramStep(StateManager& state, ParamId id, int delta) {
             break;
         case ParamId::RhythmPattern:
             state.pendingRhythm.pattern = static_cast<uint8_t>(cycleEnum(
-                state.pendingRhythm.pattern, param_bounds::RHYTHM_PATTERN_MAX + 1, dir));
+                state.pendingRhythm.pattern, rhythmCount(), dir));
             break;
         case ParamId::RhythmMute:   state.pendingRhythm.muted   = delta > 0; break;
         case ParamId::RhythmEnable: state.pendingRhythm.enabled = delta > 0; break;
@@ -522,9 +523,9 @@ void paramCycle(StateManager& state, ParamId id) {
                           static_cast<int>(PlayMode::COUNT), 1));
             break;
         case ParamId::ChordVoicing:
-            state.pendingChord.voicing_mode =
-                (state.pendingChord.voicing_mode == VoicingMode::RootPosition)
-                    ? VoicingMode::Smart : VoicingMode::RootPosition;
+            state.pendingChord.voicing_mode = static_cast<VoicingMode>(
+                cycleEnum(static_cast<int>(state.pendingChord.voicing_mode),
+                          static_cast<int>(VoicingMode::COUNT), 1));
             break;
         case ParamId::ChordInversion:
             state.pendingChord.inversion = static_cast<InversionMode>(
@@ -549,7 +550,7 @@ void paramCycle(StateManager& state, ParamId id) {
             break;
         case ParamId::RhythmPattern:
             state.pendingRhythm.pattern = static_cast<uint8_t>(cycleEnum(
-                state.pendingRhythm.pattern, param_bounds::RHYTHM_PATTERN_MAX + 1, 1));
+                state.pendingRhythm.pattern, rhythmCount(), 1));
             break;
         case ParamId::RhythmMute:   state.pendingRhythm.muted   = !state.pendingRhythm.muted;   break;
         case ParamId::RhythmEnable: state.pendingRhythm.enabled = !state.pendingRhythm.enabled; break;
@@ -605,4 +606,167 @@ bool isAutoRepeatable(ParamId id) {
         default:
             return false;
     }
+}
+
+namespace {
+
+// Current value of a non-drum parameter as an int (enum index, bool 0/1, int).
+int paramIntValue(const StateManager& s, ParamId id) {
+    switch (id) {
+        case ParamId::ChordOctave:      return s.pendingChord.octave;
+        case ParamId::ChordMode:        return static_cast<int>(s.pendingChord.play_mode);
+        case ParamId::ChordVoicing:     return static_cast<int>(s.pendingChord.voicing_mode);
+        case ParamId::ChordDuration:    return s.pendingChord.note_duration_ms;
+        case ParamId::ChordVelocity:    return s.pendingChord.velocity;
+        case ParamId::ChordPan:         return s.pendingChord.pan;
+        case ParamId::ChordRoll:        return s.pendingChord.chord_roll_ms;
+        case ParamId::ChordMinNotes:    return s.pendingChord.min_notes;
+        case ParamId::ChordMinInterval: return s.pendingChord.min_interval;
+        case ParamId::ChordInversion:   return static_cast<int>(s.pendingChord.inversion);
+        case ParamId::ChordArpMode:     return static_cast<int>(s.pendingChord.arp_mode);
+        case ParamId::StrumOctave:      return s.pendingStrum.octave;
+        case ParamId::StrumDuration:    return s.pendingStrum.note_duration_ms;
+        case ParamId::StrumVelocity:    return s.pendingStrum.velocity;
+        case ParamId::StrumLayout:      return s.pendingStrum.limited_keys ? 1 : 0;
+        case ParamId::StrumMode:        return static_cast<int>(s.pendingStrum.mode);
+        case ParamId::StrumRoot:        return s.pendingStrum.root_pc;
+        case ParamId::StrumScale:       return static_cast<int>(s.pendingStrum.scale_type);
+        case ParamId::RhythmTempo:      return s.pendingRhythm.tempo;
+        case ParamId::RhythmSwing:      return s.pendingRhythm.swing;
+        case ParamId::RhythmPattern:    return s.pendingRhythm.pattern;
+        case ParamId::RhythmMute:       return s.pendingRhythm.muted ? 1 : 0;
+        case ParamId::RhythmEnable:     return s.pendingRhythm.enabled ? 1 : 0;
+        case ParamId::RhythmClock:      return s.config.midi_clock_enabled ? 1 : 0;
+        case ParamId::RhythmLed:        return s.config.bpm_indicator ? 1 : 0;
+        case ParamId::BassEnable:       return s.pendingBass.enabled ? 1 : 0;
+        case ParamId::BassOctave:       return s.pendingBass.octave;
+        case ParamId::BassDuration:     return s.pendingBass.note_duration_ms;
+        case ParamId::BassVelocity:     return s.pendingBass.velocity;
+        case ParamId::BassChannel:      return s.pendingBass.channel;
+        case ParamId::BassPattern:      return static_cast<int>(s.pendingBass.pattern);
+        default:                        return 0;
+    }
+}
+
+} // namespace
+
+void paramSet(StateManager& state, ParamId id, int value) {
+    switch (id) {
+        case ParamId::ChordOctave:
+            state.pendingChord.octave = static_cast<int8_t>(clamp<int>(
+                value, param_bounds::CHORD_OCTAVE_MIN, param_bounds::CHORD_OCTAVE_MAX));
+            break;
+        case ParamId::ChordMode:
+            state.pendingChord.play_mode = static_cast<PlayMode>(clamp<int>(
+                value, 0, static_cast<int>(PlayMode::COUNT) - 1));
+            break;
+        case ParamId::ChordVoicing:
+            state.pendingChord.voicing_mode = static_cast<VoicingMode>(clamp<int>(
+                value, 0, static_cast<int>(VoicingMode::COUNT) - 1));
+            break;
+        case ParamId::ChordDuration:
+            state.pendingChord.note_duration_ms = static_cast<int16_t>(clamp<int>(
+                value, param_bounds::CHORD_NOTE_DURATION_MIN, param_bounds::CHORD_NOTE_DURATION_MAX));
+            break;
+        case ParamId::ChordVelocity:
+            state.pendingChord.velocity = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::CHORD_VELOCITY_MIN, param_bounds::CHORD_VELOCITY_MAX));
+            break;
+        case ParamId::ChordPan:
+            state.pendingChord.pan = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::CHORD_PAN_MIN, param_bounds::CHORD_PAN_MAX));
+            break;
+        case ParamId::ChordRoll:
+            state.pendingChord.chord_roll_ms = static_cast<int16_t>(clamp<int>(
+                value, param_bounds::CHORD_ROLL_MIN, param_bounds::CHORD_ROLL_MAX));
+            break;
+        case ParamId::ChordMinNotes:
+            state.pendingChord.min_notes = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::CHORD_MIN_NOTES_MIN, param_bounds::CHORD_MIN_NOTES_MAX));
+            break;
+        case ParamId::ChordMinInterval:
+            state.pendingChord.min_interval = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::CHORD_MIN_INTERVAL_MIN, param_bounds::CHORD_MIN_INTERVAL_MAX));
+            break;
+        case ParamId::ChordInversion:
+            state.pendingChord.inversion = static_cast<InversionMode>(clamp<int>(
+                value, 0, static_cast<int>(InversionMode::COUNT) - 1));
+            break;
+        case ParamId::ChordArpMode:
+            state.pendingChord.arp_mode = static_cast<ArpMode>(clamp<int>(
+                value, 0, static_cast<int>(ArpMode::COUNT) - 1));
+            break;
+
+        case ParamId::StrumOctave:
+            state.pendingStrum.octave = static_cast<int8_t>(clamp<int>(
+                value, param_bounds::STRUM_OCTAVE_MIN, param_bounds::STRUM_OCTAVE_MAX));
+            break;
+        case ParamId::StrumDuration:
+            state.pendingStrum.note_duration_ms = static_cast<int16_t>(clamp<int>(
+                value, param_bounds::STRUM_NOTE_DURATION_MIN, param_bounds::STRUM_NOTE_DURATION_MAX));
+            break;
+        case ParamId::StrumVelocity:
+            state.pendingStrum.velocity = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::STRUM_VELOCITY_MIN, param_bounds::STRUM_VELOCITY_MAX));
+            break;
+        case ParamId::StrumLayout: state.pendingStrum.limited_keys = value != 0; break;
+        case ParamId::StrumMode:
+            state.pendingStrum.mode = static_cast<StrumMode>(clamp<int>(
+                value, 0, static_cast<int>(StrumMode::COUNT) - 1));
+            break;
+        case ParamId::StrumRoot:
+            state.pendingStrum.root_pc = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::STRUM_ROOT_MIN, param_bounds::STRUM_ROOT_MAX));
+            break;
+        case ParamId::StrumScale:
+            state.pendingStrum.scale_type = static_cast<ScaleType>(clamp<int>(
+                value, 0, static_cast<int>(ScaleType::COUNT) - 1));
+            break;
+
+        case ParamId::RhythmTempo:
+            state.pendingRhythm.tempo = static_cast<uint16_t>(clamp<int>(
+                value, param_bounds::TEMPO_MIN, param_bounds::TEMPO_MAX));
+            break;
+        case ParamId::RhythmSwing:
+            state.pendingRhythm.swing = static_cast<int8_t>(clamp<int>(
+                value, param_bounds::SWING_MIN, param_bounds::SWING_MAX));
+            break;
+        case ParamId::RhythmPattern:
+            state.pendingRhythm.pattern = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::RHYTHM_PATTERN_MIN, rhythmCount() - 1));
+            break;
+        case ParamId::RhythmMute:   state.pendingRhythm.muted   = value != 0; break;
+        case ParamId::RhythmEnable: state.pendingRhythm.enabled = value != 0; break;
+        case ParamId::RhythmClock:  state.config.midi_clock_enabled = value != 0; break;
+        case ParamId::RhythmLed:    state.config.bpm_indicator       = value != 0; break;
+
+        case ParamId::BassEnable:   state.pendingBass.enabled = value != 0; break;
+        case ParamId::BassOctave:
+            state.pendingBass.octave = static_cast<int8_t>(clamp<int>(
+                value, param_bounds::BASS_OCTAVE_MIN, param_bounds::BASS_OCTAVE_MAX));
+            break;
+        case ParamId::BassDuration:
+            state.pendingBass.note_duration_ms = static_cast<int16_t>(clamp<int>(
+                value, param_bounds::BASS_NOTE_DURATION_MIN, param_bounds::BASS_NOTE_DURATION_MAX));
+            break;
+        case ParamId::BassVelocity:
+            state.pendingBass.velocity = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::BASS_VELOCITY_MIN, param_bounds::BASS_VELOCITY_MAX));
+            break;
+        case ParamId::BassChannel:
+            state.pendingBass.channel = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::BASS_CHANNEL_MIN, param_bounds::BASS_CHANNEL_MAX));
+            break;
+        case ParamId::BassPattern:
+            state.pendingBass.pattern = static_cast<BassPattern>(clamp<int>(
+                value, 0, static_cast<int>(BassPattern::COUNT) - 1));
+            break;
+
+        default: break;
+    }
+}
+
+void paramToggle(StateManager& state, ParamId id, int valueA, int valueB) {
+    int cur = paramIntValue(state, id);
+    paramSet(state, id, (cur == valueA) ? valueB : valueA);
 }

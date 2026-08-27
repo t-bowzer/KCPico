@@ -1,8 +1,9 @@
 # KeybChord (Pico Edition) — Wiring Diagram
 
-Visual companion to the canonical pin map. The pin/power tables in **Spec §2.2** and
-**Roadmap §5.2** remain **authoritative** for exact pins and component values; this
-diagram is a rendered connection view of those tables.
+Visual companion to the canonical pin map. The pin/power tables in
+**Spec §2.2** ([KeybChord_Pico_Spec.md](KeybChord_Pico_Spec.md)) remain
+**authoritative** for exact pins and component values; this diagram is a rendered
+connection view of those tables.
 
 This is a **logical connection diagram** (which wire goes where), not a physical
 breadboard layout. All resistors are **1/4 W (0.25 W)**.
@@ -109,7 +110,7 @@ flowchart LR
   keep a backlit LCD within budget or power its backlight separately.
 
 For reference designs and precedent (rppicomidi, Adafruit MIDI FeatherWing, PJRC/Teensy,
-MIDI.org 2014 update, Pico-PIO-USB, Pico datasheet power section), see **Roadmap §5.5**.
+MIDI.org 2014 update, Pico-PIO-USB, Pico datasheet power section), see the spec.
 
 ## Regenerating the PNG
 

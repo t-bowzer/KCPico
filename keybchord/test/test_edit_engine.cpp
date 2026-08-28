@@ -120,9 +120,9 @@ TEST_F(EditEngineTest, F2CyclesArpMode) {
 }
 
 TEST_F(EditEngineTest, F3CyclesBassPattern) {
-    EXPECT_EQ(state_.pendingBass.pattern, BassPattern::Walking);
+    EXPECT_EQ(state_.pendingBass.pattern, 0);   // Walking
     edit_->handleKeyEvent(key(0x3C, true), 0);   // F3
-    EXPECT_EQ(state_.pendingBass.pattern, BassPattern::Whole);
+    EXPECT_EQ(state_.pendingBass.pattern, 1);   // Whole
 }
 
 TEST_F(EditEngineTest, F4CyclesRhythmPattern) {

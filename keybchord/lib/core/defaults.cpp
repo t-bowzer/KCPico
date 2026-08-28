@@ -1,6 +1,7 @@
 #include "defaults.h"
 
 #include "base.h"
+#include "bass.h"
 #include "config.h"
 #include "keymap_config.h"
 #include "presets.h"
@@ -166,12 +167,87 @@ const char* const kRhythmJson[RHYTHM_COUNT] = {
 })",
 };
 
+// Shipped bass patterns (spec 6.8/6.9), embedded in code (pretty-printed) so the
+// filesystem can be self-provisioned on first boot. `steps` are chord-degree
+// codes (-1 = rest, 0 = root, 1 = 3rd, 2 = 5th, 3 = 6th/7th) on the 16th-note
+// grid; `sustain_steps` (optional) gives a note's length in steps.
+const char* const kBassJson[BASS_COUNT] = {
+    // Walking: root-3rd-5th-6th/7th on beats 1-4.
+    R"({
+  "name": "Walking",
+  "steps_per_bar": 16,
+  "steps": [0,-1,-1,-1, 1,-1,-1,-1, 2,-1,-1,-1, 3,-1,-1,-1]
+})",
+
+    // Whole: root, whole note.
+    R"({
+  "name": "Whole",
+  "steps_per_bar": 16,
+  "steps": [0,-1,-1,-1, -1,-1,-1,-1, -1,-1,-1,-1, -1,-1,-1,-1],
+  "sustain_steps": [16,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0]
+})",
+
+    // Half: root, half notes.
+    R"({
+  "name": "Half",
+  "steps_per_bar": 16,
+  "steps": [0,-1,-1,-1, -1,-1,-1,-1, 0,-1,-1,-1, -1,-1,-1,-1],
+  "sustain_steps": [8,0,0,0, 0,0,0,0, 8,0,0,0, 0,0,0,0]
+})",
+
+    // Quarter: root, quarter notes.
+    R"({
+  "name": "Quarter",
+  "steps_per_bar": 16,
+  "steps": [0,-1,-1,-1, 0,-1,-1,-1, 0,-1,-1,-1, 0,-1,-1,-1]
+})",
+
+    // Half Alt: root/5th alternating half notes.
+    R"({
+  "name": "Half Alt",
+  "steps_per_bar": 16,
+  "steps": [0,-1,-1,-1, -1,-1,-1,-1, 2,-1,-1,-1, -1,-1,-1,-1],
+  "sustain_steps": [8,0,0,0, 0,0,0,0, 8,0,0,0, 0,0,0,0]
+})",
+
+    // Quarter Alt: root/5th alternating quarter notes.
+    R"({
+  "name": "Quarter Alt",
+  "steps_per_bar": 16,
+  "steps": [0,-1,-1,-1, 2,-1,-1,-1, 0,-1,-1,-1, 2,-1,-1,-1]
+})",
+
+    // 3/4 Alt: root on beat 1, 5th on the last beat of the bar.
+    R"({
+  "name": "3/4 Alt",
+  "steps_per_bar": 16,
+  "steps": [0,-1,-1,-1, -1,-1,-1,-1, -1,-1,-1,-1, 2,-1,-1,-1]
+})",
+
+    // Hold: root sustains while the chord is sounding (not beat-driven).
+    R"({
+  "name": "Hold",
+  "steps_per_bar": 16,
+  "hold": true,
+  "steps": [0]
+})",
+
+    // No 6th: root (half) -> 3rd (quarter) -> 5th (quarter) -> repeat.
+    R"({
+  "name": "No 6th",
+  "steps_per_bar": 16,
+  "steps": [0,-1,-1,-1, -1,-1,-1,-1, 1,-1,-1,-1, 2,-1,-1,-1],
+  "sustain_steps": [8,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0]
+})",
+};
+
 } // namespace
 
 
 void provisionDefaults(StorageAdapter& storage) {
     storage.mkdir("/presets");
     storage.mkdir("/rhythms");
+    storage.mkdir("/bass");
     // Global config (defaults).
     AppConfig::defaults().save(storage);
 
@@ -190,9 +266,20 @@ void provisionDefaults(StorageAdapter& storage) {
         storage.writeFile("/rhythms/" + std::string(rhythmFileName(i)),
                           kRhythmJson[i]);
     }
+
+    // 9 named bass patterns.
+    for (int i = 0; i < BASS_COUNT; i++) {
+        storage.writeFile("/bass/" + std::string(bassFileName(i)),
+                          kBassJson[i]);
+    }
 }
 
 const char* defaultRhythmJson(int index) {
     if (index < 0 || index >= RHYTHM_COUNT) return nullptr;
     return kRhythmJson[index];
+}
+
+const char* defaultBassJson(int index) {
+    if (index < 0 || index >= BASS_COUNT) return nullptr;
+    return kBassJson[index];
 }

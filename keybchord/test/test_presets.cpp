@@ -2,6 +2,7 @@
 #include "presets.h"
 #include "storage_stub.h"
 #include "params.h"
+#include "bass.h"
 
 
 TEST(Presets, DefaultPreset) {
@@ -194,7 +195,7 @@ TEST(Presets, BassBlockRoundTrip) {
     orig.bass.note_duration_ms = 200;
     orig.bass.velocity = 110;
     orig.bass.channel = 5;
-    orig.bass.pattern = BassPattern::QuarterAlt;
+    orig.bass.pattern = bassIndex("Quarter Alt");
     EXPECT_TRUE(savePreset(storage, 3, 0, orig));
 
     PresetSlot loaded = loadPreset(storage, 3, 0);
@@ -203,7 +204,7 @@ TEST(Presets, BassBlockRoundTrip) {
     EXPECT_EQ(loaded.bass.note_duration_ms, 200);
     EXPECT_EQ(loaded.bass.velocity, 110);
     EXPECT_EQ(loaded.bass.channel, 5);
-    EXPECT_EQ(loaded.bass.pattern, BassPattern::QuarterAlt);
+    EXPECT_EQ(loaded.bass.pattern, bassIndex("Quarter Alt"));
 }
 
 TEST(Presets, BassPatternNameFallback) {
@@ -211,15 +212,15 @@ TEST(Presets, BassPatternNameFallback) {
     storage.writeFile("/presets/bank1.json",
         "[{\"bass\":{\"pattern\":\"not_a_pattern\"}}]");
     PresetSlot p = loadPreset(storage, 0, 0);
-    EXPECT_EQ(p.bass.pattern, BassPattern::Walking);
+    EXPECT_EQ(p.bass.pattern, 0);  // falls back to Walking (index 0)
 }
 
-TEST(Presets, WalkNoSixthPatternRoundTrip) {
+TEST(Presets, NoSixthPatternRoundTrip) {
     StorageStub storage;
     storage.writeFile("/presets/bank1.json",
-        "[{\"bass\":{\"pattern\":\"walk_no_6th\"}}]");
+        "[{\"bass\":{\"pattern\":\"No 6th\"}}]");
     PresetSlot p = loadPreset(storage, 0, 0);
-    EXPECT_EQ(p.bass.pattern, BassPattern::WalkNoSixth);
+    EXPECT_EQ(p.bass.pattern, bassIndex("No 6th"));
 }
 
 TEST(Presets, ExtendedDrumMapRoundTrip) {

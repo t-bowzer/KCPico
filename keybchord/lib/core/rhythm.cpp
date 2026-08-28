@@ -22,6 +22,10 @@ constexpr const char* kRhythmFiles[RHYTHM_COUNT] = {
 // table". Installed by installRhythmNames() after loading patterns.
 std::vector<std::string> g_names;
 
+// Runtime per-pattern short-code list (parallel to g_names). Empty means "no
+// authored short codes". Installed by installRhythmShortNames().
+std::vector<std::string> g_short_names;
+
 } // namespace
 
 
@@ -33,6 +37,9 @@ bool parseRhythmPattern(const std::string& json, RhythmPattern& out) {
     RhythmPattern p;
     if (doc.containsKey("name") && doc["name"].is<const char*>()) {
         p.name = doc["name"].as<std::string>();
+    }
+    if (doc.containsKey("short_name") && doc["short_name"].is<const char*>()) {
+        p.short_name = doc["short_name"].as<std::string>();
     }
     if (doc.containsKey("steps_per_bar") && doc["steps_per_bar"].is<int>()) {
         p.steps_per_bar = doc["steps_per_bar"].as<int>();
@@ -175,6 +182,19 @@ void installRhythmNames(std::vector<std::string> names) {
 
 void clearRhythmNames() {
     g_names.clear();
+}
+
+const char* rhythmShortName(int index) {
+    if (index < 0 || index >= static_cast<int>(g_short_names.size())) return "";
+    return g_short_names[index].c_str();
+}
+
+void installRhythmShortNames(std::vector<std::string> names) {
+    g_short_names = std::move(names);
+}
+
+void clearRhythmShortNames() {
+    g_short_names.clear();
 }
 
 const char* rhythmFileName(int index) {

@@ -10,6 +10,7 @@
 #include "chord_engine.h"
 #include "strum_engine.h"
 #include "bass_engine.h"
+#include "bass.h"
 #include "rhythm_engine.h"
 #include "edit_engine.h"
 #include "display_manager.h"
@@ -167,6 +168,14 @@ void setup() {
     auto& storage = *g_adapters.storage;
     g_state.config = AppConfig::load(storage);
 
+    // Load rhythm + bass patterns first so their names are available to keymap
+    // validation (set/toggle actions may reference a pattern by name).
+    RhythmLibrary rlib = loadRhythmPatterns(storage);
+    installRhythmNames(rlib.names);
+    installRhythmShortNames(rlib.short_names);
+    BassLibrary blib = loadBassPatterns(storage);
+    installBassNames(blib.names);
+
     // Load the configurable keymap; on validation failure, write an error log,
     // show a persistent LCD message, and refuse to process input (halt).
     {
@@ -193,12 +202,9 @@ void setup() {
     g_strumEngine = new StrumEngine(g_state, *g_router);
     g_bassEngine  = new BassEngine(g_state, *g_router);
     g_bassEngine->setChordEngine(g_chordEngine);
+    g_bassEngine->setPatterns(std::move(blib.patterns));
     g_rhythmEngine = new RhythmEngine(g_state, g_rhythmQueue);
-    {
-        RhythmLibrary lib = loadRhythmPatterns(storage);
-        installRhythmNames(lib.names);
-        g_rhythmEngine->setPatterns(std::move(lib.patterns));
-    }
+    g_rhythmEngine->setPatterns(std::move(rlib.patterns));
 
     g_display = new DisplayManager(g_state, *g_adapters.lcd);
     g_display->update(nowUs());

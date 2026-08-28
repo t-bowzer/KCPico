@@ -213,6 +213,7 @@ RhythmLibrary loadRhythmPatterns(StorageAdapter& storage) {
         }
         lib.patterns.push_back(p);
         lib.names.push_back(p.name.empty() ? rhythmName(i) : p.name);
+        lib.short_names.push_back(p.short_name);
     }
 
     // 2. User-provided rhythms: any other *.json in /rhythms/, sorted by
@@ -234,11 +235,13 @@ RhythmLibrary loadRhythmPatterns(StorageAdapter& storage) {
         if (!parseRhythmPattern(raw, p) || p.tracks.empty()) continue;
         lib.patterns.push_back(p);
         lib.names.push_back(p.name.empty() ? f.substr(0, f.size() - 5) : p.name);
+        lib.short_names.push_back(p.short_name);
     }
 
     if (lib.patterns.empty()) {
         lib.patterns.push_back(builtinRock1());
         lib.names.push_back("Rock 1");
+        lib.short_names.push_back("");
     }
     return lib;
 }

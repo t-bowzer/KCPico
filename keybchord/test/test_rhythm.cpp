@@ -60,6 +60,18 @@ TEST(Rhythm, ParseRejectsMalformed) {
     EXPECT_FALSE(parseRhythmPattern("[1,2,3]", p));  // not an object
 }
 
+TEST(Rhythm, ParseShortName) {
+    const char* json = R"({
+      "name": "Custom",
+      "short_name": "Cst",
+      "steps_per_bar": 4,
+      "tracks": [ { "note": 36, "name": "kick", "pattern": [1,0,0,0] } ]
+    })";
+    RhythmPattern p;
+    ASSERT_TRUE(parseRhythmPattern(json, p));
+    EXPECT_EQ(p.short_name, "Cst");
+}
+
 TEST(Rhythm, StepEventsFireOnPatternHits) {
     RhythmPattern p;
     p.steps_per_bar = 16;

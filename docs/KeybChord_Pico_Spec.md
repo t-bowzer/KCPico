@@ -222,7 +222,7 @@ The system is a set of cooperating modules coordinated by a central state manage
 - **FR-B2** The bass plays a fixed looping **interval cycle** on each beat of the bar (see 6.8): root → 3rd → 5th → 6th/7th → (repeat). The cycle length adapts to the pattern's meter (`beats_per_bar`; a 3/4 waltz cycles over root–3rd–5th only).
 - **FR-B3** Bass voice parameters (5.9): enable, octave (whole-octave transpose from the base root, default −1), note duration, velocity, pattern, and MIDI channel (default 3; may equal any other function's channel). The bass follows the currently-selected chord's root and type (including in Held mode after key release).
 - **FR-B4** The bass note is short/percussive (note-on with rapid note-off after `note_duration_ms`), mimicking the Omnichord's plucked double-bass "thump". It is driven by the rhythm clock's beat edges and is silent when the rhythm is not running.
-- **FR-B5** **Configurable bass pattern** (`bass.pattern`, 5.9): in addition to the default walking cycle, the bass supports `whole` (root, whole note), `half` (root, half note), `quarter` (root, quarter note), `half_alt` (root/5th alternating half notes), `quarter_alt` (root/5th alternating quarter notes), `three_four_alt` (root on beat 1, 5th on the last beat), `walk_no_6th` (root half note, then 3rd and 5th quarter notes), and `hold` (root sustains while the chord is sounding — a held key in Press/Arp, indefinitely in Held). Whole/half patterns sustain their notes (not `note_duration_ms`); the beat-driven patterns fire in lockstep with the rhythm beat so they are never early relative to the drums.
+- **FR-B5** **Configurable bass patterns** (`bass.pattern`, 5.9): bass patterns are JSON files in `/bass/*.json` (the 9 built-ins plus user files, loaded like rhythm patterns). The built-ins are `Walking` (root-3rd-5th-6th/7th), `Whole`, `Half`, `Quarter`, `Half Alt`, `Quarter Alt`, `3/4 Alt`, `No 6th`, and `Hold` (root sustains while the chord is sounding — a held key in Press/Arp, indefinitely in Held). Patterns are a 16th-note grid of chord-degree codes (root/3rd/5th/6th-or-7th) so they follow the chord's root and type; whole/half notes sustain via an optional `sustain_steps` array. The beat-driven patterns fire on the rhythm 16th-note grid in lockstep with the drums.
 
 ---
 
@@ -530,21 +530,39 @@ The walking bass (4.7) plays a fixed looping interval cycle per beat, relative t
 The cycle length equals the pattern's `beats_per_bar` (`steps_per_bar / 4`); a 3/4 waltz plays only the first three offsets (root–3rd–5th). Bass note = `rootMidi(root_pc, base_root_midi, bass_octave) + offset[beat]`.
 
 ### 6.9 Configurable Bass Patterns (FR-B5)
-The bass pattern parameter (`bass.pattern`, 5.9) selects among the walking cycle (6.8) and a set of root/5th patterns. Each pattern returns a semitone offset above the root for a given beat (0-based), or a rest (`−1`):
+Bass patterns are JSON files in `/bass/*.json` (the 9 built-ins below plus user
+files), loaded at boot in the same way as rhythm patterns (7.x). The pattern
+parameter (`bass.pattern`, 5.9) selects an index into that list by name. Each
+pattern is a 16th-note grid (`steps_per_bar`) whose `steps` are **chord-degree
+codes**: `-1` = rest, `0` = root, `1` = 3rd, `2` = 5th, `3` = 6th/7th — resolved
+through the per-chord-type blueprint (6.8), so the note follows the chord's root
+*and* type (minor 3rd vs major 3rd, etc.). An optional parallel `sustain_steps`
+array gives each note's length in 16th steps (`0` = percussive, using
+`note_duration_ms`).
 
-| Pattern | Beat 0 | Beat 1 | Beat 2 | Beat 3 | Sustain |
-|---------|--------|--------|--------|--------|---------|
-| `walking` (default) | blueprint (6.8) | blueprint | blueprint | blueprint | percussive (`note_duration_ms`) |
-| `whole` | 0 | — | — | — | `beats_per_bar` beats |
-| `half` | 0 | — | 0 | — | 2 beats |
-| `quarter` | 0 | 0 | 0 | 0 | percussive |
-| `half_alt` | 0 | — | 7 | — | 2 beats |
-| `quarter_alt` | 0 | 7 | 0 | 7 | percussive |
-| `three_four_alt` | 0 | — | — | 7* | percussive |
-| `hold` | 0 (sustains) | — | — | — | until chord released |
-| `walk_no_6th` | 0 (half note) | — | 3rd | 5th | 2 beats on beat 0 |
+The 9 built-in patterns:
 
-`three_four_alt` places the 5th on the **last** beat of the bar (beat 3 in 4/4, beat 2 in 3/4). `walk_no_6th` plays the root as a half note, then the 3rd and 5th as quarter notes (percussive), then repeats. `hold` is not beat-driven: it sustains the root while the chord is sounding (a held key in Press/Arp mode, indefinitely in Held mode) and is released when the chord stops sounding or the bass is disabled. Whole/half sustained notes re-articulate immediately when the chord changes mid-note (so the bass follows the new root), and they release slightly before the next note's attack for a clean articulation. All beat-driven patterns fire on the rhythm beat boundary in lockstep with the drums (never one 16th-note early).
+| Index | Name | Steps (beats) | Sustain |
+|-------|------|---------------|---------|
+| 0 | Walking | root-3rd-5th-6th/7th (blueprint 6.8) | percussive |
+| 1 | Whole | root | whole bar |
+| 2 | Half | root | half note |
+| 3 | Quarter | root | percussive |
+| 4 | Half Alt | root / 5th | half note |
+| 5 | Quarter Alt | root / 5th | percussive |
+| 6 | 3/4 Alt | root on beat 1, 5th on the last beat | percussive |
+| 7 | Hold | root (sustains) | until chord released |
+| 8 | No 6th | root (half) → 3rd (quarter) → 5th (quarter) | 2 beats on beat 0 |
+
+The bass follows the rhythm's meter when it is shorter: a 4/4 bass pattern under
+a 3/4 (waltz) rhythm plays only its first 12 steps then wraps. `hold` is not
+beat-driven: it sustains the root while the chord is sounding (a held key in
+Press/Arp mode, indefinitely in Held mode) and is released when the chord stops
+sounding or the bass is disabled. Whole/half sustained notes re-articulate
+immediately when the chord changes mid-note (so the bass follows the new root),
+and they release slightly before the next note's attack for a clean
+articulation. All beat-driven patterns fire on the rhythm 16th-note step grid in
+lockstep with the drums.
 
 ---
 
@@ -560,6 +578,7 @@ Each rhythm is a step sequence stored as a JSON file on LittleFS (one file per p
 ```json
 {
   "name": "Rock 1",
+  "short_name": "Rk",
   "steps_per_bar": 16,
   "swing": 0,
   "tracks": [
@@ -569,6 +588,7 @@ Each rhythm is a step sequence stored as a JSON file on LittleFS (one file per p
   ]
 }
 ```
+- `short_name` (optional) is the 2-character code shown on the idle LCD line; it is truncated to its first two characters if longer. When absent, built-ins use their hard-coded code and user patterns use the first two letters of `name`.
 - `pattern` values may be `0` (rest) or `1..127` (velocity; `1` = default velocity).
 - GM percussion note numbers: kick 36, snare 38, closed hat 42, open hat 46, etc.
 - **`swing` is an integer** here (see 7.3): per-pattern swing is stored as a signed integer percentage −75..+75, not a float. (A pattern authored with `"swing": 0` means none; `"swing": 50` means a 50% off-beat delay.) This differs from the original Pi spec, which used a 0.0–0.75 float.
@@ -644,7 +664,7 @@ All config/preset/pattern files live on the Pico's **LittleFS** filesystem in on
     "note_duration_ms": 150,
     "velocity": 90,
     "channel": 3,
-    "pattern": "walking"
+    "pattern": "Walking"
   },
   "rhythm": {
     "enabled": false,
@@ -671,7 +691,7 @@ All config/preset/pattern files live on the Pico's **LittleFS** filesystem in on
   }
 }
 ```
-> `rhythm.swing` is a **signed integer −75..+75** (Section 7.3), not a float. The `chord.extensions` object has been removed: add9/add11/add13 are now held modifiers (FR-C7) and are not persisted. `play_mode` is one of `held` / `press_to_play` / `arpeggio` / `arp_hold` / `silent` (Rhythm mode was replaced by the walking bass, FR-B1). `bass.pattern` is one of `walking` / `whole` / `half` / `quarter` / `half_alt` / `quarter_alt` / `three_four_alt` / `walk_no_6th` / `hold` (FR-B5).
+> `rhythm.swing` is a **signed integer −75..+75** (Section 7.3), not a float. The `chord.extensions` object has been removed: add9/add11/add13 are now held modifiers (FR-C7) and are not persisted. `play_mode` is one of `held` / `press_to_play` / `arpeggio` / `arp_hold` / `silent` (Rhythm mode was replaced by the walking bass, FR-B1). `bass.pattern` is a bass pattern **name** (`Walking` / `Whole` / `Half` / `Quarter` / `Half Alt` / `Quarter Alt` / `3/4 Alt` / `No 6th` / `Hold`, or a user file's `name`) per FR-B5.
 
 ### 8.3 Combination, Chord-Type & Root-Order Tables
 The Omnichord combination matrix (6.3), chord interval formulas (6.2), the circle-of-fifths root order (5.1, `chord_root_order`), the keymap, and per-parameter defaults are stored as editable JSON on LittleFS (shipped from repo `data/`) so behavior/layout can be tuned without recompiling. To minimize flash writes and RAM, large static tables may alternatively be compiled into flash as C++ constants with JSON overrides — see the roadmap for the chosen persistence strategy (default: JSON on LittleFS via ArduinoJson).
@@ -709,7 +729,7 @@ All adjustable parameters, with min/max/default/step. On default initialization 
 | note_duration_ms (bass) | bass | int | 50 | 4000 | 150 | 50 | bass note length |
 | velocity (bass) | bass | int | 1 | 127 | 90 | 1 | |
 | channel (bass) | bass | int | 1 | 16 | 3 | 1 | MIDI channel (may equal any function) |
-| pattern (bass) | bass | enum | — | — | `walking` | cycle | walking / whole / half / quarter / half_alt / quarter_alt / three_four_alt / walk_no_6th / hold (FR-B5) |
+| pattern (bass) | bass | enum | — | — | `Walking` | cycle | pattern name: Walking / Whole / Half / Quarter / Half Alt / Quarter Alt / 3/4 Alt / No 6th / Hold + user files (FR-B5) |
 | tempo | rhythm | int | 40 | 260 | 120 | 1 | BPM |
 | swing | rhythm | int | −75 | +75 | 0 | 5 | signed off-beat delay percentage (integer/fixed-point; see 7.3) |
 | enabled | rhythm | bool | off | on | off | toggle | rhythm on/off |

@@ -35,6 +35,7 @@ struct RhythmTrack {
 
 struct RhythmPattern {
     std::string name;
+    std::string short_name;            // optional 2-char LCD code (truncated on use)
     int steps_per_bar = 16;
     int8_t swing = 0;                 // per-pattern default swing -75..+75
     std::vector<RhythmTrack> tracks;
@@ -49,11 +50,13 @@ struct StepEvent {
 
 
 // The complete loaded rhythm set: the patterns in play order plus their display
-// names (same order). `names` is installed into the name registry via
-// installRhythmNames() so presets/display resolve index <-> name consistently.
+// names and short codes (same order). `names` and `short_names` are installed
+// into the runtime registries via installRhythmNames()/installRhythmShortNames()
+// so presets/display resolve index <-> name consistently.
 struct RhythmLibrary {
     std::vector<RhythmPattern> patterns;
     std::vector<std::string>  names;
+    std::vector<std::string>  short_names;
 };
 
 
@@ -111,6 +114,13 @@ int rhythmCount();
 // sync with the pattern vector passed to RhythmEngine::setPatterns().
 void installRhythmNames(std::vector<std::string> names);
 void clearRhythmNames();
+
+// Per-pattern optional short code ("" when none). Resolves against the list
+// installed by installRhythmShortNames(); empty when no list is installed or the
+// index has no authored short code.
+const char* rhythmShortName(int index);
+void installRhythmShortNames(std::vector<std::string> names);
+void clearRhythmShortNames();
 
 // LittleFS file name (no directory) for a *built-in* rhythm by index.
 const char* rhythmFileName(int index);

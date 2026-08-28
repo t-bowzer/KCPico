@@ -1,5 +1,6 @@
 #include "presets.h"
 #include "base.h"
+#include "bass.h"
 #include "rhythm.h"
 #include "strum.h"
 #include <ArduinoJson.h>
@@ -213,34 +214,7 @@ ScaleType parseScaleType(const std::string& s) {
     return ScaleType::Ionian;
 }
 
-BassPattern parseBassPattern(const std::string& s) {
-    if (s == "whole")          return BassPattern::Whole;
-    if (s == "half")           return BassPattern::Half;
-    if (s == "quarter")        return BassPattern::Quarter;
-    if (s == "half_alt")       return BassPattern::HalfAlt;
-    if (s == "quarter_alt")    return BassPattern::QuarterAlt;
-    if (s == "three_four_alt") return BassPattern::ThreeFourAlt;
-    if (s == "hold")           return BassPattern::Hold;
-    if (s == "walk_no_6th")    return BassPattern::WalkNoSixth;
-    return BassPattern::Walking;
-}
-
-const char* bassPatternName(BassPattern p) {
-    switch (p) {
-        case BassPattern::Whole:        return "whole";
-        case BassPattern::Half:         return "half";
-        case BassPattern::Quarter:      return "quarter";
-        case BassPattern::HalfAlt:      return "half_alt";
-        case BassPattern::QuarterAlt:   return "quarter_alt";
-        case BassPattern::ThreeFourAlt: return "three_four_alt";
-        case BassPattern::Hold:         return "hold";
-        case BassPattern::WalkNoSixth:  return "walk_no_6th";
-        default:                        return "walking";
-    }
-}
-
 } // namespace
-
 PresetSlot loadPreset(StorageAdapter& storage, int bank, int slot) {
     if (bank < 0 || bank >= NUM_BANKS || slot < 0 || slot >= NUM_SLOTS) {
         return PresetSlot::defaults();
@@ -350,8 +324,10 @@ PresetSlot loadPreset(StorageAdapter& storage, int bank, int slot) {
             p.bass.velocity = static_cast<uint8_t>(clamp<int>(b["velocity"].as<int>(), 1, 127));
         if (b.containsKey("enabled") && b["enabled"].is<bool>())
             p.bass.enabled = b["enabled"].as<bool>();
-        if (b.containsKey("pattern") && b["pattern"].is<const char*>())
-            p.bass.pattern = parseBassPattern(b["pattern"].as<std::string>());
+        if (b.containsKey("pattern") && b["pattern"].is<const char*>()) {
+            int idx = bassIndex(b["pattern"].as<std::string>());
+            if (idx >= 0) p.bass.pattern = static_cast<uint8_t>(idx);
+        }
     }
 
     if (obj.containsKey("rhythm")) {
@@ -491,7 +467,7 @@ bool savePreset(StorageAdapter& storage, int bank, int slot, const PresetSlot& p
     bass["note_duration_ms"] = preset.bass.note_duration_ms;
     bass["velocity"]         = preset.bass.velocity;
     bass["enabled"]          = preset.bass.enabled;
-    bass["pattern"]          = bassPatternName(preset.bass.pattern);
+    bass["pattern"]          = bassName(preset.bass.pattern);
 
     auto rhythm = obj["rhythm"].to<JsonObject>();
     rhythm["channel"] = preset.rhythm.channel;

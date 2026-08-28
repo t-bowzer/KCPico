@@ -250,3 +250,55 @@ TEST_F(KeymapConfigTest, CustomRemapResolves) {
     EXPECT_EQ(a.cmd, KeyCmd::IncParam);
     EXPECT_EQ(a.param, ParamId::RhythmTempo);
 }
+
+TEST_F(KeymapConfigTest, PatternNamesResolveToIndices) {
+    storage_.writeFile("/keymap.json", R"({
+      "bindings": [
+        { "keys": ["PrtSc"], "action": { "type": "set", "param": "rhythm_pattern", "value": "Rock 2" } },
+        { "keys": ["ScLk"], "action": { "type": "set", "param": "bass_pattern", "value": "Half Alt" } },
+        { "keys": ["F9"], "action": { "type": "open_menu", "menu": "chord" } },
+        { "keys": ["F10"], "action": { "type": "open_menu", "menu": "strum" } },
+        { "keys": ["F11"], "action": { "type": "open_menu", "menu": "rhythm" } },
+        { "keys": ["F12"], "action": { "type": "open_menu", "menu": "bass" } },
+        { "keys": ["Super", "F11"], "action": { "type": "open_menu", "menu": "drum" } },
+        { "keys": ["Home"], "action": { "type": "preset_prev" } },
+        { "keys": ["End"], "action": { "type": "preset_next" } },
+        { "keys": ["Insert"], "action": { "type": "preset_save" } }
+      ]
+    })");
+    KeymapLoadResult r = KeymapConfig::load(storage_);
+    EXPECT_TRUE(r.ok) << [&] {
+        std::string s;
+        for (const auto& e : r.errors) s += e + "; ";
+        return s;
+    }();
+
+    KeymapResolver resolver(&r.config);
+    KeyAction a = resolver.resolve(0x46, 0);  // PrtSc -> rhythm_pattern "Rock 2"
+    EXPECT_EQ(a.cmd, KeyCmd::SetParam);
+    EXPECT_EQ(a.param, ParamId::RhythmPattern);
+    EXPECT_EQ(a.valueA, 1);
+
+    a = resolver.resolve(0x47, 0);  // ScLk -> bass_pattern "Half Alt"
+    EXPECT_EQ(a.cmd, KeyCmd::SetParam);
+    EXPECT_EQ(a.param, ParamId::BassPattern);
+    EXPECT_EQ(a.valueA, 4);
+}
+
+TEST_F(KeymapConfigTest, UnknownPatternNameRejected) {
+    storage_.writeFile("/keymap.json", R"({
+      "bindings": [
+        { "keys": ["PrtSc"], "action": { "type": "set", "param": "bass_pattern", "value": "Nope" } },
+        { "keys": ["F9"], "action": { "type": "open_menu", "menu": "chord" } },
+        { "keys": ["F10"], "action": { "type": "open_menu", "menu": "strum" } },
+        { "keys": ["F11"], "action": { "type": "open_menu", "menu": "rhythm" } },
+        { "keys": ["F12"], "action": { "type": "open_menu", "menu": "bass" } },
+        { "keys": ["Super", "F11"], "action": { "type": "open_menu", "menu": "drum" } },
+        { "keys": ["Home"], "action": { "type": "preset_prev" } },
+        { "keys": ["End"], "action": { "type": "preset_next" } },
+        { "keys": ["Insert"], "action": { "type": "preset_save" } }
+      ]
+    })");
+    KeymapLoadResult r = KeymapConfig::load(storage_);
+    EXPECT_FALSE(r.ok);
+}

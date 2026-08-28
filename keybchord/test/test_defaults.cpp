@@ -4,6 +4,7 @@
 #include "storage_stub.h"
 #include "config.h"
 #include "presets.h"
+#include "bass.h"
 #include "rhythm.h"
 
 
@@ -35,5 +36,15 @@ TEST(Defaults, ProvisionsConfigPresetsAndRhythms) {
         EXPECT_TRUE(parseRhythmPattern(storage.readFile(path), p)) << path;
         EXPECT_FALSE(p.tracks.empty()) << path;
         EXPECT_EQ(p.name, rhythmName(i)) << path;
+    }
+
+    // All 9 bass patterns written and parseable.
+    for (int i = 0; i < BASS_COUNT; i++) {
+        std::string path = "/bass/" + std::string(bassFileName(i));
+        EXPECT_TRUE(storage.exists(path)) << path;
+        BassPattern p;
+        EXPECT_TRUE(parseBassPattern(storage.readFile(path), p)) << path;
+        EXPECT_FALSE(p.steps.empty()) << path;
+        EXPECT_EQ(p.name, bassName(i)) << path;
     }
 }

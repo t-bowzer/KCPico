@@ -35,6 +35,7 @@ need to prepare anything.
 | `/keymap.json` | Configurable key bindings (`bindings` array). |
 | `/presets/bank1.json` … `/presets/bank10.json` | 10 banks × 8 preset slots (each file is a JSON **array of 8** objects). |
 | `/rhythms/*.json` | Rhythm patterns — the 12 built-ins plus any user files you add. |
+| `/bass/*.json` | Bass patterns — the 9 built-ins plus any user files you add. |
 | `/keymap_error.log` | Written only when `/keymap.json` fails validation (see §4). |
 
 ---
@@ -188,7 +189,7 @@ covering 10 banks × 8 slots = 80 presets. Editing one object changes that slot.
 | `note_duration_ms` | int | 50–4000 | `150` | Bass note length (step 50). |
 | `velocity` | int | 1–127 | `90` | |
 | `channel` | int | 1–16 | `3` | MIDI channel. |
-| `pattern` | enum | — | `walking` | `walking` / `whole` / `half` / `quarter` / `half_alt` / `quarter_alt` / `three_four_alt` / `walk_no_6th` / `hold` |
+| `pattern` | enum | — | `walking` | Pattern **name** (built-in name or a user file's `name`): `Walking`, `Whole`, `Half`, `Quarter`, `Half Alt`, `Quarter Alt`, `3/4 Alt`, `No 6th`, `Hold`. |
 
 ### 3.5 `rhythm` parameters
 
@@ -296,8 +297,13 @@ these **short** names (which differ slightly from the preset JSON names):
 | `arp_mode` | `up`, `down`, `up_down`, `alternating`, `random` (or 0–4) |
 | `strum_mode` | `chord`, `scale`, `piano` (or 0–2) |
 | `strum_scale` | `ionian`, `dorian`, `phrygian`, `lydian`, `mixolydian`, `aeolian`, `locrian`, `harmonic_minor`, `melodic_minor`, `major_pentatonic`, `minor_pentatonic`, `blues` |
-| `bass_pattern` | `walking`, `whole`, `half`, `quarter`, `half_alt`, `quarter_alt`, `three_four_alt`, `hold`, `walk_no_sixth` |
+| `bass_pattern` | `Walking`, `Whole`, `Half`, `Quarter`, `Half Alt`, `Quarter Alt`, `3/4 Alt`, `Hold`, `No 6th` (or 0–8, or any user pattern's `name`) |
+| `rhythm_pattern` | any built-in or user rhythm `name` (e.g. `Rock 1`, `Test Groove`), or an index 0–N |
 | bool params (`strum_layout`, `rhythm_mute`, `rhythm_enable`, `rhythm_clock`, `rhythm_led`, `bass_enable`) | `on`/`off`, `true`/`false`, `1`/`0` |
+
+> `rhythm_pattern` / `bass_pattern` names are resolved against the patterns
+> loaded at boot (built-ins + user files), so a name that doesn't match a loaded
+> pattern is treated as a keymap error (see §4.5).
 
 ### 4.5 Validation & required coverage
 
@@ -313,13 +319,14 @@ drum**, plus **`preset_prev`**, **`preset_next`**, and **`preset_save`**.
 
 ---
 
-## 5. Rhythms — `/rhythms/*.json`
+## 5. Patterns — `/rhythms/*.json` and `/bass/*.json`
 
-### 5.1 Schema
+### 5.1 Schema (rhythm)
 
 ```json
 {
   "name": "Rock 1",
+  "short_name": "Rk",
   "steps_per_bar": 16,
   "swing": 0,
   "tracks": [
@@ -333,6 +340,7 @@ drum**, plus **`preset_prev`**, **`preset_next`**, and **`preset_save`**.
 | Field | Type | Notes |
 |-------|------|-------|
 | `name` | string | Display name (shown on the LCD in the Rhythm menu). |
+| `short_name` | string (optional) | 2-character code shown on the idle line of the LCD (truncated to the first two characters if longer). Falls back to the built-in code for built-ins, or the first two letters of `name` for user patterns. |
 | `steps_per_bar` | int | Length of each `pattern` array; 4 steps = 1 beat (16th-note grid). |
 | `swing` | int | Per-pattern default swing (−75…+75, clamped). |
 | `tracks[]` | array | One entry per percussion voice. |
@@ -387,6 +395,74 @@ Practical rules:
 
 A ready-to-copy example lives at `examples/test_rhythm.json` (a "Test Groove"
 pattern); copy it to `/rhythms/test_rhythm.json` to verify user rhythms load.
+
+### 5.4 Schema (bass)
+
+```json
+{
+  "name": "Half Alt",
+  "steps_per_bar": 16,
+  "steps": [0, -1, -1, -1, -1, -1, -1, -1, 2, -1, -1, -1, -1, -1, -1, -1],
+  "sustain_steps": [8, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0]
+}
+```
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `name` | string | Display name (shown on the LCD in the Bass menu, used by presets/keymap). |
+| `steps_per_bar` | int | Length of the `steps` array; 4 steps = 1 beat (16th-note grid, same as rhythm). |
+| `steps[]` | int array | Chord-degree codes: `-1` = rest, `0` = root, `1` = 3rd, `2` = 5th, `3` = 6th/7th. The note is resolved through the chord's interval formula, so it follows the chord type (a minor 3rd for minor chords, etc.). |
+| `sustain_steps[]` | int array (optional) | Parallel array giving each note's length in 16th steps. `0`/absent = percussive (uses `bass.note_duration_ms`). |
+| `hold` | bool (optional) | `true` marks the special Hold pattern (root sustains while the chord is sounding, not beat-driven). |
+
+### 5.5 The 9 built-in bass patterns
+
+These ship in firmware and are written to `/bass/` on first boot (and
+re-provisioned if you delete one):
+
+| Index | File | Name |
+|-------|------|------|
+| 0 | `walking.json` | Walking |
+| 1 | `whole.json` | Whole |
+| 2 | `half.json` | Half |
+| 3 | `quarter.json` | Quarter |
+| 4 | `half_alt.json` | Half Alt |
+| 5 | `quarter_alt.json` | Quarter Alt |
+| 6 | `three_four_alt.json` | 3/4 Alt |
+| 7 | `hold.json` | Hold |
+| 8 | `walk_no_6th.json` | No 6th |
+
+### 5.6 Adding your own bass patterns
+
+You **can** add new bass patterns. Drop any extra `*.json` file into `/bass/`
+(see §1 for how to mount the drive). They behave like user rhythms:
+
+- **Loaded after** the 9 built-ins, at indices 9, 10, … (built-ins keep indices
+  0–8, so existing presets and the `F3` cycle order are unchanged).
+- **Ordered alphabetically by filename** among themselves.
+- **Named by the `name` field** (falls back to the filename).
+- **Selected with `F3`** (cycle) or the Bass menu; the name shows on the LCD.
+- **Referenced by name in presets** (`bass.pattern`) and in the keymap
+  (`bass_pattern`). A preset/keymap referencing a deleted or renamed file falls
+  back to the first pattern (Walking).
+
+Practical rules:
+
+- The filename must end in `.json` and must not match one of the 9 built-in
+  filenames above.
+- Keep at most ~23 user files (the firmware caps the total at **32** patterns).
+- A pattern with an empty `steps` array is skipped.
+- You can edit any built-in `.json` in place; deleting one re-provisions the
+  default.
+
+A ready-to-copy example lives at `examples/test_bass.json` (a "Test Bass" root/
+5th half-note pattern); copy it to `/bass/test_bass.json` to verify user bass
+patterns load.
+
+> **Meter note:** the bass follows the rhythm's meter when it is shorter than
+> the bass pattern. A 4/4 bass pattern over a 3/4 (waltz) rhythm plays only its
+> first 12 steps, then wraps — so a walking bass naturally drops its 6th/7th on
+> the fourth beat, and `3/4 Alt` becomes root on beat 1, 5th on beat 3.
 
 ---
 

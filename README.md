@@ -19,12 +19,12 @@ out a DIN-5 connector — no computer required.
   …) plus user-loadable patterns, tempo, swing, mute, MIDI clock out, and a
   keyboard-LED beat indicator.
 - **Walking bass** — beat-synced patterns (walking, whole, half, quarter, hold,
-  …) following the active chord.
+  …) following the active chord, all editable as JSON.
 - **Presets** — 10 banks × 8 slots (80 presets) with on-device naming.
 - **DIN-5 MIDI OUT** — 3.3 V loop, standards-compliant per the MIDI 1.0 spec.
 - **LCD1602** status/parameter display over I2C.
-- **Fully configurable** — `config.json`, `keymap.json`, presets, and rhythms
-  are all editable JSON on a USB Mass Storage drive.
+- **Fully configurable** — `config.json`, `keymap.json`, presets, rhythms, and
+  bass patterns are all editable JSON on a USB Mass Storage drive.
 
 ## Hardware
 
@@ -71,8 +71,9 @@ On first boot the firmware self-provisions its config, presets, and rhythms.
 
 Everything is JSON. See **[docs/custom-configuration-guide.md](docs/custom-configuration-guide.md)**
 for the complete reference (config, presets, keymap, and how to add your own
-rhythm patterns). A ready-to-copy example rhythm is in
-[examples/test_rhythm.json](examples/test_rhythm.json).
+rhythm and bass patterns). Ready-to-copy examples are in
+[examples/test_rhythm.json](examples/test_rhythm.json) and
+[examples/test_bass.json](examples/test_bass.json).
 
 ## Documentation
 

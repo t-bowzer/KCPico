@@ -237,29 +237,13 @@ struct RhythmParams {
     static RhythmParams defaults();
 };
 
-// Walking-bass pattern (Upgrade-Plan): the default interval cycle plus a set of
-// user-selectable root/5th patterns. `Hold` sustains the root while the chord
-// is sounding rather than being beat-driven.
-enum class BassPattern : uint8_t {
-    Walking = 0,   // root-3rd-5th-6th/7th cycle on each beat (spec 6.8)
-    Whole,         // root, whole notes
-    Half,          // root, half notes
-    Quarter,       // root, quarter notes
-    HalfAlt,       // root/5th alternating half notes
-    QuarterAlt,    // root/5th alternating quarter notes
-    ThreeFourAlt,  // root on beat 1, 5th on the last beat
-    Hold,          // root sustained while the chord is held
-    WalkNoSixth,   // root (half) -> 3rd (quarter) -> 5th (quarter) -> repeat
-    COUNT
-};
-
 struct BassParams {
     bool        enabled          = false;
     int8_t      octave           = -1;
     int16_t     note_duration_ms = 150;
     uint8_t     velocity         = 90;
     uint8_t     channel          = 3;
-    BassPattern pattern          = BassPattern::Walking;
+    uint8_t     pattern          = 0;   // index into the bass pattern list
 
     static BassParams defaults();
 };

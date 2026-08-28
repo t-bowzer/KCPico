@@ -2,11 +2,13 @@
 
 #include <vector>
 
+#include "bass.h"
 #include "bass_engine.h"
 #include "chord_engine.h"
 #include "midi_router.h"
 #include "recording_midi_out.h"
 #include "state.h"
+#include "storage_stub.h"
 
 
 class BassEngineTest : public ::testing::Test {
@@ -16,6 +18,11 @@ protected:
         state_.loadDefaults();
         router_ = new MidiRouter(midi_, state_);
         bass_   = new BassEngine(state_, *router_);
+
+        // Load the built-in bass patterns (self-provisioned from templates).
+        BassLibrary lib = loadBassPatterns(storage_);
+        installBassNames(lib.names);
+        bass_->setPatterns(std::move(lib.patterns));
 
         // Select C major and enable the walking bass on channel 3, octave -1.
         ResolvedChord c{0, ChordType::Major};
@@ -30,6 +37,7 @@ protected:
     }
 
     void TearDown() override {
+        clearBassNames();
         delete bass_;
         delete router_;
     }
@@ -56,31 +64,53 @@ protected:
 
     RecordingMidiOutAdapter midi_;
     StateManager state_;
+    StorageStub storage_;
     MidiRouter* router_ = nullptr;
     BassEngine* bass_ = nullptr;
 };
 
 
 // Walking bass cycles root-3rd-5th-6th on the four beats of a 4/4 bar. The
-// engine fires when a beat-boundary step has just fired (stepAbs % 4 == 1).
+// engine fires on each 16th-note step edge.
 TEST_F(BassEngineTest, WalksFourBeatCycle) {
     state_.rhythmClock.running = true;
     state_.rhythmClock.stepsPerBar = 16;
-    state_.rhythmClock.stepAbs = 1;   // beat 0 just fired -> root C3 = 48
+    state_.rhythmClock.stepAbs = 1;   // step 0 just fired -> root C3 = 48
     bass_->update(0);
     EXPECT_EQ(lastNoteOn(3), 48);
 
-    state_.rhythmClock.stepAbs = 5;   // beat 1 -> 3rd = 52
+    state_.rhythmClock.stepAbs = 5;   // step 4 -> 3rd = 52
     bass_->update(0);
     EXPECT_EQ(lastNoteOn(3), 52);
 
-    state_.rhythmClock.stepAbs = 9;   // beat 2 -> 5th = 55
+    state_.rhythmClock.stepAbs = 9;   // step 8 -> 5th = 55
     bass_->update(0);
     EXPECT_EQ(lastNoteOn(3), 55);
 
-    state_.rhythmClock.stepAbs = 13;  // beat 3 -> 6th = 57
+    state_.rhythmClock.stepAbs = 13;  // step 12 -> 6th = 57
     bass_->update(0);
     EXPECT_EQ(lastNoteOn(3), 57);
+}
+
+// A 3/4 waltz rhythm chops the bass bar to 12 steps: root-3rd-5th, then wrap.
+TEST_F(BassEngineTest, WaltzChopsToThreeBeats) {
+    state_.rhythmClock.running = true;
+    state_.rhythmClock.stepsPerBar = 12;
+    state_.rhythmClock.stepAbs = 1;   // step 0 -> root
+    bass_->update(0);
+    EXPECT_EQ(lastNoteOn(3), 48);
+
+    state_.rhythmClock.stepAbs = 5;   // step 4 -> 3rd
+    bass_->update(0);
+    EXPECT_EQ(lastNoteOn(3), 52);
+
+    state_.rhythmClock.stepAbs = 9;   // step 8 -> 5th
+    bass_->update(0);
+    EXPECT_EQ(lastNoteOn(3), 55);
+
+    state_.rhythmClock.stepAbs = 13;  // step 12 wraps to step 0 -> root again
+    bass_->update(0);
+    EXPECT_EQ(lastNoteOn(3), 48);
 }
 
 // Bass is silent while the rhythm is not running (FR-B4).
@@ -118,13 +148,13 @@ TEST_F(BassEngineTest, NoteOffAfterDuration) {
     EXPECT_EQ(noteOffCount(3), 1);
 }
 
-// A new beat releases the previous note (monophonic walking line).
+// A new step releases the previous note (monophonic walking line).
 TEST_F(BassEngineTest, NewBeatReleasesPrevious) {
     state_.rhythmClock.running = true;
     state_.rhythmClock.stepAbs = 1;
     bass_->update(0);
 
-    // Fire beat 1 before the previous note's duration elapses.
+    // Fire step 4 before the previous note's duration elapses.
     state_.rhythmClock.stepAbs = 5;
     bass_->update(1000);
     EXPECT_EQ(noteOffCount(3), 1);   // previous released
@@ -133,7 +163,7 @@ TEST_F(BassEngineTest, NewBeatReleasesPrevious) {
 
 // Configurable pattern: Quarter plays the root on every beat.
 TEST_F(BassEngineTest, QuarterPatternPlaysRootOnEachBeat) {
-    state_.pendingBass.pattern = BassPattern::Quarter;
+    state_.pendingBass.pattern = bassIndex("Quarter");
     state_.rhythmClock.running = true;
     state_.rhythmClock.stepsPerBar = 16;
 
@@ -148,7 +178,7 @@ TEST_F(BassEngineTest, QuarterPatternPlaysRootOnEachBeat) {
 
 // Whole pattern sustains the root across the bar (past note_duration_ms).
 TEST_F(BassEngineTest, WholePatternSustainsBar) {
-    state_.pendingBass.pattern = BassPattern::Whole;
+    state_.pendingBass.pattern = bassIndex("Whole");
     state_.rhythmClock.running = true;
     state_.rhythmClock.stepsPerBar = 16;
 
@@ -163,7 +193,7 @@ TEST_F(BassEngineTest, WholePatternSustainsBar) {
 
 // Hold pattern sustains the root only while the chord is sounding.
 TEST_F(BassEngineTest, HoldPatternTracksChord) {
-    state_.pendingBass.pattern = BassPattern::Hold;
+    state_.pendingBass.pattern = bassIndex("Hold");
     ChordEngine chord(state_, *router_);
     bass_->setChordEngine(&chord);
 
@@ -180,7 +210,7 @@ TEST_F(BassEngineTest, HoldPatternTracksChord) {
 
 // A new chord re-articulates a sustained whole note immediately (mid-measure).
 TEST_F(BassEngineTest, WholeNoteFollowsChordChange) {
-    state_.pendingBass.pattern = BassPattern::Whole;
+    state_.pendingBass.pattern = bassIndex("Whole");
     state_.rhythmClock.running = true;
     state_.rhythmClock.stepsPerBar = 16;
 
@@ -189,7 +219,7 @@ TEST_F(BassEngineTest, WholeNoteFollowsChordChange) {
     EXPECT_EQ(lastNoteOn(3), 48);
 
     state_.selectedChord = ResolvedChord{7, ChordType::Major};  // G major
-    bass_->update(1000);              // no beat boundary
+    bass_->update(1000);              // no step edge
     EXPECT_EQ(lastNoteOn(3), 55);     // G3 follows immediately
     EXPECT_EQ(noteOffCount(3), 1);    // old root released
 }
@@ -197,7 +227,7 @@ TEST_F(BassEngineTest, WholeNoteFollowsChordChange) {
 // Whole notes release slightly before the bar ends so the next note attacks
 // cleanly.
 TEST_F(BassEngineTest, WholeNoteReleasesEarly) {
-    state_.pendingBass.pattern = BassPattern::Whole;
+    state_.pendingBass.pattern = bassIndex("Whole");
     state_.rhythmClock.running = true;
     state_.rhythmClock.stepsPerBar = 16;
 
@@ -205,7 +235,7 @@ TEST_F(BassEngineTest, WholeNoteReleasesEarly) {
     bass_->update(0);
     EXPECT_EQ(lastNoteOn(3), 48);
 
-    // stepUs(120)=125000us; beat=500000us; whole=2000000us; release 30ms early.
+    // stepUs(120)=125000us; whole=16 steps=2000000us; release 30ms early.
     bass_->update(1970000 - 1);
     EXPECT_EQ(noteOffCount(3), 0);
 
@@ -216,7 +246,7 @@ TEST_F(BassEngineTest, WholeNoteReleasesEarly) {
 // Hold mode follows a new chord even when the old chord key is still held while
 // the new chord key is pressed (overlapped chord switch).
 TEST_F(BassEngineTest, HoldFollowsNewChordWithoutReleasing) {
-    state_.pendingBass.pattern = BassPattern::Hold;
+    state_.pendingBass.pattern = bassIndex("Hold");
     ChordEngine chord(state_, *router_);
     bass_->setChordEngine(&chord);
 

@@ -6,7 +6,9 @@
 #include <cstdint>
 
 #include "base.h"
+#include "bass.h"
 #include "keymap.h"
+#include "rhythm.h"
 
 
 static const char* KEYMAP_PATH = "/keymap.json";
@@ -141,11 +143,6 @@ const ValueName kScaleNames[] = {
     {"harmonic_minor", 7}, {"melodic_minor", 8},
     {"major_pentatonic", 9}, {"minor_pentatonic", 10}, {"blues", 11},
 };
-const ValueName kBassPatternNames[] = {
-    {"walking", 0}, {"whole", 1}, {"half", 2}, {"quarter", 3},
-    {"half_alt", 4}, {"quarter_alt", 5}, {"three_four_alt", 6},
-    {"hold", 7}, {"walk_no_sixth", 8},
-};
 
 bool lookupValue(const ValueName* table, size_t n, const std::string& s, int& out) {
     for (size_t i = 0; i < n; i++) {
@@ -208,8 +205,18 @@ bool parseValue(ParamId id, const std::string& s, int& out) {
             return lookupValue(kStrumModeNames, 3, s, out);
         case ParamId::StrumScale:
             return lookupValue(kScaleNames, 12, s, out);
-        case ParamId::BassPattern:
-            return lookupValue(kBassPatternNames, 9, s, out);
+        case ParamId::RhythmPattern: {
+            int idx = rhythmIndex(s);
+            if (idx < 0) return false;
+            out = idx;
+            return true;
+        }
+        case ParamId::BassPattern: {
+            int idx = bassIndex(s);
+            if (idx < 0) return false;
+            out = idx;
+            return true;
+        }
         default:
             return false;
     }

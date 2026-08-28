@@ -12,3 +12,7 @@ void provisionDefaults(StorageAdapter& storage);
 // JSON for built-in rhythm `index` (0..RHYTHM_COUNT-1), or nullptr out of range.
 // Used to self-heal a missing/corrupt built-in rhythm file on load.
 const char* defaultRhythmJson(int index);
+
+// JSON for built-in bass pattern `index` (0..BASS_COUNT-1), or nullptr out of
+// range. Used to self-heal a missing/corrupt built-in bass file on load.
+const char* defaultBassJson(int index);

@@ -1,5 +1,6 @@
 {
   "name": "Test Groove",
+  "short_name": "TG",
   "steps_per_bar": 16,
   "swing": 0,
   "tracks": [

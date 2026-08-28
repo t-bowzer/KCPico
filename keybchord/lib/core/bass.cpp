@@ -1,9 +1,24 @@
 #include "bass.h"
 
+#include <ArduinoJson.h>
+
+#include "params.h"
+
 
 namespace {
 
-// Four-beat interval blueprint per chord type (spec 6.8). Beat 4 uses the
+constexpr const char* kBassNames[BASS_COUNT] = {
+    "Walking", "Whole", "Half", "Quarter", "Half Alt",
+    "Quarter Alt", "3/4 Alt", "Hold", "No 6th",
+};
+
+constexpr const char* kBassFiles[BASS_COUNT] = {
+    "walking.json", "whole.json", "half.json", "quarter.json",
+    "half_alt.json", "quarter_alt.json", "three_four_alt.json",
+    "hold.json", "walk_no_6th.json",
+};
+
+// Four-degree interval blueprint per chord type (spec 6.8). Degree 3 uses the
 // chord's 7th when present, else the 6th (offset 9).
 constexpr int8_t kBlueprints[][4] = {
     {0, 4, 7, 9},    // Major
@@ -19,76 +34,104 @@ constexpr int8_t kBlueprints[][4] = {
     {0, 3, 6, 10},   // Min7b5
 };
 
+// Runtime name list (built-ins + user files). Empty means "use the built-in
+// table". Installed by installBassNames() after loading patterns.
+std::vector<std::string> g_names;
+
 } // namespace
 
 
-int bassOffsetForBeat(ChordType type, int beat, int beatsPerBar) {
-    if (beatsPerBar <= 0) beatsPerBar = 4;
-    if (beat < 0) beat = 0;
-    if (beat >= beatsPerBar) beat = beatsPerBar - 1;
+bool parseBassPattern(const std::string& json, BassPattern& out) {
+    JsonDocument doc;
+    if (deserializeJson(doc, json)) return false;
+    if (!doc.is<JsonObject>()) return false;
 
+    BassPattern p;
+    if (doc.containsKey("name") && doc["name"].is<const char*>()) {
+        p.name = doc["name"].as<std::string>();
+    }
+    if (doc.containsKey("steps_per_bar") && doc["steps_per_bar"].is<int>()) {
+        p.steps_per_bar = doc["steps_per_bar"].as<int>();
+    }
+    if (doc.containsKey("hold") && doc["hold"].is<bool>()) {
+        p.hold = doc["hold"].as<bool>();
+    }
+    if (doc.containsKey("steps") && doc["steps"].is<JsonArray>()) {
+        for (JsonVariant v : doc["steps"].as<JsonArray>()) {
+            int val = v.is<int>() ? v.as<int>() : 0;
+            p.steps.push_back(static_cast<int8_t>(
+                clamp<int>(val, -1, 3)));
+        }
+    }
+    if (doc.containsKey("sustain_steps") && doc["sustain_steps"].is<JsonArray>()) {
+        for (JsonVariant v : doc["sustain_steps"].as<JsonArray>()) {
+            int val = v.is<int>() ? v.as<int>() : 0;
+            p.sustain_steps.push_back(static_cast<uint8_t>(
+                clamp<int>(val, 0, 64)));
+        }
+    }
+
+    if (p.steps.empty()) return false;
+
+    out = p;
+    return true;
+}
+
+int bassDegreeOffset(ChordType type, int degree) {
     int t = static_cast<int>(type);
     if (t < 0 || t >= static_cast<int>(ChordType::COUNT)) t = 0;
-    return kBlueprints[t][beat];
+    if (degree < 0 || degree >= 4) return -1;
+    return kBlueprints[t][degree];
 }
 
-int bassOffsetForPattern(BassPattern pattern, ChordType type, int beat, int beatsPerBar) {
-    if (beatsPerBar <= 0) beatsPerBar = 4;
-    if (beat < 0) beat = 0;
-    if (beat >= beatsPerBar) beat = beatsPerBar - 1;
+int bassStepOffset(const BassPattern& p, ChordType type, int step) {
+    if (p.hold) return -1;
+    if (step < 0 || step >= static_cast<int>(p.steps.size())) return -1;
+    int8_t degree = p.steps[step];
+    if (degree < 0) return -1;  // rest
+    return bassDegreeOffset(type, degree);
+}
 
-    switch (pattern) {
-        case BassPattern::Whole:
-            return (beat == 0) ? 0 : -1;
-        case BassPattern::Half:
-            return (beat % 2 == 0) ? 0 : -1;
-        case BassPattern::Quarter:
-            return 0;
-        case BassPattern::HalfAlt:
-            // Half notes alternating root/5th: root on the first half, 5th on
-            // the second.
-            return (beat % 2 == 0) ? (((beat / 2) % 2 == 0) ? 0 : 7) : -1;
-        case BassPattern::QuarterAlt:
-            // Quarter notes alternating root/5th.
-            return (beat % 2 == 0) ? 0 : 7;
-        case BassPattern::ThreeFourAlt:
-            // Root on beat 1, 5th on the last beat of the bar.
-            if (beat == 0) return 0;
-            if (beat == beatsPerBar - 1) return 7;
-            return -1;
-        case BassPattern::Hold:
-            return 0;  // root, handled separately (not beat-driven)
-        case BassPattern::WalkNoSixth:
-            // Root (half note) -> 3rd (quarter) -> 5th (quarter) -> repeat.
-            switch (beat % 4) {
-                case 0: return 0;
-                case 1: return -1;
-                case 2: return bassOffsetForBeat(type, 1, beatsPerBar);  // 3rd
-                default: return bassOffsetForBeat(type, 2, beatsPerBar); // 5th
-            }
-        case BassPattern::Walking:
-        default:
-            return bassOffsetForBeat(type, beat, beatsPerBar);
+int bassStepSustain(const BassPattern& p, int step) {
+    if (step < 0 || step >= static_cast<int>(p.sustain_steps.size())) return 0;
+    return p.sustain_steps[step];
+}
+
+const char* bassName(int index) {
+    if (!g_names.empty()) {
+        if (index < 0 || index >= static_cast<int>(g_names.size())) return g_names[0].c_str();
+        return g_names[index].c_str();
     }
+    if (index < 0 || index >= BASS_COUNT) return kBassNames[0];
+    return kBassNames[index];
 }
 
-int bassSustainBeats(BassPattern pattern, int beat, int beatsPerBar) {
-    if (beatsPerBar <= 0) beatsPerBar = 4;
-    switch (pattern) {
-        case BassPattern::Whole:
-            return beatsPerBar;
-        case BassPattern::Half:
-        case BassPattern::HalfAlt:
-            return 2;
-        case BassPattern::WalkNoSixth:
-            return (beat % 4 == 0) ? 2 : 0;  // root = half note, 3rd/5th percussive
-        default:
-            return 0;  // percussive: use note_duration_ms
+int bassIndex(const std::string& name) {
+    if (!g_names.empty()) {
+        for (size_t i = 0; i < g_names.size(); i++) {
+            if (name == g_names[i]) return static_cast<int>(i);
+        }
+        return -1;
     }
+    for (int i = 0; i < BASS_COUNT; i++) {
+        if (name == kBassNames[i]) return i;
+    }
+    return -1;
 }
 
-int bassNote(ChordType type, int rootPc, uint8_t base_root_midi,
-             int bassOctave, int beat, int beatsPerBar) {
-    int root = rootMidi(rootPc, base_root_midi, bassOctave);
-    return root + bassOffsetForBeat(type, beat, beatsPerBar);
+int bassCount() {
+    return g_names.empty() ? BASS_COUNT : static_cast<int>(g_names.size());
+}
+
+void installBassNames(std::vector<std::string> names) {
+    g_names = std::move(names);
+}
+
+void clearBassNames() {
+    g_names.clear();
+}
+
+const char* bassFileName(int index) {
+    if (index < 0 || index >= BASS_COUNT) return kBassFiles[0];
+    return kBassFiles[index];
 }

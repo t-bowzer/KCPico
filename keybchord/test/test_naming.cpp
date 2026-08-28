@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <vector>
+
 #include "naming.h"
+#include "rhythm.h"
 
 
 TEST(Naming, PlayModeShortNames) {
@@ -30,6 +34,44 @@ TEST(Naming, RhythmShortCodeOutOfRangeFallsBackToFirst) {
     EXPECT_STREQ(rhythmShortCode(-1), "Rk");
     EXPECT_STREQ(rhythmShortCode(12), "Rk");
     EXPECT_STREQ(rhythmShortCode(999), "Rk");
+}
+
+TEST(Naming, RhythmShortCodeDerivesFromUserName) {
+    std::vector<std::string> names;
+    for (int i = 0; i < RHYTHM_COUNT; i++) names.push_back(rhythmName(i));
+    names.push_back("Test Groove");
+    names.push_back("funk");
+    installRhythmNames(names);
+
+    EXPECT_STREQ(rhythmShortCode(RHYTHM_COUNT), "TE");
+    EXPECT_STREQ(rhythmShortCode(RHYTHM_COUNT + 1), "FU");
+
+    clearRhythmNames();
+    EXPECT_STREQ(rhythmShortCode(RHYTHM_COUNT), "Rk");  // back to built-in fallback
+}
+
+TEST(Naming, RhythmShortCodeUsesAuthoredShortName) {
+    std::vector<std::string> names;
+    std::vector<std::string> shorts;
+    for (int i = 0; i < RHYTHM_COUNT; i++) {
+        names.push_back(rhythmName(i));
+        shorts.push_back("");
+    }
+    shorts[0] = "R1";               // overrides the built-in "Rk"
+    names.push_back("My Funky Groove");
+    shorts.push_back("FG");
+    names.push_back("Long Name Here");
+    shorts.push_back("TooLong");    // truncated to "To"
+    installRhythmNames(names);
+    installRhythmShortNames(shorts);
+
+    EXPECT_STREQ(rhythmShortCode(0), "R1");
+    EXPECT_STREQ(rhythmShortCode(RHYTHM_COUNT), "FG");
+    EXPECT_STREQ(rhythmShortCode(RHYTHM_COUNT + 1), "To");
+
+    clearRhythmNames();
+    clearRhythmShortNames();
+    EXPECT_STREQ(rhythmShortCode(0), "Rk");  // built-in code restored
 }
 
 TEST(Naming, NoteNameFlatSpellingAndOctave) {

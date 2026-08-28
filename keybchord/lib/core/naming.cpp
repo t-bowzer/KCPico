@@ -26,13 +26,55 @@ const char* voicingModeName(VoicingMode mode) {
     }
 }
 
+namespace {
+
+// First two characters of `s` (verbatim, possibly fewer if shorter).
+const char* firstTwoChars(const char* s) {
+    static char buf[3];
+    int n = 0;
+    for (const char* p = s; p && *p && n < 2; ++p) {
+        buf[n++] = *p;
+    }
+    buf[n] = '\0';
+    return buf;
+}
+
+// Derived 2-char code from a pattern name: first two alphanumeric characters,
+// uppercased.
+const char* codeFromName(const char* name) {
+    static char buf[3];
+    int n = 0;
+    for (const char* p = name; p && *p && n < 2; ++p) {
+        char c = *p;
+        if (c >= 'a' && c <= 'z') c = static_cast<char>(c - 'a' + 'A');
+        if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+            buf[n++] = c;
+        }
+    }
+    if (n == 0) { buf[0] = 'U'; buf[1] = 's'; n = 2; }
+    buf[n] = '\0';
+    return buf;
+}
+
+} // namespace
+
+
 const char* rhythmShortCode(int index) {
     static const char* const kCodes[RHYTHM_COUNT] = {
         "Rk", "R2", "Wz", "Sw", "SR", "BN",
         "Rb", "Tg", "Mr", "Sb", "Ds", "Fx",
     };
-    if (index < 0 || index >= RHYTHM_COUNT) return kCodes[0];
-    return kCodes[index];
+    // Out of range (no such pattern) falls back to the first built-in.
+    if (index < 0 || index >= rhythmCount()) return kCodes[0];
+
+    // An authored short_name always wins (truncated to two characters).
+    const char* s = rhythmShortName(index);
+    if (s && s[0]) return firstTwoChars(s);
+
+    if (index < RHYTHM_COUNT) return kCodes[index];
+
+    // User-defined rhythm without a short_name: derive from its name.
+    return codeFromName(rhythmName(index));
 }
 
 std::string noteName(uint8_t note) {

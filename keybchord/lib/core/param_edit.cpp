@@ -1,5 +1,6 @@
 #include "param_edit.h"
 
+#include "bass.h"
 #include "naming.h"
 #include "rhythm.h"
 #include "strum.h"
@@ -134,20 +135,6 @@ const char* pcName(uint8_t pc) {
     return kPcNames[pc % 12];
 }
 
-const char* bassPatternShort(BassPattern p) {
-    switch (p) {
-        case BassPattern::Whole:        return "Whole";
-        case BassPattern::Half:         return "Half";
-        case BassPattern::Quarter:      return "Quarter";
-        case BassPattern::HalfAlt:      return "Half Alt";
-        case BassPattern::QuarterAlt:   return "Quarter Alt";
-        case BassPattern::ThreeFourAlt: return "3/4 Alt";
-        case BassPattern::Hold:         return "Hold";
-        case BassPattern::WalkNoSixth:  return "No 6th";
-        default:                        return "Walking";
-    }
-}
-
 std::string drumVelString(uint8_t v) {
     if (v == param_bounds::DRUM_VELOCITY_OFF) return "Off";
     return (v == 0) ? "Auto" : std::to_string(v);
@@ -242,7 +229,7 @@ std::string paramValueString(const StateManager& state, ParamId id) {
         case ParamId::BassDuration:  return std::to_string(state.pendingBass.note_duration_ms);
         case ParamId::BassVelocity:  return std::to_string(state.pendingBass.velocity);
         case ParamId::BassChannel:   return std::to_string(state.pendingBass.channel);
-        case ParamId::BassPattern:   return bassPatternShort(state.pendingBass.pattern);
+        case ParamId::BassPattern:   return bassName(state.pendingBass.pattern);
 
         case ParamId::DrumKickNote:    return std::to_string(state.pendingRhythm.drums.kick);
         case ParamId::DrumKickVel:     return drumVelString(state.pendingRhythm.drums.kick_vel);
@@ -401,9 +388,8 @@ void paramStep(StateManager& state, ParamId id, int delta) {
                 state.pendingBass.channel + dir, param_bounds::BASS_CHANNEL_MIN, param_bounds::BASS_CHANNEL_MAX));
             break;
         case ParamId::BassPattern:
-            state.pendingBass.pattern = static_cast<BassPattern>(
-                cycleEnum(static_cast<int>(state.pendingBass.pattern),
-                          static_cast<int>(BassPattern::COUNT), dir));
+            state.pendingBass.pattern = static_cast<uint8_t>(cycleEnum(
+                state.pendingBass.pattern, bassCount(), dir));
             break;
 
         case ParamId::DrumKickNote:
@@ -758,8 +744,8 @@ void paramSet(StateManager& state, ParamId id, int value) {
                 value, param_bounds::BASS_CHANNEL_MIN, param_bounds::BASS_CHANNEL_MAX));
             break;
         case ParamId::BassPattern:
-            state.pendingBass.pattern = static_cast<BassPattern>(clamp<int>(
-                value, 0, static_cast<int>(BassPattern::COUNT) - 1));
+            state.pendingBass.pattern = static_cast<uint8_t>(clamp<int>(
+                value, 0, bassCount() - 1));
             break;
 
         default: break;

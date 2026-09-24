@@ -23,6 +23,13 @@ The filesystem is presented as a USB Mass Storage drive named **"KeybChord"**:
 > native USB port. While the drive is mounted the firmware must not write to the
 > filesystem, so preset Save/Clear is suppressed until you eject and reboot.
 
+### Updating the firmware (enclosed build)
+
+If the Pico's BOOTSEL button is not reachable, hold **`Esc`** on the connected
+keyboard and power the unit **on** — it reboots into the USB bootloader
+(`RPI-RP2` drive) so you can drag a new `firmware.uf2` onto it without opening
+the enclosure.
+
 **First boot:** when the flash is empty the firmware self-provisions the whole
 layout — `config.json`, `/keymap.json`, `/presets/`, and `/rhythms/`. You do not
 need to prepare anything.

@@ -266,6 +266,7 @@ Because `Shift` (both keys) is a chord root, **Shift is never used as a function
 - **`F12`** — opens the **Bass Edit** menu (toggle).
 - **`Super`** (`Windows` key) — global/system modifier, used for preset navigation/save/clear (5.7) and panic (5.8). The target keyboard has no `Fn` key, so the `Windows`/`Super` key is used. (Stored in config as `global_fn: "super"`.)
 - **`Esc`** — returns to the main menu from any edit menu (and cancels prompts).
+- **`Esc`** (held at **power-on only**) — reboot into the USB bootloader (`RPI-RP2` drive) so the Pico can be reflashed over USB without opening the enclosure.
 - **`Ctrl`** — held at **power-on only**, to also present the USB Mass Storage drive (M9); it has no runtime function.
 
 Inside an edit menu, **chord and strum keys remain live** so a parameter change can be heard immediately without leaving the menu.
@@ -403,10 +404,11 @@ the cursor open. The cursor auto-resets after 5 s of idleness.
 | `F4` | Toggle the beat LED on/off (main-menu single-key, FR-R8) |
 | `Space` | **Tap tempo:** average the intervals of the most recent taps (up to 8) to set the rhythm tempo; a >2 s gap starts a fresh set |
 | `Ctrl` (held at power-on) | Also present the USB Mass Storage drive (M9); no runtime function |
+| `Esc` (held at power-on) | Reboot into the USB bootloader (`RPI-RP2`) to reflash the Pico without opening the enclosure |
 | `Super + Esc` | **Panic:** All-Sound-Off + All-Notes-Off on all channels/DIN output (FR-C11) |
 | `Esc` | Exit the current edit menu / cancel the current prompt |
 
-> **Note on modifiers:** all modifiers are read from the HID report modifier byte (`LCtrl/LShift/LAlt/LGui/RCtrl/RShift/RAlt/RGui`). `Shift` is a chord root. `Ctrl`/`Alt`/`Menu` have no runtime function (menus moved to `F9`–`F12`; `Ctrl` is the power-on boot key). `Super` is the global modifier for presets/panic.
+> **Note on modifiers:** all modifiers are read from the HID report modifier byte (`LCtrl/LShift/LAlt/LGui/RCtrl/RShift/RAlt/RGui`). `Shift` is a chord root. `Ctrl`/`Alt`/`Menu` have no runtime function (menus moved to `F9`–`F12`; `Ctrl` is the power-on boot key). `Esc` is the power-on bootloader key. `Super` is the global modifier for presets/panic.
 
 ### 5.9 Bass Controls & the Bass Edit Menu
 

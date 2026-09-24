@@ -9,6 +9,7 @@ public:
     std::vector<KeyEvent> poll() override;
     bool setLed(uint8_t led_usage, bool on) override;
     bool connected() const override { return mounted_; }
+    bool reportReceived() const override { return reportReceived_; }
 
     void onMount(uint8_t dev_addr, uint8_t instance);
     void onUmount(uint8_t dev_addr, uint8_t instance);
@@ -17,6 +18,7 @@ public:
 private:
     static constexpr size_t MAX_KEYS = 6;
     bool    mounted_  = false;
+    bool    reportReceived_ = false;
     uint8_t dev_addr_  = 0;
     uint8_t instance_  = 0;
     uint8_t prev_mods_ = 0;

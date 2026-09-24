@@ -28,6 +28,11 @@ public:
     // Whether the keyboard is currently enumerated (NFR-5). Default true so
     // null adapters and tests report "connected".
     virtual bool connected() const { return true; }
+
+    // Whether at least one valid HID report has been received since the keyboard
+    // enumerated. Used by the boot-key scan to know when the initial report (and
+    // thus the held-keys state) has arrived. Default false (no report yet).
+    virtual bool reportReceived() const { return false; }
 };
 
 class MidiOutAdapter {

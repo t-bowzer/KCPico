@@ -54,6 +54,10 @@ pio run -e pico          # builds keybchord/.pio/build/pico/firmware.uf2
    a mass-storage drive.
 2. Drag `firmware.uf2` onto the drive; the Pico reboots and runs it.
 
+No BOOTSEL button accessible (enclosed build)? Power off, hold **Esc** on the
+connected keyboard, and power on — the firmware reboots straight into the
+BOOTSEL drive, so you can drag `firmware.uf2` on without opening the enclosure.
+
 On first boot the firmware self-provisions its config, presets, and rhythms.
 
 ## Using it

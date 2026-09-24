@@ -88,6 +88,8 @@ void InputUsbHost::onReport(uint8_t dev_addr, uint8_t instance,
         return;
     }
 
+    reportReceived_ = true;
+
     uint8_t modifiers = report[0];
     uint64_t received_us = time_us_64();
     uint8_t mod_changed = modifiers ^ prev_mods_;

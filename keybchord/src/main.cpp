@@ -24,7 +24,9 @@
 #endif
 
 #if defined(ARDUINO_ARCH_RP2040)
-#include "pico/time.h"  // time_us_64() (64-bit monotonic; micros() wraps at ~71 min)
+#include "pico/time.h"      // time_us_64() (64-bit monotonic; micros() wraps at ~71 min)
+#include "pico/bootrom.h"   // reset_usb_boot()
+#include "pico/multicore.h" // multicore_reset_core1()
 #endif
 
 static Adapters        g_adapters;
@@ -133,31 +135,63 @@ static void handlePanic() {
     logInfo("Panic: all-sound-off + all-notes-off (16ch)");
 }
 
-// Polls the keyboard for a short window at boot looking for a held Ctrl (LCtrl
-// or RCtrl, reported in the HID modifier byte). When held, the native USB port
-// also presents the FatFS Mass Storage drive so the user can drag-drop edit
-// config.json/presets/rhythms (M9/M10). Returns true if the drive should be
-// enabled.
-static bool detectBootKey() {
-    constexpr uint8_t CTRL_MASK = 0x11;  // LCtrl | RCtrl
+// Boot-time key gesture (polled for a short window before the main loop):
+//   - Esc held  -> enter the USB bootloader (BOOTSEL) so the Pico can be
+//                  reflashed over USB without opening the enclosure.
+//   - Ctrl held -> present the FatFS Mass Storage drive on the native USB port
+//                  so config.json/presets/rhythms can be drag-drop edited (M9/M10).
+// Bootloader wins if both are held (flashing supersedes file editing).
+enum class BootMode { None, Bootloader, MassStorage };
+
+static BootMode detectBootMode() {
+    constexpr uint8_t CTRL_MASK    = 0x11;  // LCtrl | RCtrl
+    constexpr uint8_t HID_USAGE_ESC = 0x29;  // keyboard Escape
+    constexpr uint64_t kSettleUs   = 300000ULL;  // grace after first report
     uint64_t deadline = nowUs() + 2000000ULL;  // hard cap (no keyboard present)
-    bool connectedSeen = false;
+    uint64_t settleDeadline = 0;
+    bool reportSeen = false;
 
     while (nowUs() < deadline) {
         bool connected = g_adapters.input->connected();
         auto events = g_adapters.input->poll();
         for (const auto& ev : events) {
-            if (ev.pressed && (ev.modifiers & CTRL_MASK)) {
-                return true;
+            if (!ev.pressed) continue;
+            if (ev.hid_usage == HID_USAGE_ESC) {
+                return BootMode::Bootloader;
+            }
+            if (ev.modifiers & CTRL_MASK) {
+                return BootMode::MassStorage;
             }
         }
-        // Once the keyboard has enumerated and its initial report has been read
-        // without Ctrl, the boot key was not held — stop waiting.
-        if (connected && connectedSeen) break;
-        if (connected) connectedSeen = true;
+        // A keyboard may report its modifiers before the key array, so a held
+        // Esc can arrive in a report right after the first one. Wait for the
+        // first report, then keep scanning for a short settle grace before
+        // concluding no boot key was held.
+        if (connected && g_adapters.input->reportReceived() && !reportSeen) {
+            reportSeen = true;
+            settleDeadline = nowUs() + kSettleUs;
+        }
+        if (reportSeen && nowUs() >= settleDeadline) break;
         delay(10);
     }
-    return false;
+    return BootMode::None;
+}
+
+// Reboot into the ROM USB bootloader (BOOTSEL). Core 1 is stopped first: its
+// loop1() services TinyUSB and feeds the watchdog, and either can race with the
+// bootrom's reset of the USB controller / watchdog (leaving the chip hung with
+// the drive never appearing). The native USB is then dropped so the host sees a
+// clean detach before the bootrom re-enumerates as RPI-RP2. The on-board LED
+// (GPIO 25) is used as the bootloader activity light so entering BOOTSEL is
+// visible even before the drive mounts.
+static void enterBootloader() {
+#if defined(ARDUINO_ARCH_RP2040)
+    multicore_reset_core1();
+    tud_disconnect();
+    busy_wait_ms(50);
+    reset_usb_boot(1u << LED_BUILTIN, 0);
+    while (true) {}  // reset_usb_boot() is noreturn
+#endif
 }
 
 void setup() {
@@ -237,9 +271,21 @@ void setup() {
 
     logInfo("KeybChord Pico ready");
 
-    // M9: if F11 was held at boot, also present the FatFS Mass Storage drive on
-    // the native USB port (the serial debug log stays available).
-    if (detectBootKey()) {
+    // Boot-key gesture: Esc enters the USB bootloader (reflash without opening
+    // the enclosure); Ctrl also presents the FatFS Mass Storage drive on the
+    // native USB port (the serial debug log stays available).
+    switch (detectBootMode()) {
+    case BootMode::Bootloader:
+        logInfo("Esc boot key: entering USB bootloader");
+        if (g_display) {
+            g_display->showError("Entering", "bootloader...");
+            g_display->update(nowUs());
+        }
+        delay(50);
+        enterBootloader();
+        break;
+
+    case BootMode::MassStorage:
         g_msc = new MscFatFs();
         if (g_msc->begin()) {
             g_msc->setDriveEnabled(true);
@@ -254,6 +300,11 @@ void setup() {
             delete g_msc;
             g_msc = nullptr;
         }
+        break;
+
+    case BootMode::None:
+    default:
+        break;
     }
 
     // NFR-5: enable the hardware watchdog to recover from a wedged USB stack.

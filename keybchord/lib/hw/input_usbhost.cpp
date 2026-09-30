@@ -15,10 +15,8 @@ extern "C" {
 
 void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance,
                       uint8_t const* desc_report, uint16_t desc_len) {
-    (void)desc_report;
-    (void)desc_len;
     if (g_inputInstance) {
-        g_inputInstance->onMount(dev_addr, instance);
+        g_inputInstance->onMount(dev_addr, instance, desc_report, desc_len);
     }
 }
 
@@ -63,10 +61,28 @@ bool InputUsbHost::begin() {
     return true;
 }
 
-void InputUsbHost::onMount(uint8_t dev_addr, uint8_t instance) {
+void InputUsbHost::onMount(uint8_t dev_addr, uint8_t instance,
+                           const uint8_t* desc_report, uint16_t desc_len) {
     mounted_  = true;
     dev_addr_ = dev_addr;
     instance_ = instance;
+    report_id_ = 0;
+
+    // Find the keyboard input report's Report ID. Report-protocol keyboards
+    // (common with 2.4 GHz wireless dongles, which usually enumerate with
+    // bInterfaceSubClass != boot) prefix each interrupt report with this byte;
+    // boot-protocol reports never do. Used by onReport() to skip the ID byte.
+    if (desc_report && desc_len) {
+        tuh_hid_report_info_t infos[8];
+        uint8_t n = tuh_hid_parse_report_descriptor(infos, 8, desc_report, desc_len);
+        for (uint8_t i = 0; i < n; i++) {
+            if (infos[i].usage_page == HID_USAGE_PAGE_DESKTOP &&
+                infos[i].usage == HID_USAGE_DESKTOP_KEYBOARD) {
+                report_id_ = infos[i].report_id;
+                break;
+            }
+        }
+    }
 
     tuh_hid_set_protocol(dev_addr, instance, HID_PROTOCOL_BOOT);
     tuh_hid_receive_report(dev_addr, instance);
@@ -75,6 +91,7 @@ void InputUsbHost::onMount(uint8_t dev_addr, uint8_t instance) {
 void InputUsbHost::onUmount(uint8_t dev_addr, uint8_t instance) {
     if (dev_addr == dev_addr_ && instance == instance_) {
         mounted_ = false;
+        report_id_ = 0;
         for (auto& k : prev_keys_) k = 0;
         prev_mods_ = 0;
         led_state_ = 0;
@@ -83,14 +100,26 @@ void InputUsbHost::onUmount(uint8_t dev_addr, uint8_t instance) {
 
 void InputUsbHost::onReport(uint8_t dev_addr, uint8_t instance,
                             const uint8_t* report, uint16_t len) {
-    if (dev_addr != dev_addr_ || instance != instance_ || len < 8) {
+    if (dev_addr != dev_addr_ || instance != instance_) {
+        tuh_hid_receive_report(dev_addr, instance);
+        return;
+    }
+
+    // A report-protocol keyboard prefixes the report with its Report ID; drop
+    // it so the rest parses as the standard 8-byte boot-format layout.
+    uint8_t off = 0;
+    if (report_id_ != 0 && len > 0 && report[0] == report_id_) {
+        off = 1;
+    }
+
+    if (len < off + 8) {
         tuh_hid_receive_report(dev_addr, instance);
         return;
     }
 
     reportReceived_ = true;
 
-    uint8_t modifiers = report[0];
+    uint8_t modifiers = report[off];
     uint64_t received_us = time_us_64();
     uint8_t mod_changed = modifiers ^ prev_mods_;
     for (int bit = 0; bit < 8; bit++) {
@@ -103,8 +132,8 @@ void InputUsbHost::onReport(uint8_t dev_addr, uint8_t instance,
     prev_mods_ = modifiers;
 
     uint8_t currentKeys[MAX_KEYS];
-    for (size_t i = 0; i < MAX_KEYS && (i + 2) < len; i++) {
-        currentKeys[i] = report[i + 2];
+    for (size_t i = 0; i < MAX_KEYS && (off + 2 + i) < len; i++) {
+        currentKeys[i] = report[off + 2 + i];
     }
 
     for (size_t i = 0; i < MAX_KEYS; i++) {

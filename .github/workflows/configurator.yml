@@ -33,6 +33,15 @@ jobs:
         working-directory: configurator
         run: pyinstaller packaging/keybchord-configurator.spec
 
+      - name: Rename binary per OS
+        working-directory: configurator
+        shell: bash
+        run: |
+          ext=""
+          [ "$RUNNER_OS" = "Windows" ] && ext=".exe"
+          os_name=$(echo "$RUNNER_OS" | tr '[:upper:]' '[:lower:]')
+          mv "dist/keybchord-configurator${ext}" "dist/keybchord-configurator-${os_name}${ext}"
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:

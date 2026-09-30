@@ -79,11 +79,18 @@ rhythm and bass patterns). Ready-to-copy examples are in
 [examples/test_rhythm.json](examples/test_rhythm.json) and
 [examples/test_bass.json](examples/test_bass.json).
 
+For a point-and-click way to edit all of the above — presets, rhythm/bass
+patterns, the keymap, and global settings, plus backup/restore and writing
+straight to the device — use the cross-platform
+**[KeybChord Configurator](configurator/README.md)** desktop app.
+
 ## Documentation
 
 - [Product spec](docs/KeybChord_Pico_Spec.md) — full behavior and data models.
 - [Wiring](docs/wiring.md) — connection diagram.
 - [Custom configuration guide](docs/custom-configuration-guide.md) — JSON reference.
+- [v0.1.0 roadmap](docs/v0.1.0-roadmap.md) — milestones and acceptance coverage.
+- [v0.2.0 roadmap](docs/v0.2.0-roadmap.md) — current development plan.
 
 ## Development
 

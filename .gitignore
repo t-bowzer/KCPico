@@ -23,3 +23,15 @@ Thumbs.db
 
 # Dependencies (PlatformIO fetches these)
 lib/.pio/
+
+# Python (configurator)
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+.pytest_cache/
+configurator/build/
+configurator/dist/
+

@@ -251,13 +251,17 @@ key-combo to an action.
 
 **Bindable keys:** `F1`–`F12`, `PrtSc`, `ScLk`, `Pause`, `Insert`, `Home`,
 `PgUp`, `Delete`, `End`, `PgDn`, `Space`, `=`, `-`, `KpPlus`, `KpMinus`,
-`KpEnter`.
+`KpEnter`, `Left`, `Down`, `Right`, `Up`.
 
 **Reserved keys (cannot be rebound):** the chord grid (`Tab`, `Q`…`[`, `Caps`,
 `A`…`'`, `LShift`…`/`, `RShift`), strum keys (number row `1`…`0` and the keypad
-`0 . 1…9 NumLock / *`), `` ` `` (backtick), `Esc`, the arrow keys
-(`Left`/`Down`/`Right`/`Up`), `Enter`, and `Backspace`. `Super`+`Esc` (panic)
-and `Super`+`1`…`8` (preset load) are also hard-coded.
+`0 . 1…9 NumLock / *`), `` ` `` (backtick), `Esc`, `Enter`, and `Backspace`.
+`Super`+`Esc` (panic) and `Super`+`1`…`8` (preset load) are also hard-coded.
+
+> The arrow keys (`Left`/`Down`/`Right`/`Up`) are bindable; by default `Left`,
+> `Down`, and `Right` are bound to the held add9/add11/add13 extensions. Inside
+> an edit menu the arrows still navigate the menu regardless of any keymap
+> binding.
 
 ### 4.2 Action types
 
@@ -269,6 +273,7 @@ and `Super`+`1`…`8` (preset load) are also hard-coded.
 | `inc` | `param` | Step the parameter +1 (clamps; auto-repeats where applicable). |
 | `dec` | `param` | Step the parameter −1. |
 | `toggle` | `param`, `a`, `b` | If value == `a`, set to `b`, else set to `a`. |
+| `ext` | `value` | Trigger a held chord extension: `9` (add9), `11` (add11), or `13` (add13). |
 | `drum_mute` | `index` (0–11) | Mute/unmute the Nth track of the current pattern. |
 | `preset_prev` / `preset_next` | — | Move the preset cursor back/forward. |
 | `preset_bank_prev` / `preset_bank_next` | — | Move the preset bank back/forward. |

@@ -132,10 +132,6 @@ bool keymapIsReserved(uint8_t hid_usage) {
         case HID_USAGE_ESC:
         case HID_USAGE_ENTER:
         case HID_USAGE_BACKSPACE:
-        case HID_USAGE_LEFT:
-        case HID_USAGE_DOWN:
-        case HID_USAGE_RIGHT:
-        case HID_USAGE_UP:
             return true;
         default:
             return false;
@@ -213,9 +209,20 @@ KeyAction KeymapResolver::resolve(uint8_t hid_usage, uint8_t modifiers) const {
         a.cmd = KeyCmd::Backtick;
         return a;
     }
-    if (hid_usage == HID_USAGE_LEFT)  { if (!super) a.cmd = KeyCmd::Ext9;  return a; }
-    if (hid_usage == HID_USAGE_DOWN)  { if (!super) a.cmd = KeyCmd::Ext11; return a; }
-    if (hid_usage == HID_USAGE_RIGHT) { if (!super) a.cmd = KeyCmd::Ext13; return a; }
+    // Held extension keys (Left/Down/Right) are configurable. They resolve
+    // through the *no-modifier* binding so they keep working while Ctrl/Alt is
+    // held (they are held modifiers — releasing one mid-combo must still
+    // resolve, or the extension would latch). Super still suppresses them.
+    // Defaults are add9/add11/add13.
+    if (hid_usage == HID_USAGE_LEFT || hid_usage == HID_USAGE_DOWN ||
+        hid_usage == HID_USAGE_RIGHT) {
+        if (super) return a;
+        if (keymap_) {
+            const KeyAction* found = keymap_->find(0, hid_usage);
+            if (found) return *found;
+        }
+        return a;
+    }
     if (hid_usage == HID_USAGE_ESC)   { if (!super) a.cmd = KeyCmd::ClearEdit; return a; }
     if (isNumberRowStrum(hid_usage) || isKeypadStrum(hid_usage)) {
         if (super) return a;

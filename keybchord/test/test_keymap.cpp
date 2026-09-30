@@ -303,8 +303,11 @@ TEST(Keymap, ReservedFlag) {
     EXPECT_TRUE(keymapIsReserved(0x1E));   // 1
     EXPECT_TRUE(keymapIsReserved(0x35));   // backtick
     EXPECT_TRUE(keymapIsReserved(0x29));   // Esc
-    EXPECT_TRUE(keymapIsReserved(0x50));   // Left
     EXPECT_TRUE(keymapIsReserved(0x28));   // Enter
+    EXPECT_FALSE(keymapIsReserved(0x50));  // Left (now bindable)
+    EXPECT_FALSE(keymapIsReserved(0x51));  // Down (now bindable)
+    EXPECT_FALSE(keymapIsReserved(0x4F));  // Right (now bindable)
+    EXPECT_FALSE(keymapIsReserved(0x52));  // Up (now bindable)
     EXPECT_FALSE(keymapIsReserved(0x3A));  // F1
     EXPECT_FALSE(keymapIsReserved(0x4A));  // Home
 }

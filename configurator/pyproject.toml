@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "keybchord-configurator"
+version = "0.1.0"
+description = "GUI configurator for the KeybChord Pico (presets, rhythms, bass, keymap, backup)"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "t-bowzer" }]
+requires-python = ">=3.9"
+keywords = ["keybchord", "midi", "pico", "rp2040", "configurator"]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Sound/Audio :: MIDI",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "PySide6>=6.5",
+]
+
+[project.optional-dependencies]
+preview = [
+    "numpy>=1.24",
+    "sounddevice>=0.4",
+]
+dev = [
+    "pytest>=7",
+    "pyinstaller>=6",
+]
+
+[project.scripts]
+keybchord_configurator = "keybchord_configurator.app:main"
+
+[project.gui-scripts]
+keybchord-configurator = "keybchord_configurator.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+keybchord_configurator = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

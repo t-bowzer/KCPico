@@ -28,7 +28,7 @@ constexpr uint8_t KMOD_SUPER = 0x04;  // LGui | RGui
 uint8_t keymapComboMask(uint8_t hid_modifiers);
 
 // True if the HID usage is a reserved key that may not be rebound in the
-// keymap config (chord-grid, strum, backtick, Esc, arrows, Enter/Backspace).
+// keymap config (chord-grid, strum, backtick, Esc, Enter/Backspace).
 bool keymapIsReserved(uint8_t hid_usage);
 
 // Character produced by a keyboard key for preset name text-entry, or '\0' if
@@ -38,20 +38,21 @@ bool keymapIsReserved(uint8_t hid_usage);
 char keymapCharForUsage(uint8_t hid_usage, uint8_t modifiers = 0);
 
 // A resolved key command. "Reserved" commands (ChordKey/Backtick/StrumKey/
-// Ext*/ClearEdit/Panic) are hardcoded; everything else is data-driven from the
-// loaded keymap config.
+// ClearEdit/Panic) are hardcoded; everything else is data-driven from the
+// loaded keymap config (including the held extensions Ext9/Ext11/Ext13, which
+// map to the "ext" keymap action).
 enum class KeyCmd : uint8_t {
     None = 0,
     // Reserved (hardcoded, non-configurable):
     ChordKey,       // one of the 36 chord-grid keys (GridCell in action)
     Backtick,       // ` key (leftmost-column modifier source)
     StrumKey,       // number-row / keypad strum key (layout applied in engine)
-    Ext9,           // Left arrow  (held add9 modifier, FR-C7)
-    Ext11,          // Down arrow  (held add11 modifier, FR-C7)
-    Ext13,          // Right arrow (held add13 modifier, FR-C7)
     ClearEdit,      // Esc (exits the edit menu / cancels)
     Panic,          // Super+Esc -> all-sound/notes-off all channels (FR-C11)
     // Configurable:
+    Ext9,           // held add9 modifier (default: Left arrow, FR-C7)
+    Ext11,          // held add11 modifier (default: Down arrow, FR-C7)
+    Ext13,          // held add13 modifier (default: Right arrow, FR-C7)
     OpenMenu,       // menu = EditMenu
     CycleParam,     // param
     SetParam,       // param + valueA

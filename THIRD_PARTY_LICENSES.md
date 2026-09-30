@@ -128,3 +128,22 @@ that the following condition is met:
 This software is provided by the copyright holder and contributors "AS IS" and
 any warranties related to this software are DISCLAIMED. The copyright owner or
 contributors be NOT LIABLE for any damages caused by use of this software.
+
+---
+
+## Configurator (Python GUI) dependencies
+
+The `configurator/` application is MIT-licensed and depends on the following
+Python packages. They are not part of the firmware.
+
+| Component | License | Used by |
+|-----------|---------|---------|
+| PySide6 (Qt for Python) | LGPL-3.0 (dynamically linked) | GUI runtime |
+| numpy | BSD-3-Clause | Optional audio preview |
+| sounddevice | MIT | Optional audio preview |
+| PyInstaller | GPL-2.0 (with bootloader exception) | Build tool only (not redistributed in the app binary) |
+
+PySide6 is LGPLv3; because it is dynamically linked, the configurator's own
+source remains MIT-licensed. The LGPL text is available at
+https://www.gnu.org/licenses/lgpl-3.0.html and Qt's source at
+https://code.qt.io/qt/qtbase. numpy is BSD-3-Clause; sounddevice is MIT.

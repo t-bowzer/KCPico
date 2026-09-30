@@ -35,6 +35,10 @@ constexpr uint8_t HID_USAGE_PGDN      = 0x4E;
 constexpr uint8_t HID_USAGE_KP_MINUS  = 0x56;
 constexpr uint8_t HID_USAGE_KP_PLUS   = 0x57;
 constexpr uint8_t HID_USAGE_KP_ENTER  = 0x58;
+constexpr uint8_t HID_USAGE_RIGHT     = 0x4F;
+constexpr uint8_t HID_USAGE_LEFT      = 0x50;
+constexpr uint8_t HID_USAGE_DOWN      = 0x51;
+constexpr uint8_t HID_USAGE_UP        = 0x52;
 
 // --- Key name table (configurable keys only; modifiers handled separately) ---
 struct KeyName {
@@ -51,6 +55,7 @@ const KeyName kKeyNames[] = {
     {"Delete", 0x4C}, {"End", 0x4D}, {"PgDn", 0x4E},
     {"Space", 0x2C}, {"=", 0x2E}, {"-", 0x2D},
     {"KpPlus", 0x57}, {"KpMinus", 0x56}, {"KpEnter", 0x58},
+    {"Left", 0x50}, {"Down", 0x51}, {"Right", 0x4F}, {"Up", 0x52},
     {"1", 0x1E}, {"2", 0x1F}, {"3", 0x20}, {"4", 0x21},
     {"5", 0x22}, {"6", 0x23}, {"7", 0x24}, {"8", 0x25},
 };
@@ -276,6 +281,7 @@ KeymapConfig KeymapConfig::defaults() {
     auto decp = [](ParamId p) { KeyAction a; a.cmd = KeyCmd::DecParam; a.param = p; return a; };
     auto openMenu = [](EditMenu m) { KeyAction a; a.cmd = KeyCmd::OpenMenu; a.menu = m; return a; };
     auto preset = [](KeyCmd c) { KeyAction a; a.cmd = c; return a; };
+    auto ext = [](KeyCmd c) { KeyAction a; a.cmd = c; return a; };
     auto drumMute = [](uint8_t idx) { KeyAction a; a.cmd = KeyCmd::DrumMute; a.slot = idx; return a; };
 
     // F1-F4: most common settings.
@@ -306,6 +312,11 @@ KeymapConfig KeymapConfig::defaults() {
     bind(0, HID_USAGE_MINUS,  decp(ParamId::ChordOctave));
     bind(0, HID_USAGE_KP_PLUS,  incp(ParamId::StrumOctave));
     bind(0, HID_USAGE_KP_MINUS, decp(ParamId::StrumOctave));
+
+    // Held extensions (arrow keys): add9/add11/add13.
+    bind(0, HID_USAGE_LEFT,  ext(KeyCmd::Ext9));
+    bind(0, HID_USAGE_DOWN,  ext(KeyCmd::Ext11));
+    bind(0, HID_USAGE_RIGHT, ext(KeyCmd::Ext13));
 
     // Tempo.
     bind(0, HID_USAGE_PGUP, incp(ParamId::RhythmTempo));
@@ -550,6 +561,19 @@ KeymapLoadResult KeymapConfig::load(StorageAdapter& storage) {
             if (!actErr) needValue("a", a.param, a.valueA);
             if (!actErr) needValue("b", a.param, a.valueB);
             a.cmd = KeyCmd::ToggleParam;
+        } else if (type == "ext") {
+            int v = 0;
+            needInt("value", v);
+            if (!actErr) {
+                if (v == 9)       a.cmd = KeyCmd::Ext9;
+                else if (v == 11) a.cmd = KeyCmd::Ext11;
+                else if (v == 13) a.cmd = KeyCmd::Ext13;
+                else {
+                    result.errors.push_back(where + ": ext 'value' must be 9, 11, or 13");
+                    result.ok = false;
+                    actErr = true;
+                }
+            }
         } else if (type == "drum_mute") {
             int idx;
             if (!act.containsKey("index") || !act["index"].is<int>()) {
@@ -659,6 +683,9 @@ R"({
     { "keys": ["-"], "action": { "type": "dec", "param": "chord_octave" } },
     { "keys": ["KpPlus"], "action": { "type": "inc", "param": "strum_octave" } },
     { "keys": ["KpMinus"], "action": { "type": "dec", "param": "strum_octave" } },
+    { "keys": ["Left"], "action": { "type": "ext", "value": 9 } },
+    { "keys": ["Down"], "action": { "type": "ext", "value": 11 } },
+    { "keys": ["Right"], "action": { "type": "ext", "value": 13 } },
     { "keys": ["PgUp"], "action": { "type": "inc", "param": "tempo" } },
     { "keys": ["PgDn"], "action": { "type": "dec", "param": "tempo" } },
     { "keys": ["Space"], "action": { "type": "tap_tempo" } },

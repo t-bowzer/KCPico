@@ -19,6 +19,10 @@
 #include "debug_log.h"
 #include "msc_fatfs.h"
 
+#ifdef KEYBCHORD_TEST_HOOK
+#include "test_hook.h"
+#endif
+
 #if defined(ARDUINO_ARCH_RP2040)
 #include "device/usbd.h"
 #endif
@@ -43,6 +47,10 @@ static EditEngine*     g_editEngine = nullptr;
 static PresetEngine*   g_presetEngine = nullptr;
 static MscFatFs*       g_msc = nullptr;
 static bool            g_keymapError = false;  // set when keymap.json fails validation
+
+#ifdef KEYBCHORD_TEST_HOOK
+static TestHook*       g_testHook = nullptr;
+#endif
 
 static inline uint64_t nowUs() {
 #if defined(ARDUINO_ARCH_RP2040)
@@ -232,6 +240,7 @@ void setup() {
     g_midiMonitorEnabled = g_state.config.midi_monitor_enabled;
 
     g_router = new MidiRouter(*g_adapters.midiOut, g_state);
+    g_router->setUsbOut(g_adapters.usbMidiOut.get());
     g_chordEngine = new ChordEngine(g_state, *g_router);
     g_strumEngine = new StrumEngine(g_state, *g_router);
     g_bassEngine  = new BassEngine(g_state, *g_router);
@@ -263,6 +272,10 @@ void setup() {
 
     g_presetEngine->loadStartupPreset();
     g_display->update(nowUs());
+
+#ifdef KEYBCHORD_TEST_HOOK
+    g_testHook = new TestHook(g_state, *g_router, g_chordEngine, g_strumEngine);
+#endif
 
     if (g_keymapError) {
         g_display->showError("Keymap error", "Remount to fix");
@@ -318,6 +331,10 @@ void loop() {
     if (!g_adapters.input) return;
 
     uint64_t now_us = nowUs();
+
+#ifdef KEYBCHORD_TEST_HOOK
+    if (g_testHook) g_testHook->poll(now_us);
+#endif
 
     // Halt when the keymap failed validation: keep the error screen up and do
     // not process any input until the file is fixed and the device rebooted.

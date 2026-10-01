@@ -47,6 +47,7 @@ class AppConfig:
 
     def __init__(self) -> None:
         self.din_enabled: bool = True
+        self.usb_midi_enabled: bool = True
         self.midi_clock_enabled: bool = False
         self.base_root_midi: int = 60
         self.note_range_low: int = 48
@@ -75,6 +76,9 @@ class AppConfig:
         midi = data.get("midi")
         if isinstance(midi, dict):
             cfg.din_enabled = _as_bool(midi.get("din_enabled"), cfg.din_enabled)
+            cfg.usb_midi_enabled = _as_bool(
+                midi.get("usb_enabled"), cfg.usb_midi_enabled
+            )
             cfg.midi_clock_enabled = _as_bool(
                 midi.get("clock_enabled"), cfg.midi_clock_enabled
             )
@@ -146,6 +150,7 @@ class AppConfig:
         return {
             "midi": {
                 "din_enabled": self.din_enabled,
+                "usb_enabled": self.usb_midi_enabled,
                 "clock_enabled": self.midi_clock_enabled,
             },
             "chord": {

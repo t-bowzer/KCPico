@@ -15,6 +15,7 @@ protected:
 TEST_F(ConfigTest, Defaults) {
     AppConfig cfg = AppConfig::defaults();
     EXPECT_TRUE(cfg.din_enabled);
+    EXPECT_TRUE(cfg.usb_midi_enabled);
     EXPECT_FALSE(cfg.midi_clock_enabled);
     EXPECT_EQ(cfg.base_root_midi, 60);
     EXPECT_EQ(cfg.note_range_low, 48);
@@ -48,6 +49,31 @@ TEST_F(ConfigTest, LoadMinimalValidConfig) {
     EXPECT_TRUE(cfg.midi_clock_enabled);
     // Other fields use defaults
     EXPECT_EQ(cfg.base_root_midi, 60);
+}
+
+TEST_F(ConfigTest, UsbMidiEnabledDefaultsTrue) {
+    AppConfig cfg = AppConfig::load(storage_);  // missing -> defaults
+    EXPECT_TRUE(cfg.usb_midi_enabled);
+}
+
+TEST_F(ConfigTest, LoadUsbMidiEnabled) {
+    const char* json = R"({"midi":{"usb_enabled":false}})";
+    storage_.writeFile("/config.json", json);
+    AppConfig cfg = AppConfig::load(storage_);
+    EXPECT_FALSE(cfg.usb_midi_enabled);
+
+    storage_.writeFile("/config.json", R"({"midi":{"usb_enabled":true}})");
+    cfg = AppConfig::load(storage_);
+    EXPECT_TRUE(cfg.usb_midi_enabled);
+}
+
+TEST_F(ConfigTest, UsbMidiEnabledRoundTrip) {
+    AppConfig cfg = AppConfig::defaults();
+    cfg.usb_midi_enabled = false;
+    EXPECT_TRUE(cfg.save(storage_));
+
+    AppConfig loaded = AppConfig::load(storage_);
+    EXPECT_FALSE(loaded.usb_midi_enabled);
 }
 
 TEST_F(ConfigTest, LoadClampsOutOfRange) {

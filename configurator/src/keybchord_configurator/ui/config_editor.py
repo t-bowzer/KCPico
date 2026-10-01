@@ -29,8 +29,10 @@ class ConfigEditor(QWidget):
         midi_group = QGroupBox("MIDI")
         midi_form = QFormLayout(midi_group)
         self.din_enabled = bool_check(True, "DIN MIDI enabled")
+        self.usb_midi_enabled = bool_check(True, "USB MIDI enabled")
         self.clock_enabled = bool_check(False, "MIDI clock out")
         midi_form.addRow(self.din_enabled)
+        midi_form.addRow(self.usb_midi_enabled)
         midi_form.addRow(self.clock_enabled)
         root.addWidget(midi_group)
 
@@ -86,7 +88,8 @@ class ConfigEditor(QWidget):
 
     def _widgets(self):
         return [
-            self.din_enabled, self.clock_enabled, self.base_root_midi,
+            self.din_enabled, self.usb_midi_enabled, self.clock_enabled,
+            self.base_root_midi,
             self.note_range_low, self.note_range_high, self.display_revert_ms,
             self.display_prompt_ms, self.display_cursor_ms, self.display_menu_ms,
             self.bpm_indicator, self.led_target, self.led_flash_ms,
@@ -104,6 +107,7 @@ class ConfigEditor(QWidget):
 
     def load(self, cfg: AppConfig) -> None:
         self.din_enabled.setChecked(cfg.din_enabled)
+        self.usb_midi_enabled.setChecked(cfg.usb_midi_enabled)
         self.clock_enabled.setChecked(cfg.midi_clock_enabled)
         self.base_root_midi.setValue(cfg.base_root_midi)
         self.note_range_low.setValue(cfg.note_range_low)
@@ -123,6 +127,7 @@ class ConfigEditor(QWidget):
 
     def store(self, cfg: AppConfig) -> None:
         cfg.din_enabled = self.din_enabled.isChecked()
+        cfg.usb_midi_enabled = self.usb_midi_enabled.isChecked()
         cfg.midi_clock_enabled = self.clock_enabled.isChecked()
         cfg.base_root_midi = self.base_root_midi.value()
         cfg.note_range_low = self.note_range_low.value()

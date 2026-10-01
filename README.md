@@ -22,6 +22,8 @@ out a DIN-5 connector — no computer required.
   …) following the active chord, all editable as JSON.
 - **Presets** — 10 banks × 8 slots (80 presets) with on-device naming.
 - **DIN-5 MIDI OUT** — 3.3 V loop, standards-compliant per the MIDI 1.0 spec.
+- **USB MIDI OUT** — composite USB MIDI device on the native port (alongside the
+  debug serial), toggleable via `Ctrl+F8` / `midi.usb_enabled`.
 - **LCD1602** status/parameter display over I2C.
 - **Fully configurable** — `config.json`, `keymap.json`, presets, rhythms, and
   bass patterns are all editable JSON on a USB Mass Storage drive.

@@ -356,6 +356,7 @@ def validate_config(data: Any) -> ValidationResult:
     midi = data.get("midi")
     if isinstance(midi, dict):
         _check_bool(result, "midi", midi, "din_enabled")
+        _check_bool(result, "midi", midi, "usb_enabled")
         _check_bool(result, "midi", midi, "clock_enabled")
     elif midi is not None:
         result.add_error("'midi' must be an object")

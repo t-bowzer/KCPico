@@ -18,6 +18,7 @@ enum class LedTarget : uint8_t {
 
 struct AppConfig {
     bool     din_enabled             = true;
+    bool     usb_midi_enabled        = true;   // USB MIDI device output (M11)
     bool     midi_clock_enabled      = false;
     uint8_t  base_root_midi          = 60;
     uint8_t  note_range_low          = 48;

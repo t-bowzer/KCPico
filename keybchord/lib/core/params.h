@@ -109,6 +109,7 @@ enum class ParamId : uint8_t {
     RhythmEnable,
     RhythmClock,
     RhythmLed,
+    UsbMidi,      // global: USB MIDI device output on/off (M11)
     // Bass
     BassEnable,
     BassOctave,

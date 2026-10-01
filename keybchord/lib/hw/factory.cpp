@@ -7,6 +7,7 @@
 #include "input_usbhost.h"
 #include "lcd_hd44780.h"
 #include "midi_out_uart.h"
+#include "midi_out_usb.h"
 #include "storage_fatfs.h"
 #endif
 
@@ -36,6 +37,14 @@ Adapters createAdapters() {
         } else {
             a.midiOut = std::make_unique<NullMidiOutAdapter>();
         }
+    }
+
+    {
+        auto usbMidi = std::make_unique<MidiOutUsb>();
+        if (usbMidi->begin()) {
+            a.usbMidiOut = std::move(usbMidi);
+        }
+        // On failure usbMidiOut stays null; the router degrades gracefully.
     }
 
     {

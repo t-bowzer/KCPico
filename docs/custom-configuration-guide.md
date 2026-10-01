@@ -53,7 +53,7 @@ A single object. Any omitted key uses its default.
 
 ```json
 {
-  "midi":    { "din_enabled": true, "clock_enabled": false },
+  "midi":    { "din_enabled": true, "usb_enabled": true, "clock_enabled": false },
   "chord":   { "base_root_midi": 60, "note_range": [48, 84] },
   "display": {
     "revert_timeout_ms": 1500,
@@ -70,7 +70,8 @@ A single object. Any omitted key uses its default.
 | Key | Type | Range | Default | Notes |
 |-----|------|-------|---------|-------|
 | `midi.din_enabled` | bool | — | `true` | Reserved; parsed but not currently used (DIN MIDI out is always active). |
-| `midi.clock_enabled` | bool | — | `false` | Transmit MIDI clock (`0xF8`) on DIN. Toggle = `F8`. |
+| `midi.usb_enabled` | bool | — | `true` | USB MIDI device output on/off (v0.2). The interface always enumerates; this only gates whether bytes are sent. Toggle = `Ctrl+F8`. |
+| `midi.clock_enabled` | bool | — | `false` | Transmit MIDI clock (`0xF8`) on DIN and USB. Toggle = `F8`. |
 | `chord.base_root_midi` | int | 0–127 | `60` | Anchor MIDI note for chord root position (60 = C4). |
 | `chord.note_range` | [int,int] | 0–127 each | `[48, 84]` | Voicing note window. An inverted pair is auto-swapped. |
 | `display.revert_timeout_ms` | int | 250–5000 | `1500` | How long a parameter value stays on the LCD before reverting. |
@@ -289,7 +290,7 @@ key-combo to an action.
 `strum_octave`, `strum_duration`, `strum_velocity`, `strum_layout`,
 `strum_mode`, `strum_root`, `strum_scale`,
 `tempo`, `swing`, `rhythm_pattern`, `rhythm_mute`, `rhythm_enable`,
-`rhythm_clock`, `rhythm_led`,
+`rhythm_clock`, `rhythm_led`, `usb_midi`,
 `bass_enable`, `bass_octave`, `bass_duration`, `bass_velocity`,
 `bass_channel`, `bass_pattern`.
 
@@ -311,7 +312,7 @@ these **short** names (which differ slightly from the preset JSON names):
 | `strum_scale` | `ionian`, `dorian`, `phrygian`, `lydian`, `mixolydian`, `aeolian`, `locrian`, `harmonic_minor`, `melodic_minor`, `major_pentatonic`, `minor_pentatonic`, `blues` |
 | `bass_pattern` | `Walking`, `Whole`, `Half`, `Quarter`, `Half Alt`, `Quarter Alt`, `3/4 Alt`, `Hold`, `No 6th` (or 0–8, or any user pattern's `name`) |
 | `rhythm_pattern` | any built-in or user rhythm `name` (e.g. `Rock 1`, `Test Groove`), or an index 0–N |
-| bool params (`strum_layout`, `rhythm_mute`, `rhythm_enable`, `rhythm_clock`, `rhythm_led`, `bass_enable`) | `on`/`off`, `true`/`false`, `1`/`0` |
+| bool params (`strum_layout`, `rhythm_mute`, `rhythm_enable`, `rhythm_clock`, `rhythm_led`, `usb_midi`, `bass_enable`) | `on`/`off`, `true`/`false`, `1`/`0` |
 
 > `rhythm_pattern` / `bass_pattern` names are resolved against the patterns
 > loaded at boot (built-ins + user files), so a name that doesn't match a loaded

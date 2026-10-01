@@ -28,8 +28,13 @@ public:
 
     void sendTestNote();
 
+    // Optional second output (USB MIDI device). Messages are fanned out to it
+    // when set and config.usb_midi_enabled is on. May be null (native/tests).
+    void setUsbOut(MidiOutAdapter* usbOut);
+
 private:
     MidiOutAdapter& midiOut_;
+    MidiOutAdapter* usbOut_ = nullptr;
     StateManager& state_;
 
     void send(const MidiMessage& msg);

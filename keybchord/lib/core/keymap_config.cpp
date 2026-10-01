@@ -106,6 +106,7 @@ const ParamName kParamNames[] = {
     {"rhythm_enable", ParamId::RhythmEnable},
     {"rhythm_clock", ParamId::RhythmClock},
     {"rhythm_led", ParamId::RhythmLed},
+    {"usb_midi", ParamId::UsbMidi},
     {"bass_enable", ParamId::BassEnable},
     {"bass_octave", ParamId::BassOctave},
     {"bass_duration", ParamId::BassDuration},
@@ -178,6 +179,7 @@ bool isBoolParam(ParamId id) {
         case ParamId::RhythmEnable:
         case ParamId::RhythmClock:
         case ParamId::RhythmLed:
+        case ParamId::UsbMidi:
         case ParamId::BassEnable:
             return true;
         default:
@@ -340,6 +342,7 @@ KeymapConfig KeymapConfig::defaults() {
     bind(KMOD_CTRL, HID_USAGE_F1 + 2, cycle(ParamId::ChordArpMode));   // Ctrl+F3
     bind(KMOD_CTRL, HID_USAGE_F1 + 3, toggle(ParamId::ChordRoll, 0, 50)); // Ctrl+F4
     bind(KMOD_CTRL, HID_USAGE_F1 + 4, toggle(ParamId::RhythmLed, 1, 0));  // Ctrl+F5
+    bind(KMOD_CTRL, HID_USAGE_F1 + 7, toggle(ParamId::UsbMidi, 1, 0));    // Ctrl+F8
     bind(KMOD_CTRL, HID_USAGE_EQUALS, incp(ParamId::ChordVelocity));
     bind(KMOD_CTRL, HID_USAGE_MINUS,  decp(ParamId::ChordVelocity));
     bind(KMOD_CTRL, HID_USAGE_KP_ENTER, cycle(ParamId::StrumLayout));
@@ -701,6 +704,7 @@ R"({
     { "keys": ["Ctrl", "F3"], "action": { "type": "cycle", "param": "arp_mode" } },
     { "keys": ["Ctrl", "F4"], "action": { "type": "toggle", "param": "chord_roll", "a": 0, "b": 50 } },
     { "keys": ["Ctrl", "F5"], "action": { "type": "toggle", "param": "rhythm_led", "a": 1, "b": 0 } },
+    { "keys": ["Ctrl", "F8"], "action": { "type": "toggle", "param": "usb_midi", "a": 1, "b": 0 } },
     { "keys": ["Ctrl", "="], "action": { "type": "inc", "param": "chord_velocity" } },
     { "keys": ["Ctrl", "-"], "action": { "type": "dec", "param": "chord_velocity" } },
     { "keys": ["Ctrl", "KpEnter"], "action": { "type": "cycle", "param": "strum_layout" } },

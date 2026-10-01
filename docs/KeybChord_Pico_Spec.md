@@ -21,7 +21,6 @@ KeybChord is a standalone MIDI controller. A standard USB keyboard is plugged in
 ### 1.3 Non-Goals (v1)
 - No onboard audio synthesis. KeybChord is a **MIDI controller only**; sound is produced by an external synth/DAW.
 - No graphical UI beyond the LCD1602.
-- **No USB MIDI device output.** The single USB port is dedicated to hosting the keyboard; MIDI leaves the device over DIN only. (USB MIDI could be revisited later with a second USB interface or a different board; out of scope for v1.)
 - No network/Bluetooth MIDI.
 
 ### 1.4 Implementation Constraints
@@ -134,10 +133,11 @@ The system is a set of cooperating modules coordinated by a central state manage
 `USB host (TinyUSB/PIO-USB)` → Input Manager → Keymap Resolver → (Chord | Strum | Bass | Rhythm | Nav | Param) action → State Manager → engines produce MIDI events → MIDI Router → DIN/UART. Display Manager and LED Indicator observe State Manager / scheduler for updates.
 
 ### 3.4 MIDI Output Detail
-- **DIN/UART:** Open `Serial2` (UART1) at 31250 baud, 8N1; write raw MIDI bytes. This is the only MIDI output.
+- **DIN/UART:** Open `Serial2` (UART1) at 31250 baud, 8N1; write raw MIDI bytes.
+- **USB MIDI device (native USB):** the RP2040's native USB port presents a TinyUSB **composite CDC (debug log) + MIDI** device; the MIDI router fans every outgoing message to the USB MIDI interface. USB MIDI is gated by `midi.usb_enabled` (default on); when off, the interface still enumerates but no bytes are sent.
 - Per-function channel/route is applied per message (chord/strum/rhythm channels, Section 4.5).
 - The output must degrade gracefully if nothing is connected on the far end (the firmware keeps transmitting; an unconnected DIN is not an error).
-- **No USB MIDI:** there is no USB MIDI device endpoint in v1 (Section 1.3). Any reference to a "USB output" from the original spec does not apply here.
+- The keyboard is hosted on the **PIO-USB** port (`GP0`/`GP1`), so the native USB port is free for power + CDC debug + USB MIDI — there is no host/gadget role conflict.
 
 ---
 
@@ -202,7 +202,7 @@ The system is a set of cooperating modules coordinated by a central state manage
 - **FR-P12** **Default channels:** on default initialization, MIDI channels differ per function — chord = 1, strum = 2, bass = 3, rhythm = 10. The user may edit these; overlaps are permitted and are the user's responsibility.
 
 ### 4.5 MIDI Output
-- **FR-M1** MIDI output via DIN (UART). This is the sole output in v1.
+- **FR-M1** MIDI output via **DIN (UART)** and **USB MIDI (native USB device)**. Both outputs carry the same messages (the router fans out to both); USB MIDI can be disabled via `midi.usb_enabled` without affecting DIN.
 - **FR-M2** Independent MIDI channels selectable per function (chord / strum / bass / rhythm), saved as part of the preset.
 - **FR-M3** Rhythm defaults to channel 10 (GM percussion) but channel is configurable per FR-M2.
 - **FR-M4** The system continues without error if the DIN cable is disconnected or nothing is listening (it keeps transmitting).
@@ -613,7 +613,7 @@ All config/preset/pattern files live on the Pico's **LittleFS** filesystem in on
 ### 8.1 Global Config (`/config.json`)
 ```json
 {
-  "midi": { "din_enabled": true, "clock_enabled": false },
+  "midi": { "din_enabled": true, "usb_enabled": true, "clock_enabled": false },
   "chord": { "base_root_midi": 60, "note_range": [48, 84] },
   "display": {
     "revert_timeout_ms": 1500,
@@ -630,7 +630,7 @@ All config/preset/pattern files live on the Pico's **LittleFS** filesystem in on
   "logging": { "debug_log": true, "midi_monitor": true }
 }
 ```
-> Notes vs. the Pi spec: there is **no `usb_enabled`** MIDI flag (DIN only); **no `keyboard_device`** field (the firmware owns the single hosted keyboard, no device path); **no `i2c_address`/`modifiers`/`chord_root_order`** (removed). Any value absent from `config.json` or a preset is filled from the defaults in the Parameter Reference (Section 9). See NFR-9 for validation and first-boot generation.
+> Notes vs. the Pi spec: there is **no `keyboard_device`** field (the firmware owns the single hosted keyboard, no device path); **no `i2c_address`/`modifiers`/`chord_root_order`** (removed). `midi.usb_enabled` was added in v0.2 (USB MIDI device output). Any value absent from `config.json` or a preset is filled from the defaults in the Parameter Reference (Section 9). See NFR-9 for validation and first-boot generation.
 
 ### 8.2 Preset (`/presets/bank<N>.json` → array of 8)
 ```json
@@ -752,6 +752,7 @@ All adjustable parameters, with min/max/default/step. On default initialization 
 | drum_clave_note | rhythm | int | 0 | 127 | 75 | 1 | clave GM note (FR-R9) |
 | drum_shaker_note | rhythm | int | 0 | 127 | 82 | 1 | shaker GM note (FR-R9) |
 | drum_*_vel | rhythm | int | 0 | 127 | 0 | 1 | per-piece velocity; 0 = Auto (follow pattern) (FR-R9) |
+| usb_enabled | global | bool | off | on | on | toggle | USB MIDI device output on/off (M11; interface always enumerates) |
 | clock_enabled | global | bool | off | on | off | toggle | MIDI clock transmit (FR-R7) |
 | bpm_indicator | global | bool | off | on | on | toggle | keyboard-LED BPM indicator (FR-R8) |
 | led (indicator) | global | enum | — | — | `num_lock` | — | which keyboard LED(s) to flash: num_lock / caps_lock / scroll_lock / all |

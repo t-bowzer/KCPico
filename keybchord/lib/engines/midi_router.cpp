@@ -41,6 +41,9 @@ void MidiRouter::panic() {
 
 void MidiRouter::flush() {
     midiOut_.flush();
+    if (usbOut_ && state_.config.usb_midi_enabled) {
+        usbOut_->flush();
+    }
 }
 
 void MidiRouter::sendRaw(const MidiMessage& msg) {
@@ -48,6 +51,9 @@ void MidiRouter::sendRaw(const MidiMessage& msg) {
         logMidiOut(msg.status, msg.data1, msg.data2);
     }
     midiOut_.send(msg);
+    if (usbOut_ && state_.config.usb_midi_enabled) {
+        usbOut_->send(msg);
+    }
 }
 
 void MidiRouter::sendTestNote() {
@@ -57,9 +63,16 @@ void MidiRouter::sendTestNote() {
     noteOn(channel, note, velocity);
 }
 
+void MidiRouter::setUsbOut(MidiOutAdapter* usbOut) {
+    usbOut_ = usbOut;
+}
+
 void MidiRouter::send(const MidiMessage& msg) {
     logMidiOut(msg.status, msg.data1, msg.data2);
     midiOut_.send(msg);
+    if (usbOut_ && state_.config.usb_midi_enabled) {
+        usbOut_->send(msg);
+    }
 }
 
 

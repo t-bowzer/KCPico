@@ -95,3 +95,81 @@ TEST(MidiRouter, PanicSendsCcOnAllChannelsAndClearsState) {
         EXPECT_TRUE(seen123[ch]) << "CC123 missing on channel " << ch;
     }
 }
+
+// M11: USB MIDI fan-out (the second output target, gated by usb_midi_enabled).
+TEST(MidiRouter, UsbOutFansOutWhenEnabled) {
+    RecordingMidiOutAdapter din;
+    RecordingMidiOutAdapter usb;
+    din.begin();
+    usb.begin();
+    StateManager state;
+    state.loadDefaults();
+    state.config.usb_midi_enabled = true;
+
+    MidiRouter router(din, state);
+    router.setUsbOut(&usb);
+
+    router.noteOn(1, 60, 100);
+    router.noteOff(1, 60);
+
+    EXPECT_EQ(din.noteOnCount(), 1);
+    EXPECT_EQ(usb.noteOnCount(), 1);
+    EXPECT_EQ(din.noteOffCount(), 1);
+    EXPECT_EQ(usb.noteOffCount(), 1);
+}
+
+TEST(MidiRouter, UsbOutSilentWhenDisabled) {
+    RecordingMidiOutAdapter din;
+    RecordingMidiOutAdapter usb;
+    din.begin();
+    usb.begin();
+    StateManager state;
+    state.loadDefaults();
+    state.config.usb_midi_enabled = false;
+
+    MidiRouter router(din, state);
+    router.setUsbOut(&usb);
+
+    router.noteOn(1, 60, 100);
+
+    EXPECT_EQ(din.noteOnCount(), 1);
+    EXPECT_EQ(usb.noteOnCount(), 0);
+}
+
+TEST(MidiRouter, UsbOutIdenticalToDin) {
+    RecordingMidiOutAdapter din;
+    RecordingMidiOutAdapter usb;
+    din.begin();
+    usb.begin();
+    StateManager state;
+    state.loadDefaults();
+    state.config.usb_midi_enabled = true;
+
+    MidiRouter router(din, state);
+    router.setUsbOut(&usb);
+
+    router.noteOn(1, 60, 100);
+    router.cc(1, midi::CC_PAN, 64);
+    router.noteOff(1, 60);
+
+    ASSERT_EQ(din.messages().size(), usb.messages().size());
+    for (size_t i = 0; i < din.messages().size(); i++) {
+        EXPECT_EQ(din.messages()[i].status, usb.messages()[i].status);
+        EXPECT_EQ(din.messages()[i].data1, usb.messages()[i].data1);
+        EXPECT_EQ(din.messages()[i].data2, usb.messages()[i].data2);
+    }
+}
+
+TEST(MidiRouter, UsbOutNullIsSafe) {
+    RecordingMidiOutAdapter din;
+    din.begin();
+    StateManager state;
+    state.loadDefaults();
+    state.config.usb_midi_enabled = true;
+
+    MidiRouter router(din, state);
+    // No USB target set: must not crash and must still send on DIN.
+
+    router.noteOn(1, 60, 100);
+    EXPECT_EQ(din.noteOnCount(), 1);
+}

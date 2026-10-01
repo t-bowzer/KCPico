@@ -55,7 +55,7 @@ const char* const kShortName[] = {
     "Octave", "Mode", "Voicing", "Duration", "Velocity", "Pan",
     "Roll", "Min Notes", "Min Interval", "Inversion", "Arp Mode",
     "Octave", "Duration", "Velocity", "Layout", "Mode", "Root", "Scale",
-    "Tempo", "Swing", "Pattern", "Mute", "Rhythm", "Clock", "Beat LED",
+    "Tempo", "Swing", "Pattern", "Mute", "Rhythm", "Clock", "Beat LED", "USB MIDI",
     "Enable", "Octave", "Duration", "Velocity", "Channel", "Pattern",
     "Kick", "Kick Vel", "Snare", "Snare Vel",
     "Hi-Hat", "Hi-Hat Vel", "Open Hat", "Open Hat Vel",
@@ -72,7 +72,7 @@ const char* const kFullName[] = {
     "Strum Octave", "Strum Duration", "Strum Velocity", "Strum Layout",
     "Strum Mode", "Strum Root", "Strum Scale",
     "Rhythm Tempo", "Rhythm Swing", "Rhythm Pattern", "Rhythm Mute",
-    "Rhythm On/Off", "Clock Out", "Beat LED",
+    "Rhythm On/Off", "Clock Out", "Beat LED", "USB MIDI",
     "Bass On/Off", "Bass Octave", "Bass Duration", "Bass Velocity", "Bass Channel",
     "Bass Pattern",
     "Kick Note", "Kick Vel", "Snare Note", "Snare Vel",
@@ -223,6 +223,7 @@ std::string paramValueString(const StateManager& state, ParamId id) {
         case ParamId::RhythmEnable:  return onOff(state.pendingRhythm.enabled);
         case ParamId::RhythmClock:   return onOff(state.config.midi_clock_enabled);
         case ParamId::RhythmLed:     return onOff(state.config.bpm_indicator);
+        case ParamId::UsbMidi:       return onOff(state.config.usb_midi_enabled);
 
         case ParamId::BassEnable:    return onOff(state.pendingBass.enabled);
         case ParamId::BassOctave:    return signedInt(state.pendingBass.octave);
@@ -367,6 +368,7 @@ void paramStep(StateManager& state, ParamId id, int delta) {
         case ParamId::RhythmEnable: state.pendingRhythm.enabled = delta > 0; break;
         case ParamId::RhythmClock:  state.config.midi_clock_enabled = delta > 0; break;
         case ParamId::RhythmLed:    state.config.bpm_indicator       = delta > 0; break;
+        case ParamId::UsbMidi:      state.config.usb_midi_enabled    = delta > 0; break;
 
         case ParamId::BassEnable:   state.pendingBass.enabled = delta > 0; break;
         case ParamId::BassOctave:
@@ -542,6 +544,7 @@ void paramCycle(StateManager& state, ParamId id) {
         case ParamId::RhythmEnable: state.pendingRhythm.enabled = !state.pendingRhythm.enabled; break;
         case ParamId::RhythmClock:  state.config.midi_clock_enabled = !state.config.midi_clock_enabled; break;
         case ParamId::RhythmLed:    state.config.bpm_indicator       = !state.config.bpm_indicator;       break;
+        case ParamId::UsbMidi:      state.config.usb_midi_enabled    = !state.config.usb_midi_enabled;    break;
         case ParamId::BassEnable:   state.pendingBass.enabled = !state.pendingBass.enabled; break;
         default:
             // Int params: treat a single-key "cycle" as +1.
@@ -624,6 +627,7 @@ int paramIntValue(const StateManager& s, ParamId id) {
         case ParamId::RhythmEnable:     return s.pendingRhythm.enabled ? 1 : 0;
         case ParamId::RhythmClock:      return s.config.midi_clock_enabled ? 1 : 0;
         case ParamId::RhythmLed:        return s.config.bpm_indicator ? 1 : 0;
+        case ParamId::UsbMidi:          return s.config.usb_midi_enabled ? 1 : 0;
         case ParamId::BassEnable:       return s.pendingBass.enabled ? 1 : 0;
         case ParamId::BassOctave:       return s.pendingBass.octave;
         case ParamId::BassDuration:     return s.pendingBass.note_duration_ms;
@@ -725,6 +729,7 @@ void paramSet(StateManager& state, ParamId id, int value) {
         case ParamId::RhythmEnable: state.pendingRhythm.enabled = value != 0; break;
         case ParamId::RhythmClock:  state.config.midi_clock_enabled = value != 0; break;
         case ParamId::RhythmLed:    state.config.bpm_indicator       = value != 0; break;
+        case ParamId::UsbMidi:      state.config.usb_midi_enabled    = value != 0; break;
 
         case ParamId::BassEnable:   state.pendingBass.enabled = value != 0; break;
         case ParamId::BassOctave:

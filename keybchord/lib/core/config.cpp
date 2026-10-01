@@ -13,6 +13,7 @@ static int clampInt(int value, int minVal, int maxVal, int fallback) {
 AppConfig AppConfig::defaults() {
     AppConfig c;
     c.din_enabled          = true;
+    c.usb_midi_enabled     = true;
     c.midi_clock_enabled   = false;
     c.base_root_midi       = 60;
     c.note_range_low       = 48;
@@ -53,6 +54,9 @@ AppConfig AppConfig::load(StorageAdapter& storage) {
         auto midi = doc["midi"];
         if (midi.containsKey("din_enabled") && midi["din_enabled"].is<bool>()) {
             cfg.din_enabled = midi["din_enabled"].as<bool>();
+        }
+        if (midi.containsKey("usb_enabled") && midi["usb_enabled"].is<bool>()) {
+            cfg.usb_midi_enabled = midi["usb_enabled"].as<bool>();
         }
         if (midi.containsKey("clock_enabled") && midi["clock_enabled"].is<bool>()) {
             cfg.midi_clock_enabled = midi["clock_enabled"].as<bool>();
@@ -142,6 +146,7 @@ bool AppConfig::save(StorageAdapter& storage) const {
 
     auto midi = doc["midi"].to<JsonObject>();
     midi["din_enabled"]   = din_enabled;
+    midi["usb_enabled"]   = usb_midi_enabled;
     midi["clock_enabled"] = midi_clock_enabled;
 
     auto chord = doc["chord"].to<JsonObject>();

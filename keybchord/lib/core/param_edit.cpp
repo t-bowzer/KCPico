@@ -1,6 +1,7 @@
 #include "param_edit.h"
 
 #include "bass.h"
+#include "chordpattern.h"
 #include "naming.h"
 #include "rhythm.h"
 #include "strum.h"
@@ -12,7 +13,7 @@ const ParamId kChordParams[] = {
     ParamId::ChordOctave, ParamId::ChordMode, ParamId::ChordVoicing,
     ParamId::ChordDuration, ParamId::ChordVelocity, ParamId::ChordPan,
     ParamId::ChordRoll, ParamId::ChordMinNotes, ParamId::ChordMinInterval,
-    ParamId::ChordInversion, ParamId::ChordArpMode,
+    ParamId::ChordInversion, ParamId::ChordArpMode, ParamId::ChordPattern,
 };
 
 const ParamId kStrumParams[] = {
@@ -53,7 +54,7 @@ const char* const kTitles[] = {
 
 const char* const kShortName[] = {
     "Octave", "Mode", "Voicing", "Duration", "Velocity", "Pan",
-    "Roll", "Min Notes", "Min Interval", "Inversion", "Arp Mode",
+    "Roll", "Min Notes", "Min Interval", "Inversion", "Arp Mode", "Pattern",
     "Octave", "Duration", "Velocity", "Layout", "Mode", "Root", "Scale",
     "Tempo", "Swing", "Pattern", "Mute", "Rhythm", "Clock", "Beat LED", "USB MIDI",
     "Enable", "Octave", "Duration", "Velocity", "Channel", "Pattern",
@@ -69,6 +70,7 @@ const char* const kShortName[] = {
 const char* const kFullName[] = {
     "Chord Octave", "Chord Mode", "Voicing", "Chord Duration", "Chord Velocity",
     "Chord Pan", "Chord Roll", "Min Notes", "Min Interval", "Inversion", "Arp Mode",
+    "Chord Pattern",
     "Strum Octave", "Strum Duration", "Strum Velocity", "Strum Layout",
     "Strum Mode", "Strum Root", "Strum Scale",
     "Rhythm Tempo", "Rhythm Swing", "Rhythm Pattern", "Rhythm Mute",
@@ -207,6 +209,7 @@ std::string paramValueString(const StateManager& state, ParamId id) {
                        ? "Off" : std::to_string(state.pendingChord.min_interval);
         case ParamId::ChordInversion: return inversionShort(state.pendingChord.inversion);
         case ParamId::ChordArpMode:   return arpModeShort(state.pendingChord.arp_mode);
+        case ParamId::ChordPattern:   return chordPatternName(state.pendingChord.pattern);
 
         case ParamId::StrumOctave:   return signedInt(state.pendingStrum.octave);
         case ParamId::StrumDuration: return std::to_string(state.pendingStrum.note_duration_ms);
@@ -320,6 +323,10 @@ void paramStep(StateManager& state, ParamId id, int delta) {
             state.pendingChord.arp_mode = static_cast<ArpMode>(
                 cycleEnum(static_cast<int>(state.pendingChord.arp_mode),
                           static_cast<int>(ArpMode::COUNT), dir));
+            break;
+        case ParamId::ChordPattern:
+            state.pendingChord.pattern = static_cast<uint8_t>(cycleEnum(
+                state.pendingChord.pattern, chordPatternCount(), dir));
             break;
 
         case ParamId::StrumOctave:
@@ -613,6 +620,7 @@ int paramIntValue(const StateManager& s, ParamId id) {
         case ParamId::ChordMinInterval: return s.pendingChord.min_interval;
         case ParamId::ChordInversion:   return static_cast<int>(s.pendingChord.inversion);
         case ParamId::ChordArpMode:     return static_cast<int>(s.pendingChord.arp_mode);
+        case ParamId::ChordPattern:     return static_cast<int>(s.pendingChord.pattern);
         case ParamId::StrumOctave:      return s.pendingStrum.octave;
         case ParamId::StrumDuration:    return s.pendingStrum.note_duration_ms;
         case ParamId::StrumVelocity:    return s.pendingStrum.velocity;
@@ -685,6 +693,10 @@ void paramSet(StateManager& state, ParamId id, int value) {
         case ParamId::ChordArpMode:
             state.pendingChord.arp_mode = static_cast<ArpMode>(clamp<int>(
                 value, 0, static_cast<int>(ArpMode::COUNT) - 1));
+            break;
+        case ParamId::ChordPattern:
+            state.pendingChord.pattern = static_cast<uint8_t>(clamp<int>(
+                value, 0, chordPatternCount() - 1));
             break;
 
         case ParamId::StrumOctave:

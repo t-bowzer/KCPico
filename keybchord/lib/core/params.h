@@ -9,6 +9,8 @@ enum class PlayMode : uint8_t {
     Arpeggio,
     ArpHold,   // arpeggio that latches on release (until next chord / Esc)
     Silent,
+    Pattern,     // user-authored chord pattern (spec 6.10), rhythm-clocked
+    PatternHold, // chord pattern that latches on release
     COUNT
 };
 
@@ -93,6 +95,7 @@ enum class ParamId : uint8_t {
     ChordMinInterval,
     ChordInversion,
     ChordArpMode,
+    ChordPattern,
     // Strum
     StrumOctave,
     StrumDuration,
@@ -159,6 +162,7 @@ struct ChordParams {
     uint8_t       min_interval     = 0;    // min semitones between adjacent notes (0 = off)
     InversionMode inversion        = InversionMode::Root;
     ArpMode       arp_mode         = ArpMode::Up;
+    uint8_t       pattern          = 0;    // index into the chord pattern list
     uint8_t       channel          = 1;
 
     static ChordParams defaults();

@@ -20,6 +20,7 @@ from .io.storage import ConfigTree, default_tree, load_tree, save_tree
 from .ui.backup_view import BackupView
 from .ui.bass_editor import BassEditor
 from .ui.busy import run_with_progress
+from .ui.chordpattern_editor import ChordPatternEditor
 from .ui.config_editor import ConfigEditor
 from .ui.json_validator_view import ValidatorView, validate_directory, validate_tree
 from .ui.keymap_editor import KeymapEditor
@@ -46,6 +47,7 @@ class MainWindow(QMainWindow):
         self.presets_editor = PresetsEditor()
         self.rhythm_editor = RhythmEditor()
         self.bass_editor = BassEditor()
+        self.chordpattern_editor = ChordPatternEditor()
         self.keymap_editor = KeymapEditor()
         self.config_editor = ConfigEditor()
         self.validator_view = ValidatorView()
@@ -54,6 +56,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.presets_editor, "Presets")
         self.tabs.addTab(self.rhythm_editor, "Rhythms")
         self.tabs.addTab(self.bass_editor, "Bass")
+        self.tabs.addTab(self.chordpattern_editor, "Chord Patterns")
         self.tabs.addTab(self.keymap_editor, "Keymap")
         self.tabs.addTab(self.config_editor, "Settings")
         self.tabs.addTab(self.validator_view, "Validate")
@@ -61,7 +64,8 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.tabs)
 
         for editor in (self.presets_editor, self.rhythm_editor, self.bass_editor,
-                       self.keymap_editor, self.config_editor):
+                       self.chordpattern_editor, self.keymap_editor,
+                       self.config_editor):
             editor.changed.connect(self._mark_dirty)
 
         self.presets_editor.connect_signals()
@@ -103,6 +107,7 @@ class MainWindow(QMainWindow):
         self.presets_editor.set_tree(self._tree)
         self.rhythm_editor.set_tree(self._tree)
         self.bass_editor.set_tree(self._tree)
+        self.chordpattern_editor.set_tree(self._tree)
         self.keymap_editor.set_tree(self._tree)
         self.presets_editor.refresh_pattern_lists()
         self._update_title()

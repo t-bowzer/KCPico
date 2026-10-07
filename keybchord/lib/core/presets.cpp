@@ -1,6 +1,7 @@
 #include "presets.h"
 #include "base.h"
 #include "bass.h"
+#include "chordpattern.h"
 #include "rhythm.h"
 #include "strum.h"
 #include <ArduinoJson.h>
@@ -38,6 +39,7 @@ bool PresetSlot::sameParams(const PresetSlot& other) const {
         && chord.min_interval     == other.chord.min_interval
         && chord.inversion        == other.chord.inversion
         && chord.arp_mode         == other.chord.arp_mode
+        && chord.pattern          == other.chord.pattern
         && chord.channel          == other.chord.channel
         && strum.octave           == other.strum.octave
         && strum.note_duration_ms == other.strum.note_duration_ms
@@ -118,6 +120,8 @@ const char* playModeName(PlayMode m) {
         case PlayMode::Arpeggio:    return "arpeggio";
         case PlayMode::ArpHold:     return "arp_hold";
         case PlayMode::Silent:      return "silent";
+        case PlayMode::Pattern:     return "pattern";
+        case PlayMode::PatternHold: return "pattern_hold";
         default:                    return "held";
     }
 }
@@ -277,6 +281,10 @@ PresetSlot loadPreset(StorageAdapter& storage, int bank, int slot) {
             p.chord.inversion = parseInversion(c["inversion"].as<std::string>());
         if (c.containsKey("arp_mode") && c["arp_mode"].is<const char*>())
             p.chord.arp_mode = parseArpMode(c["arp_mode"].as<std::string>());
+        if (c.containsKey("pattern") && c["pattern"].is<const char*>()) {
+            int idx = chordPatternIndex(c["pattern"].as<std::string>());
+            if (idx >= 0) p.chord.pattern = static_cast<uint8_t>(idx);
+        }
         if (c.containsKey("play_mode")) {
             if (c["play_mode"].is<int>()) {
                 p.chord.play_mode = static_cast<PlayMode>(legacyPlayModeRemap(c["play_mode"].as<int>()));
@@ -287,6 +295,8 @@ PresetSlot loadPreset(StorageAdapter& storage, int bank, int slot) {
                 else if (pm == "arp_hold")      p.chord.play_mode = PlayMode::ArpHold;
                 else if (pm == "rhythm")        p.chord.play_mode = PlayMode::Arpeggio;  // legacy
                 else if (pm == "silent")        p.chord.play_mode = PlayMode::Silent;
+                else if (pm == "pattern")       p.chord.play_mode = PlayMode::Pattern;
+                else if (pm == "pattern_hold")  p.chord.play_mode = PlayMode::PatternHold;
                 else                             p.chord.play_mode = PlayMode::Held;
             }
         }
@@ -450,6 +460,7 @@ bool savePreset(StorageAdapter& storage, int bank, int slot, const PresetSlot& p
     chord["inversion"]        = inversionName(preset.chord.inversion);
     chord["arp_mode"]         = arpModeName(preset.chord.arp_mode);
     chord["play_mode"]        = playModeName(preset.chord.play_mode);
+    chord["pattern"]          = chordPatternName(preset.chord.pattern);
 
     auto strum = obj["strum"].to<JsonObject>();
     strum["channel"]          = preset.strum.channel;

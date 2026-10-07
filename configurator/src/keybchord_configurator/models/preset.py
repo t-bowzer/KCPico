@@ -149,6 +149,7 @@ class ChordParams:
     min_interval: int = 0
     inversion: InversionMode = InversionMode.ROOT
     arp_mode: ArpMode = ArpMode.UP
+    pattern: str = "Block"
     channel: int = 1
 
     @classmethod
@@ -181,6 +182,9 @@ class ChordParams:
         )
         p.inversion = parse_inversion(data.get("inversion"))
         p.arp_mode = parse_arp_mode(data.get("arp_mode"))
+        pattern = data.get("pattern")
+        if isinstance(pattern, str):
+            p.pattern = pattern
         p.channel = _int(data.get("channel"), CHANNEL_MIN, CHANNEL_MAX, p.channel)
         return p
 
@@ -197,6 +201,7 @@ class ChordParams:
             "min_interval": self.min_interval,
             "inversion": INVERSION_JSON[self.inversion],
             "arp_mode": ARP_MODE_JSON[self.arp_mode],
+            "pattern": self.pattern,
             "channel": self.channel,
         }
 

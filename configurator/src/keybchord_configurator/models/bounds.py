@@ -48,11 +48,13 @@ DRUM_NOTE_MIN, DRUM_NOTE_MAX = 0, 127
 DRUM_VELOCITY_MIN, DRUM_VELOCITY_MAX = 0, 127
 DRUM_VELOCITY_OFF = 128  # mutes the piece entirely
 
-# Pattern library caps (rhythm.h / bass.h).
+# Pattern library caps (rhythm.h / bass.h / chordpattern.h).
 RHYTHM_COUNT = 12
 BASS_COUNT = 9
+CHORD_PATTERN_COUNT = 9
 MAX_RHYTHMS = 32
 MAX_BASS_PATTERNS = 32
+MAX_CHORD_PATTERNS = 32
 
 NUM_BANKS = 10
 NUM_SLOTS = 8
@@ -153,6 +155,7 @@ _add(
             ("Random", ArpMode.RANDOM),
         ),
     ),
+    ParamSpec("chord_pattern", "Pattern", "Chord", "pattern"),
     # Strum
     ParamSpec("strum_octave", "Octave", "Strum", "int", OCTAVE_MIN, OCTAVE_MAX, 1),
     ParamSpec("strum_duration", "Note duration (ms)", "Strum", "int",

@@ -196,6 +196,57 @@ BUILTIN_BASS: tuple[dict, ...] = (
     },
 )
 
+# (name, steps_per_bar, steps, sustain_steps?)
+# `steps` are chord-degree bitmasks: bit0=root, bit1=3rd, bit2=5th, bit3=7th.
+BUILTIN_CHORD_PATTERNS: tuple[dict, ...] = (
+    {
+        "name": "Block",
+        "steps_per_bar": 16,
+        "steps": [15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        "sustain_steps": [16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    },
+    {
+        "name": "Alberti",
+        "steps_per_bar": 16,
+        "steps": [1, 0, 0, 0, 4, 0, 0, 0, 2, 0, 0, 0, 4, 0, 0, 0],
+    },
+    {
+        "name": "Broken Up",
+        "steps_per_bar": 16,
+        "steps": [1, 0, 0, 0, 2, 0, 0, 0, 4, 0, 0, 0, 8, 0, 0, 0],
+    },
+    {
+        "name": "Broken Down",
+        "steps_per_bar": 16,
+        "steps": [8, 0, 0, 0, 4, 0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0],
+    },
+    {
+        "name": "Pulse",
+        "steps_per_bar": 16,
+        "steps": [7, 0, 7, 0, 7, 0, 7, 0, 7, 0, 7, 0, 7, 0, 7, 0],
+    },
+    {
+        "name": "Oom-Pah",
+        "steps_per_bar": 16,
+        "steps": [1, 0, 0, 0, 6, 0, 0, 0, 1, 0, 0, 0, 6, 0, 0, 0],
+    },
+    {
+        "name": "Roll",
+        "steps_per_bar": 16,
+        "steps": [1, 0, 2, 0, 4, 0, 2, 0, 1, 0, 2, 0, 4, 0, 2, 0],
+    },
+    {
+        "name": "Split",
+        "steps_per_bar": 16,
+        "steps": [1, 0, 0, 0, 14, 0, 0, 0, 14, 0, 0, 0, 14, 0, 0, 0],
+    },
+    {
+        "name": "Arpeggio",
+        "steps_per_bar": 16,
+        "steps": [1, 2, 4, 8, 4, 2, 0, 0, 1, 2, 4, 8, 4, 2, 0, 0],
+    },
+)
+
 
 def default_rhythm_template() -> dict:
     """A blank 16-step template for a new rhythm pattern."""
@@ -218,5 +269,15 @@ def default_bass_template() -> dict:
         "name": "New Bass",
         "steps_per_bar": 16,
         "steps": [-1] * 16,
+        "sustain_steps": [0] * 16,
+    }
+
+
+def default_chord_pattern_template() -> dict:
+    """A blank 16-step template for a new chord pattern."""
+    return {
+        "name": "New Pattern",
+        "steps_per_bar": 16,
+        "steps": [0] * 16,
         "sustain_steps": [0] * 16,
     }

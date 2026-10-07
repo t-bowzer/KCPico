@@ -103,6 +103,7 @@ class PresetsEditor(QWidget):
         self.chord_inversion = enum_combo(PARAM_SPECS["chord_inversion"].values,
                                           InversionMode.ROOT)
         self.chord_arp = enum_combo(PARAM_SPECS["arp_mode"].values, ArpMode.UP)
+        self.chord_pattern = QComboBox()
         self.chord_channel = int_spin(1, 16, 1, 1)
         rows = [
             ("Play mode", self.chord_mode), ("Octave", self.chord_octave),
@@ -112,7 +113,7 @@ class PresetsEditor(QWidget):
             ("Min notes", self.chord_min_notes),
             ("Min interval", self.chord_min_interval),
             ("Inversion", self.chord_inversion), ("Arp pattern", self.chord_arp),
-            ("Channel", self.chord_channel),
+            ("Pattern", self.chord_pattern), ("Channel", self.chord_channel),
         ]
         for label, widget in rows:
             form.addRow(label, widget)
@@ -261,6 +262,7 @@ class PresetsEditor(QWidget):
             return
         self._set_combo_names(self.rhythm_pattern, self._tree.rhythm_names())
         self._set_combo_names(self.bass_pattern, self._tree.bass_names())
+        self._set_combo_names(self.chord_pattern, self._tree.chord_pattern_names())
 
     def _set_combo_names(self, combo: QComboBox, names: list[str]) -> None:
         current = combo.currentText()
@@ -291,6 +293,7 @@ class PresetsEditor(QWidget):
             self.chord_min_interval.setValue(slot.chord.min_interval)
             self._set_combo_data(self.chord_inversion, int(slot.chord.inversion))
             self._set_combo_data(self.chord_arp, int(slot.chord.arp_mode))
+            self._set_combo_text(self.chord_pattern, slot.chord.pattern)
             self.chord_channel.setValue(slot.chord.channel)
 
             self.strum_octave.setValue(slot.strum.octave)
@@ -351,6 +354,7 @@ class PresetsEditor(QWidget):
         slot.chord.min_interval = self.chord_min_interval.value()
         slot.chord.inversion = InversionMode(self.chord_inversion.currentData())
         slot.chord.arp_mode = ArpMode(self.chord_arp.currentData())
+        slot.chord.pattern = self.chord_pattern.currentText()
         slot.chord.channel = self.chord_channel.value()
 
         slot.strum.octave = self.strum_octave.value()

@@ -217,6 +217,8 @@ void setup() {
     installRhythmShortNames(rlib.short_names);
     BassLibrary blib = loadBassPatterns(storage);
     installBassNames(blib.names);
+    ChordPatternLibrary cplib = loadChordPatterns(storage);
+    installChordPatternNames(cplib.names);
 
     // Load the configurable keymap; on validation failure, write an error log,
     // show a persistent LCD message, and refuse to process input (halt).
@@ -242,6 +244,7 @@ void setup() {
     g_router = new MidiRouter(*g_adapters.midiOut, g_state);
     g_router->setUsbOut(g_adapters.usbMidiOut.get());
     g_chordEngine = new ChordEngine(g_state, *g_router);
+    g_chordEngine->setPatterns(std::move(cplib.patterns));
     g_strumEngine = new StrumEngine(g_state, *g_router);
     g_bassEngine  = new BassEngine(g_state, *g_router);
     g_bassEngine->setChordEngine(g_chordEngine);

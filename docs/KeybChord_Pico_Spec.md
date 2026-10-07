@@ -153,8 +153,10 @@ The system is a set of cooperating modules coordinated by a central state manage
   - *Held:* chord sounds on trigger and sustains until the next chord is pressed or panic/cancel is used (see FR-C10).
   - *Press-to-play:* chord triggers once on press (note-on), releases on key-up.
   - *Arpeggio:* chord notes played sequentially in one of several patterns (see 6.7); when rhythm is enabled, arpeggiation follows rhythm timing.
+  - *Pattern:* chord tones played through the selected chord pattern's 16th-note grid (6.10), in lockstep with the rhythm clock; momentary (releases on key-up).
+  - *PatternHold:* like *Pattern*, but latches on key release until the next chord / cancel.
   - *Silent (strum-only):* no chord notes sounded directly; chord defines the note pool for the strum plate only.
-- **FR-C4** Adjustable chord parameters: note duration, velocity, pan (CC10), chord roll, minimum note count, minimum interval, inversion, and arpeggio mode, via the Chord Edit menu (5.4). Values shown on LCD when edited.
+- **FR-C4** Adjustable chord parameters: note duration, velocity, pan (CC10), chord roll, minimum note count, minimum interval, inversion, arpeggio mode, and chord pattern, via the Chord Edit menu (5.4). Values shown on LCD when edited.
 - **FR-C5** Chord octave shift via `+` / `-` keys (Section 5), clamped to a sensible MIDI range.
 - **FR-C6** Voicing mode is a live-toggleable parameter (`root_position` ⇄ `smart` voice-leading), saved per-preset (see Section 6.4).
 - **FR-C7** Chord extensions (add9, add11, add13) are **held modifiers**, not toggleable parameters. Holding `Left` arrow adds add9, `Down` arrow adds add11, and `Right` arrow adds add13 to the currently-held chord (they latch per chord; see 5.4). They are **not** saved per-preset.
@@ -164,6 +166,7 @@ The system is a set of cooperating modules coordinated by a central state manage
   - *Held:* chord sounds on trigger and sustains **indefinitely** until the next chord is pressed or the panic/cancel control is used. Pressing a new chord ends the previous one.
   - *Press-to-play:* note-on on key press; note-off on **key-up**.
   - *Arpeggio:* each arpeggiated note lasts `note_duration_ms` (chord param); sequence timing follows the rhythm clock when rhythm is enabled.
+  - *Pattern / PatternHold:* each step's degree notes sound for `sustain_steps` (or `note_duration_ms` when percussive); the grid follows the rhythm clock when enabled, else the stored tempo.
   - *Silent:* no chord notes are sounded (strum pool only).
 - **FR-C11** **Panic / all-notes-off:** `Super+Esc` immediately sends All-Sound-Off (CC120) and All-Notes-Off (CC123) on all channels to the DIN output, and clears internal active-note state. Used to recover from stuck notes.
 
@@ -280,7 +283,7 @@ Main-menu single-key shortcuts (no menu):
 
 | Key | Action |
 |-----|--------|
-| `F1` | Cycle play mode (Held → Press-to-play → Arpeggio → Silent) |
+| `F1` | Cycle play mode (Held → Press-to-play → Arpeggio → Arp-Hold → Silent → Pattern → Pattern-Hold) |
 | `F2` | Toggle voicing mode (Root-position ⇄ Smart voice-leading) |
 | `Left` arrow | Hold to add **add9** to the current chord (FR-C7) |
 | `Down` arrow | Hold to add **add11** to the current chord (FR-C7) |
@@ -295,7 +298,7 @@ Main-menu single-key shortcuts (no menu):
 | F-key | Parameter | Range / cycle |
 |-------|-----------|----------------|
 | `F1` | Octave | −3..+3 (step 1) |
-| `F2` | Mode | Held / Press / Arp / Silent |
+| `F2` | Mode | Held / Press / Arp / Arp-Hold / Silent / Pattern / Pattern-Hold |
 | `F3` | Voicing | Root / Smart |
 | `F4` | Duration | 50..4000 ms (step 50) |
 | `F5` | Velocity | 1..127 |
@@ -305,6 +308,7 @@ Main-menu single-key shortcuts (no menu):
 | `F9` | Min Interval | 0..12 semitones (0 = off) |
 | `F10` | Inversion | Root / 1st / 2nd / 3rd |
 | `F11` | Arp Mode | Up / Down / Up-Down / Alternating / Random |
+| `F12` | Pattern | Built-in + user chord patterns (6.10) |
 
 ### 5.5 Function Keys — Strum Controls & the Strum Edit Menu
 
@@ -569,6 +573,42 @@ and they release slightly before the next note's attack for a clean
 articulation. All beat-driven patterns fire on the rhythm 16th-note step grid in
 lockstep with the drums.
 
+### 6.10 Configurable Chord Patterns (M13)
+
+Chord patterns are polyphonic, user-authored step sequences for the chord
+engine, selected via the `pattern` chord parameter (5.4) and stored in
+`/chordpatterns/*.json` (the 9 built-ins below plus user files), loaded at boot
+like rhythm/bass patterns. The `Pattern` and `PatternHold` play modes (6.11)
+step through the selected pattern in lockstep with the rhythm 16th-note grid
+(restarting at step 0 on each chord trigger); `PatternHold` latches on key
+release like `ArpHold`.
+
+Each step is a **degree bitmask** (0 = rest): bit 0 = root, bit 1 = 3rd,
+bit 2 = 5th, bit 3 = 7th. Multiple bits in one step sound together. Degrees
+resolve through the active chord's type to a semitone offset above the chord
+root (root position at the chord octave); voicing/inversion/min-interval do not
+apply in Pattern mode. Degree 3 (the 7th) uses the chord's 7th when present,
+otherwise **wraps to the root an octave up** on triads. An optional parallel
+`sustain_steps` array gives each step's length in 16th steps (`0` = percussive,
+using `note_duration_ms`); a rest step does not cut a sustaining note early.
+
+The 9 built-in patterns:
+
+| Index | Name | Steps | Sustain |
+|-------|------|-------|---------|
+| 0 | Block | full chord (all 4 degrees) on beat 1 | whole bar |
+| 1 | Alberti | root-5th-3rd-5th on quarter notes | percussive |
+| 2 | Broken Up | root-3rd-5th-7th on quarter notes | percussive |
+| 3 | Broken Down | 7th-5th-3rd-root on quarter notes | percussive |
+| 4 | Pulse | full triad on every 8th note | percussive |
+| 5 | Oom-Pah | root, then 3rd+5th, alternating beats | percussive |
+| 6 | Roll | root-3rd-5th-3rd on 8th notes | percussive |
+| 7 | Split | root on beat 1, 3rd+5th+7th on beats 2–4 | percussive |
+| 8 | Arpeggio | root-3rd-5th-7th-5th-3rd 16th-note cycle | percussive |
+
+The pattern follows the rhythm's meter when it is shorter (like the bass), and
+advances at the stored tempo even when the rhythm is stopped.
+
 ---
 
 ## 7. Rhythm Pattern Specification
@@ -650,6 +690,7 @@ All config/preset/pattern files live on the Pico's **LittleFS** filesystem in on
     "min_interval": 0,
     "inversion": "root",
     "arp_mode": "up",
+    "pattern": "Block",
     "voicing_mode": "root_position",
     "channel": 1
   },
@@ -696,7 +737,7 @@ All config/preset/pattern files live on the Pico's **LittleFS** filesystem in on
   }
 }
 ```
-> `rhythm.swing` is a **signed integer −75..+75** (Section 7.3), not a float. The `chord.extensions` object has been removed: add9/add11/add13 are now held modifiers (FR-C7) and are not persisted. `play_mode` is one of `held` / `press_to_play` / `arpeggio` / `arp_hold` / `silent` (Rhythm mode was replaced by the walking bass, FR-B1). `bass.pattern` is a bass pattern **name** (`Walking` / `Whole` / `Half` / `Quarter` / `Half Alt` / `Quarter Alt` / `3/4 Alt` / `No 6th` / `Hold`, or a user file's `name`) per FR-B5.
+> `rhythm.swing` is a **signed integer −75..+75** (Section 7.3), not a float. The `chord.extensions` object has been removed: add9/add11/add13 are now held modifiers (FR-C7) and are not persisted. `play_mode` is one of `held` / `press_to_play` / `arpeggio` / `arp_hold` / `silent` / `pattern` / `pattern_hold` (Rhythm mode was replaced by the walking bass, FR-B1). `bass.pattern` is a bass pattern **name** per FR-B5. `chord.pattern` is a chord pattern **name** (`Block` / `Alberti` / `Broken Up` / `Broken Down` / `Pulse` / `Oom-Pah` / `Roll` / `Split` / `Arpeggio`, or a user file's `name`) per 6.10.
 
 ### 8.3 Combination, Chord-Type & Root-Order Tables
 The Omnichord combination matrix (6.3), chord interval formulas (6.2), the circle-of-fifths root order (5.1, `chord_root_order`), the keymap, and per-parameter defaults are stored as editable JSON on LittleFS (shipped from repo `data/`) so behavior/layout can be tuned without recompiling. To minimize flash writes and RAM, large static tables may alternatively be compiled into flash as C++ constants with JSON overrides — see the roadmap for the chosen persistence strategy (default: JSON on LittleFS via ArduinoJson).
@@ -709,7 +750,7 @@ All adjustable parameters, with min/max/default/step. On default initialization 
 
 | Parameter | Scope | Type | Min | Max | Default | Step | Notes |
 |-----------|-------|------|-----|-----|---------|------|-------|
-| play_mode | chord | enum | — | — | `held` | cycle | held / press_to_play / arpeggio / arp_hold / silent |
+| play_mode | chord | enum | — | — | `held` | cycle | held / press_to_play / arpeggio / arp_hold / silent / pattern / pattern_hold |
 | note_duration_ms | chord | int | 50 | 4000 | 500 | 50 | note length for press-to-play/arp lifecycles |
 | velocity | chord | int | 1 | 127 | 100 | 1 | MIDI note-on velocity |
 | pan | chord | int | 0 | 127 | 64 | 1 | CC10; 64 = center |
@@ -720,6 +761,7 @@ All adjustable parameters, with min/max/default/step. On default initialization 
 | min_interval | chord | int | 0 | 12 | 0 | 1 | min semitones between adjacent voicing notes (0 = off) |
 | inversion | chord | enum | — | — | `root` | cycle | root / first / second / third (also PrtSc/ScLk/Pause) |
 | arp_mode | chord | enum | — | — | `up` | cycle | up / down / up_down / alternating / random |
+| pattern (chord) | chord | enum | — | — | `Block` | cycle | chord pattern name (6.10): Block / Alberti / Broken Up / Broken Down / Pulse / Oom-Pah / Roll / Split / Arpeggio + user files |
 | channel (chord) | chord | int | 1 | 16 | 1 | 1 | MIDI channel |
 | octave (strum) | strum | int | −3 | +3 | 1 | 1 | strum-pool octave placement |
 | note_duration_ms (strum) | strum | int | 50 | 4000 | 300 | 50 | strummed note length |

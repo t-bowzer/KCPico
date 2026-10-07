@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from ..models.bass import BASS_NAMES, BASS_DEGREE_REST
+from ..models.chordpattern import CHORD_MASK_SEVENTH, CHORD_PATTERN_NAMES
 from ..models.bounds import (
     BASE_ROOT_MIDI_MAX,
     BASE_ROOT_MIDI_MIN,
@@ -25,6 +26,7 @@ from ..models.bounds import (
     CHORD_MIN_INTERVAL_MIN,
     CHORD_MIN_NOTES_MAX,
     CHORD_MIN_NOTES_MIN,
+    CHORD_PATTERN_COUNT,
     CHORD_ROLL_MAX,
     CHORD_ROLL_MIN,
     DISPLAY_CURSOR_MS_MAX,
@@ -41,6 +43,7 @@ from ..models.bounds import (
     LED_FLASH_MS_MAX,
     LED_FLASH_MS_MIN,
     MAX_BASS_PATTERNS,
+    MAX_CHORD_PATTERNS,
     MAX_RHYTHMS,
     NOTE_DURATION_MAX,
     NOTE_DURATION_MIN,
@@ -162,10 +165,13 @@ def _parse_integer(s: str) -> Optional[int]:
 # --- keymap ---------------------------------------------------------------
 
 def validate_keymap(data: Any, *, rhythm_names: Optional[list[str]] = None,
-                    bass_names: Optional[list[str]] = None) -> ValidationResult:
+                    bass_names: Optional[list[str]] = None,
+                    chord_pattern_names: Optional[list[str]] = None) -> ValidationResult:
     result = ValidationResult()
     rhythm_names = list(rhythm_names) if rhythm_names else list(RHYTHM_NAMES)
     bass_names = list(bass_names) if bass_names else list(BASS_NAMES)
+    chord_pattern_names = (list(chord_pattern_names) if chord_pattern_names
+                           else list(CHORD_PATTERN_NAMES))
 
     if not isinstance(data, dict) or not isinstance(data.get("bindings"), list):
         result.add_error("top-level 'bindings' array is required")
@@ -259,7 +265,8 @@ def validate_keymap(data: Any, *, rhythm_names: Optional[list[str]] = None,
             if _is_int(value):
                 return value
             if _is_str(value):
-                parsed = _parse_keymap_value(param, value, rhythm_names, bass_names)
+                parsed = _parse_keymap_value(param, value, rhythm_names, bass_names,
+                                             chord_pattern_names)
                 if parsed is None:
                     result.add_error(f"{where}: invalid value '{value}' for '{field}'")
                     return None
@@ -319,7 +326,8 @@ def validate_keymap(data: Any, *, rhythm_names: Optional[list[str]] = None,
 
 
 def _parse_keymap_value(param: str, value: str, rhythm_names: list[str],
-                        bass_names: list[str]) -> Optional[int]:
+                        bass_names: list[str],
+                        chord_pattern_names: list[str]) -> Optional[int]:
     as_int = _parse_integer(value)
     if as_int is not None:
         return as_int
@@ -340,6 +348,11 @@ def _parse_keymap_value(param: str, value: str, rhythm_names: list[str],
     if param == "bass_pattern":
         try:
             return bass_names.index(value)
+        except ValueError:
+            return None
+    if param == "chord_pattern":
+        try:
+            return chord_pattern_names.index(value)
         except ValueError:
             return None
     return None
@@ -435,10 +448,13 @@ def _check_preset_location(result: ValidationResult, value: str, label: str) -> 
 # --- presets --------------------------------------------------------------
 
 def validate_preset_bank(data: Any, *, rhythm_names: Optional[list[str]] = None,
-                         bass_names: Optional[list[str]] = None) -> ValidationResult:
+                         bass_names: Optional[list[str]] = None,
+                         chord_pattern_names: Optional[list[str]] = None) -> ValidationResult:
     result = ValidationResult()
     rhythm_names = list(rhythm_names) if rhythm_names else list(RHYTHM_NAMES)
     bass_names = list(bass_names) if bass_names else list(BASS_NAMES)
+    chord_pattern_names = (list(chord_pattern_names) if chord_pattern_names
+                           else list(CHORD_PATTERN_NAMES))
 
     if not isinstance(data, list):
         result.add_error("preset bank must be a JSON array")
@@ -455,13 +471,15 @@ def validate_preset_bank(data: Any, *, rhythm_names: Optional[list[str]] = None,
         if not isinstance(slot, dict):
             result.add_error(f"{where}: not an object")
             continue
-        _validate_preset_slot(result, where, slot, rhythm_names, bass_names)
+        _validate_preset_slot(result, where, slot, rhythm_names, bass_names,
+                              chord_pattern_names)
 
     return result
 
 
 def _validate_preset_slot(result: ValidationResult, where: str, slot: dict,
-                          rhythm_names: list[str], bass_names: list[str]) -> None:
+                          rhythm_names: list[str], bass_names: list[str],
+                          chord_pattern_names: list[str]) -> None:
     name = slot.get("name")
     if name is not None and not _is_str(name):
         result.add_error(f"{where}: 'name' must be a string")
@@ -485,6 +503,10 @@ def _validate_preset_slot(result: ValidationResult, where: str, slot: dict,
                    CHORD_MIN_INTERVAL_MIN, CHORD_MIN_INTERVAL_MAX)
         _check_enum(result, f"{where}.chord", chord, "inversion", INVERSION_BY_JSON)
         _check_enum(result, f"{where}.chord", chord, "arp_mode", ARP_MODE_BY_JSON)
+        pattern = chord.get("pattern")
+        if _is_str(pattern) and pattern not in chord_pattern_names:
+            result.add_error(f"{where}.chord: pattern '{pattern}' does not match a "
+                             f"loaded chord pattern")
         _check_int(result, f"{where}.chord", chord, "channel", CHANNEL_MIN, CHANNEL_MAX)
     elif chord is not None:
         result.add_error(f"{where}: 'chord' must be an object")
@@ -666,23 +688,75 @@ def validate_bass(data: Any, *, filename: str = "") -> ValidationResult:
     return result
 
 
+def validate_chord_pattern(data: Any, *, filename: str = "") -> ValidationResult:
+    result = ValidationResult()
+    where = f"chord pattern '{filename}'" if filename else "chord pattern"
+    if not isinstance(data, dict):
+        result.add_error(f"{where}: must be a JSON object")
+        return result
+
+    name = data.get("name")
+    if name is None or not _is_str(name) or not name:
+        result.add_error(f"{where}: 'name' (string) is required")
+
+    steps = data.get("steps_per_bar")
+    if _is_int(steps) and steps % 4 != 0:
+        result.add_warning(f"{where}: 'steps_per_bar' = {steps} is not a "
+                           f"multiple of 4 (4 steps = 1 beat)")
+
+    step_data = data.get("steps")
+    if not isinstance(step_data, list) or len(step_data) == 0:
+        result.add_error(f"{where}: 'steps' must be a non-empty array (the "
+                         f"firmware skips patterns with no steps)")
+        return result
+
+    for v in step_data:
+        if not _is_int(v) or v < 0 or v > CHORD_MASK_SEVENTH:
+            result.add_warning(f"{where}: 'steps' values must be integers "
+                               f"0..{CHORD_MASK_SEVENTH} (degree bitmask; "
+                               f"out-of-range values are clamped)")
+            break
+
+    sustain = data.get("sustain_steps")
+    if sustain is not None:
+        if not isinstance(sustain, list):
+            result.add_error(f"{where}: 'sustain_steps' must be an array")
+        else:
+            if len(sustain) != len(step_data):
+                result.add_warning(f"{where}: 'sustain_steps' length "
+                                   f"{len(sustain)} != 'steps' length "
+                                   f"{len(step_data)}")
+            for v in sustain:
+                if not _is_int(v) or v < 0 or v > 64:
+                    result.add_warning(f"{where}: 'sustain_steps' values must be "
+                                       f"integers 0..64 (clamped)")
+                    break
+
+    return result
+
+
 # --- document dispatch ----------------------------------------------------
 
 def validate_document(path: str, data: Any, *, rhythm_names: Optional[list[str]] = None,
-                      bass_names: Optional[list[str]] = None) -> ValidationResult:
+                      bass_names: Optional[list[str]] = None,
+                      chord_pattern_names: Optional[list[str]] = None) -> ValidationResult:
     """Validate a single parsed JSON document by its on-disk path."""
     base = path.replace("\\", "/").strip("/")
     if base == "config.json":
         return validate_config(data)
     if base == "keymap.json":
-        return validate_keymap(data, rhythm_names=rhythm_names, bass_names=bass_names)
+        return validate_keymap(data, rhythm_names=rhythm_names, bass_names=bass_names,
+                               chord_pattern_names=chord_pattern_names)
     if base.startswith("presets/") or "/presets/" in path:
         return validate_preset_bank(data, rhythm_names=rhythm_names,
-                                    bass_names=bass_names)
+                                    bass_names=bass_names,
+                                    chord_pattern_names=chord_pattern_names)
     if base.startswith("rhythms/") or "/rhythms/" in path:
         return validate_rhythm(data, filename=base.rsplit("/", 1)[-1])
     if base.startswith("bass/") or "/bass/" in path:
         return validate_bass(data, filename=base.rsplit("/", 1)[-1])
+    if base.startswith("chordpatterns/") or "/chordpatterns/" in path:
+        return validate_chord_pattern(data, filename=base.rsplit("/", 1)[-1])
     result = ValidationResult()
     result.add_warning(f"'{path}' is not a recognized configuration file")
     return result

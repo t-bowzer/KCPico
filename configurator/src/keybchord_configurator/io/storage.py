@@ -17,8 +17,9 @@ from pathlib import Path
 from typing import Optional
 
 from ..models.bass import BASS_FILES, BASS_NAMES, BassPattern
+from ..models.chordpattern import CHORD_PATTERN_FILES, ChordPattern
 from ..models.config import AppConfig
-from ..models.defaults import BUILTIN_BASS, BUILTIN_RHYTHMS
+from ..models.defaults import BUILTIN_BASS, BUILTIN_CHORD_PATTERNS, BUILTIN_RHYTHMS
 from ..models.keymap import KeymapConfig, default_keymap
 from ..models.preset import PresetSlot
 from ..models.rhythm import RHYTHM_FILES, RHYTHM_NAMES, RhythmPattern
@@ -28,6 +29,7 @@ KEYMAP_FILE = "keymap.json"
 PRESETS_DIR = "presets"
 RHYTHMS_DIR = "rhythms"
 BASS_DIR = "bass"
+CHORD_PATTERNS_DIR = "chordpatterns"
 
 
 def _write_json(path: Path, data) -> None:
@@ -60,6 +62,7 @@ class ConfigTree:
     banks: list[list[PresetSlot]] = field(default_factory=list)
     rhythms: list[tuple[str, RhythmPattern]] = field(default_factory=list)
     bass: list[tuple[str, BassPattern]] = field(default_factory=list)
+    chordpatterns: list[tuple[str, ChordPattern]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if not self.banks:
@@ -73,6 +76,9 @@ class ConfigTree:
 
     def bass_names(self) -> list[str]:
         return [entry_name(filename, pattern.name) for filename, pattern in self.bass]
+
+    def chord_pattern_names(self) -> list[str]:
+        return [entry_name(filename, pattern.name) for filename, pattern in self.chordpatterns]
 
     def rhythm_name(self, pattern_name: str) -> Optional[str]:
         for filename, pattern in self.rhythms:
@@ -109,6 +115,7 @@ def load_tree(directory: str | Path) -> ConfigTree:
     tree.banks = load_presets(root)
     tree.rhythms = load_rhythms(root)
     tree.bass = load_bass(root)
+    tree.chordpatterns = load_chord_patterns(root)
     return tree
 
 
@@ -127,6 +134,10 @@ def default_tree() -> ConfigTree:
     tree.bass = [
         (BASS_FILES[i], BassPattern.from_dict(BUILTIN_BASS[i]))
         for i in range(len(BUILTIN_BASS))
+    ]
+    tree.chordpatterns = [
+        (CHORD_PATTERN_FILES[i], ChordPattern.from_dict(BUILTIN_CHORD_PATTERNS[i]))
+        for i in range(len(BUILTIN_CHORD_PATTERNS))
     ]
     return tree
 
@@ -190,6 +201,20 @@ def load_bass(root: Path) -> list[tuple[str, BassPattern]]:
     return out
 
 
+def load_chord_patterns(root: Path) -> list[tuple[str, ChordPattern]]:
+    out: list[tuple[str, ChordPattern]] = []
+    for filename in _pattern_files(root, CHORD_PATTERNS_DIR, CHORD_PATTERN_FILES):
+        path = root / CHORD_PATTERNS_DIR / filename
+        try:
+            data = read_json_file(path)
+        except (json.JSONDecodeError, OSError, ValueError):
+            continue
+        pattern = ChordPattern.from_dict(data)
+        if pattern.valid():
+            out.append((filename, pattern))
+    return out
+
+
 def save_tree(tree: ConfigTree, directory: str | Path) -> None:
     """Write the whole tree to a directory."""
     root = Path(directory)
@@ -205,6 +230,9 @@ def save_tree(tree: ConfigTree, directory: str | Path) -> None:
 
     for filename, pattern in tree.bass:
         _write_json(root / BASS_DIR / filename, pattern.to_dict())
+
+    for filename, pattern in tree.chordpatterns:
+        _write_json(root / CHORD_PATTERNS_DIR / filename, pattern.to_dict())
 
 
 def delete_user_patterns(directory: str | Path, subdir: str,

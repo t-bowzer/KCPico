@@ -298,8 +298,8 @@ TEST_F(EditEngineTest, UpDownNavigateParamsInMenu) {
     EXPECT_EQ(state_.editParam, 1);
     edit_->handleKeyEvent(key(0x52, true), 0);   // Up -> Octave
     EXPECT_EQ(state_.editParam, 0);
-    edit_->handleKeyEvent(key(0x52, true), 0);   // Up wraps to ArpMode (last)
-    EXPECT_EQ(state_.editParam, 10);
+    edit_->handleKeyEvent(key(0x52, true), 0);   // Up wraps to ChordPattern (last)
+    EXPECT_EQ(state_.editParam, 11);
 }
 
 TEST_F(EditEngineTest, LeftRightStepValueInMenu) {

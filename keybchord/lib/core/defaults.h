@@ -16,3 +16,7 @@ const char* defaultRhythmJson(int index);
 // JSON for built-in bass pattern `index` (0..BASS_COUNT-1), or nullptr out of
 // range. Used to self-heal a missing/corrupt built-in bass file on load.
 const char* defaultBassJson(int index);
+
+// JSON for built-in chord pattern `index` (0..CHORD_PATTERN_COUNT-1), or nullptr
+// out of range. Used to self-heal a missing/corrupt built-in chord pattern file.
+const char* defaultChordPatternJson(int index);

@@ -12,6 +12,8 @@ const char* playModeShort(PlayMode mode) {
         case PlayMode::Arpeggio:    return "Arp";
         case PlayMode::ArpHold:     return "ArpHld";
         case PlayMode::Silent:      return "Silent";
+        case PlayMode::Pattern:     return "Pattern";
+        case PlayMode::PatternHold: return "PtnHld";
         default:                    return "Held";
     }
 }

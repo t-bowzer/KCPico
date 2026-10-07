@@ -11,10 +11,13 @@ out a DIN-5 connector — no computer required.
   with combinations, extensions (add9/add11/add13 via arrow keys), inversions,
   and voicing modes (root / smart / down / up).
 - **Play modes** — Held, Press-to-play, Arpeggio, **Arp-hold** (latched
-  arpeggio), and Silent, with 5 arpeggio patterns (up / down / up-down /
-  alternating / random) and chord roll.
+  arpeggio), **Pattern**/**Pattern-hold** (user chord patterns, below), and
+  Silent, with 5 arpeggio patterns (up / down / up-down / alternating / random)
+  and chord roll.
 - **Strum plate** — the number row + numpad, with follow-chord / scale / piano
   note pools.
+- **Chord patterns** — 9 built-in polyphonic patterns (Block, Alberti, Pulse,
+  …) played in lockstep with the rhythm, all editable as JSON (`/chordpatterns/`).
 - **Rhythm engine** — 12 built-in drum patterns (Rock, Waltz, Swing, Bossa Nova,
   …) plus user-loadable patterns, tempo, swing, mute, MIDI clock out, and a
   keyboard-LED beat indicator.

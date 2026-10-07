@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 
 from ..io.storage import (
     BASS_DIR,
+    CHORD_PATTERNS_DIR,
     CONFIG_FILE,
     KEYMAP_FILE,
     PRESETS_DIR,
@@ -30,9 +31,11 @@ from ..io.storage import (
     load_tree,
 )
 from ..models.bass import BassPattern
+from ..models.chordpattern import ChordPattern
 from ..models.rhythm import RhythmPattern
 from ..validation.validator import (
     validate_bass,
+    validate_chord_pattern,
     validate_config,
     validate_keymap,
     validate_preset_bank,
@@ -64,6 +67,18 @@ def _collect_bass_names(directory: Path) -> list[str]:
     return names
 
 
+def _collect_chord_pattern_names(directory: Path) -> list[str]:
+    names = []
+    for path in sorted((directory / CHORD_PATTERNS_DIR).glob("*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        pattern = ChordPattern.from_dict(data)
+        names.append(pattern.name or path.stem)
+    return names
+
+
 def validate_directory(directory: str | Path) -> list[tuple[str, object]]:
     """Validate all config files in a directory.
 
@@ -89,18 +104,23 @@ def validate_directory(directory: str | Path) -> list[tuple[str, object]]:
 
     rhythm_names = _collect_rhythm_names(root) or None
     bass_names = _collect_bass_names(root) or None
+    chord_pattern_names = _collect_chord_pattern_names(root) or None
 
     add(CONFIG_FILE, root / CONFIG_FILE, validate_config)
     add(KEYMAP_FILE, root / KEYMAP_FILE, validate_keymap,
-        rhythm_names=rhythm_names, bass_names=bass_names)
+        rhythm_names=rhythm_names, bass_names=bass_names,
+        chord_pattern_names=chord_pattern_names)
 
     presets_dir = root / PRESETS_DIR
     if presets_dir.exists():
         for path in sorted(presets_dir.glob("bank*.json")):
             add(f"{PRESETS_DIR}/{path.name}", path, validate_preset_bank,
-                rhythm_names=rhythm_names, bass_names=bass_names)
+                rhythm_names=rhythm_names, bass_names=bass_names,
+                chord_pattern_names=chord_pattern_names)
 
-    for subdir, validator in ((RHYTHMS_DIR, validate_rhythm), (BASS_DIR, validate_bass)):
+    for subdir, validator in ((RHYTHMS_DIR, validate_rhythm),
+                              (BASS_DIR, validate_bass),
+                              (CHORD_PATTERNS_DIR, validate_chord_pattern)):
         directory_path = root / subdir
         if not directory_path.exists():
             continue
@@ -115,20 +135,26 @@ def validate_tree(tree: ConfigTree) -> list[tuple[str, object]]:
     results: list[tuple[str, object]] = []
     rhythm_names = tree.rhythm_names()
     bass_names = tree.bass_names()
+    chord_pattern_names = tree.chord_pattern_names()
     results.append((CONFIG_FILE, validate_config(tree.config.to_dict())))
     results.append((KEYMAP_FILE, validate_keymap(
-        tree.keymap.to_dict(), rhythm_names=rhythm_names, bass_names=bass_names)))
+        tree.keymap.to_dict(), rhythm_names=rhythm_names, bass_names=bass_names,
+        chord_pattern_names=chord_pattern_names)))
     for bank in range(10):
         results.append((f"{PRESETS_DIR}/bank{bank + 1}.json",
                         validate_preset_bank(
                             [s.to_dict() for s in tree.banks[bank]],
-                            rhythm_names=rhythm_names, bass_names=bass_names)))
+                            rhythm_names=rhythm_names, bass_names=bass_names,
+                            chord_pattern_names=chord_pattern_names)))
     for filename, pattern in tree.rhythms:
         results.append((f"{RHYTHMS_DIR}/{filename}",
                         validate_rhythm(pattern.to_dict(), filename=filename)))
     for filename, pattern in tree.bass:
         results.append((f"{BASS_DIR}/{filename}",
                         validate_bass(pattern.to_dict(), filename=filename)))
+    for filename, pattern in tree.chordpatterns:
+        results.append((f"{CHORD_PATTERNS_DIR}/{filename}",
+                        validate_chord_pattern(pattern.to_dict(), filename=filename)))
     return results
 
 

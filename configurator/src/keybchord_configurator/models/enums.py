@@ -19,6 +19,8 @@ class PlayMode(IntEnum):
     ARPEGGIO = 2
     ARP_HOLD = 3
     SILENT = 4
+    PATTERN = 5
+    PATTERN_HOLD = 6
 
 
 class VoicingMode(IntEnum):
@@ -109,6 +111,8 @@ PLAY_MODE_JSON: dict[PlayMode, str] = {
     PlayMode.ARPEGGIO: "arpeggio",
     PlayMode.ARP_HOLD: "arp_hold",
     PlayMode.SILENT: "silent",
+    PlayMode.PATTERN: "pattern",
+    PlayMode.PATTERN_HOLD: "pattern_hold",
 }
 
 VOICING_MODE_JSON: dict[VoicingMode, str] = {

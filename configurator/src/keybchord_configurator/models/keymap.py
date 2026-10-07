@@ -35,6 +35,7 @@ KEYMAP_PARAM_NAMES: tuple[str, ...] = (
     "chord_octave", "chord_mode", "chord_voicing", "chord_duration",
     "chord_velocity", "chord_pan", "chord_roll", "chord_min_notes",
     "chord_min_interval", "chord_inversion", "arp_mode",
+    "chord_pattern",
     "strum_octave", "strum_duration", "strum_velocity", "strum_layout",
     "strum_mode", "strum_root", "strum_scale",
     "tempo", "swing", "rhythm_pattern", "rhythm_mute", "rhythm_enable",
@@ -55,6 +56,7 @@ BOOL_PARAMS: frozenset[str] = frozenset(
 # play mode, voicing, and strum mode).
 PLAY_MODE_SHORT: dict[str, int] = {
     "held": 0, "press": 1, "arpeggio": 2, "arp_hold": 3, "silent": 4,
+    "pattern": 5, "pattern_hold": 6,
 }
 VOICING_SHORT: dict[str, int] = {"root": 0, "smart": 1, "down": 2, "up": 3}
 INVERSION_SHORT: dict[str, int] = {"root": 0, "first": 1, "second": 2, "third": 3}

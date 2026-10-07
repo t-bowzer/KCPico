@@ -411,3 +411,161 @@ TEST_F(ChordEngineTest, ResetVoicingReturnsToRootPosition) {
     EXPECT_TRUE(state_.isNoteActive(1, 67));
     EXPECT_FALSE(state_.isNoteActive(1, 69));
 }
+
+// --- Chord patterns (M13) --------------------------------------------------
+
+namespace {
+
+// Alberti demo: root-5th-3rd-5th on quarter-note beats (spec 6.10).
+ChordPattern albertiPattern() {
+    ChordPattern p;
+    p.name = "Alberti";
+    p.steps_per_bar = 16;
+    p.steps = {1,0,0,0, 4,0,0,0, 2,0,0,0, 4,0,0,0};
+    return p;
+}
+
+// Block: full chord (0x0F) held for the bar.
+ChordPattern blockPattern() {
+    ChordPattern p;
+    p.name = "Block";
+    p.steps_per_bar = 16;
+    p.steps = {15,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
+    p.sustain_steps = {16,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
+    return p;
+}
+
+} // namespace
+
+// Pattern mode resolves degrees to chord tones and steps on the rhythm clock.
+TEST_F(ChordEngineTest, PatternAlbertiPlaysRootFifthThirdFifth) {
+    engine_->setPatterns({albertiPattern()});
+    state_.pendingChord.play_mode = PlayMode::Pattern;
+    state_.pendingChord.pattern = 0;
+    state_.rhythmClock.running = true;
+    state_.rhythmClock.stepsPerBar = 16;
+    state_.rhythmClock.stepAbs = 0;
+
+    engine_->handleKeyEvent(key(0x17, true), 0);   // C major -> step 0 = root 60
+    EXPECT_TRUE(state_.isNoteActive(1, 60));
+
+    // Advance one 16th step at a time to beat 2 (step 4 = 5th 67).
+    for (uint32_t s = 1; s <= 4; s++) {
+        state_.rhythmClock.stepAbs = s;
+        engine_->update(0);
+    }
+    EXPECT_TRUE(state_.isNoteActive(1, 67));
+    EXPECT_FALSE(state_.isNoteActive(1, 60));
+
+    // Beat 3 (step 8 = 3rd 64).
+    for (uint32_t s = 5; s <= 8; s++) {
+        state_.rhythmClock.stepAbs = s;
+        engine_->update(0);
+    }
+    EXPECT_TRUE(state_.isNoteActive(1, 64));
+    EXPECT_FALSE(state_.isNoteActive(1, 67));
+
+    // Beat 4 (step 12 = 5th 67).
+    for (uint32_t s = 9; s <= 12; s++) {
+        state_.rhythmClock.stepAbs = s;
+        engine_->update(0);
+    }
+    EXPECT_TRUE(state_.isNoteActive(1, 67));
+    EXPECT_FALSE(state_.isNoteActive(1, 64));
+}
+
+// A multi-note step fires all its degrees together (polyphonic).
+TEST_F(ChordEngineTest, PatternMultiNoteStepFiresChord) {
+    ChordPattern p;
+    p.name = "Triad";
+    p.steps_per_bar = 16;
+    p.steps = {7,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};  // root+3rd+5th on step 0
+    engine_->setPatterns({p});
+    state_.pendingChord.play_mode = PlayMode::Pattern;
+    state_.pendingChord.pattern = 0;
+
+    engine_->handleKeyEvent(key(0x17, true), 0);  // C major
+    EXPECT_TRUE(state_.isNoteActive(1, 60));
+    EXPECT_TRUE(state_.isNoteActive(1, 64));
+    EXPECT_TRUE(state_.isNoteActive(1, 67));
+}
+
+// Degree 3 wraps to the octave root on a triad, but plays the 7th on a 7th chord.
+TEST_F(ChordEngineTest, PatternDegreeThreeWrapsOnTriad) {
+    ChordPattern p;
+    p.name = "SeventhBit";
+    p.steps_per_bar = 16;
+    p.steps = {8,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};  // bit 3 = 7th degree
+    engine_->setPatterns({p});
+    state_.pendingChord.play_mode = PlayMode::Pattern;
+    state_.pendingChord.pattern = 0;
+
+    engine_->handleKeyEvent(key(0x17, true), 0);   // C major -> octave root 72
+    EXPECT_TRUE(state_.isNoteActive(1, 72));
+    engine_->allNotesOff();
+
+    engine_->handleKeyEvent(key(0x05, true), 0);   // Cmaj7 (T+B) -> 7th = 71
+    EXPECT_TRUE(state_.isNoteActive(1, 71));
+}
+
+// Pattern advances at the stored tempo when the rhythm clock is stopped.
+TEST_F(ChordEngineTest, PatternFreeRunsAtStoredTempo) {
+    engine_->setPatterns({albertiPattern()});
+    state_.pendingChord.play_mode = PlayMode::Pattern;
+    state_.pendingChord.pattern = 0;
+    state_.pendingRhythm.tempo = 60;  // stepUs(60) = 250000 us
+
+    engine_->handleKeyEvent(key(0x17, true), 0);  // step 0 = root 60
+    EXPECT_TRUE(state_.isNoteActive(1, 60));
+
+    engine_->update(250000);   // step 1 = rest
+    engine_->update(500000);   // step 2 = rest
+    engine_->update(750000);   // step 3 = rest
+    engine_->update(1000000);  // step 4 = 5th 67
+    EXPECT_TRUE(state_.isNoteActive(1, 67));
+}
+
+// PatternHold latches on release; Pattern is momentary.
+TEST_F(ChordEngineTest, PatternHoldLatchesPatternIsMomentary) {
+    engine_->setPatterns({albertiPattern()});
+    state_.pendingChord.play_mode = PlayMode::Pattern;
+    state_.pendingChord.pattern = 0;
+    state_.rhythmClock.running = true;
+    state_.rhythmClock.stepsPerBar = 16;
+    state_.rhythmClock.stepAbs = 0;
+
+    engine_->handleKeyEvent(key(0x17, true), 0);
+    engine_->handleKeyEvent(key(0x17, false), 0);   // release: momentary stops
+    engine_->update(30000);                          // release buffer expires
+    EXPECT_FALSE(state_.isNoteActive(1, 60));
+
+    state_.pendingChord.play_mode = PlayMode::PatternHold;
+    engine_->handleKeyEvent(key(0x17, true), 0);
+    engine_->handleKeyEvent(key(0x17, false), 0);   // release: latches
+    engine_->update(30000);
+    EXPECT_TRUE(state_.isNoteActive(1, 60));
+}
+
+// Block pattern sustains the full chord across the whole bar (past one step).
+TEST_F(ChordEngineTest, PatternBlockSustainsBar) {
+    engine_->setPatterns({blockPattern()});
+    state_.pendingChord.play_mode = PlayMode::Pattern;
+    state_.pendingChord.pattern = 0;
+    state_.rhythmClock.running = true;
+    state_.rhythmClock.stepsPerBar = 16;
+    state_.rhythmClock.stepAbs = 0;
+
+    engine_->handleKeyEvent(key(0x17, true), 0);  // full chord on step 0
+    EXPECT_TRUE(state_.isNoteActive(1, 60));
+    EXPECT_TRUE(state_.isNoteActive(1, 64));
+    EXPECT_TRUE(state_.isNoteActive(1, 67));
+
+    // Advance through several rest steps: the chord keeps sustaining.
+    for (int s = 1; s <= 8; s++) {
+        state_.rhythmClock.stepAbs = static_cast<uint32_t>(s);
+        engine_->update(0);
+    }
+    EXPECT_TRUE(state_.isNoteActive(1, 60));
+    EXPECT_TRUE(state_.isNoteActive(1, 64));
+    EXPECT_TRUE(state_.isNoteActive(1, 67));
+}

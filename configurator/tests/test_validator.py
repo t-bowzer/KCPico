@@ -3,10 +3,15 @@
 import pytest
 
 from keybchord_configurator.models.config import AppConfig
-from keybchord_configurator.models.defaults import BUILTIN_BASS, BUILTIN_RHYTHMS
+from keybchord_configurator.models.defaults import (
+    BUILTIN_BASS,
+    BUILTIN_CHORD_PATTERNS,
+    BUILTIN_RHYTHMS,
+)
 from keybchord_configurator.models.keymap import default_keymap
 from keybchord_configurator.validation.validator import (
     validate_bass,
+    validate_chord_pattern,
     validate_config,
     validate_keymap,
     validate_preset_bank,
@@ -101,10 +106,12 @@ def test_preset_unknown_pattern_errors():
     slot = {
         "bass": {"pattern": "Does Not Exist"},
         "rhythm": {"pattern": "Also Missing"},
+        "chord": {"pattern": "Nope"},
     }
     result = validate_preset_bank([slot] * 8)
     assert any("bass" in e for e in result.errors)
     assert any("rhythm" in e for e in result.errors)
+    assert any("chord" in e for e in result.errors)
 
 
 def test_rhythm_empty_tracks_errors():
@@ -115,11 +122,17 @@ def test_bass_empty_steps_errors():
     assert not validate_bass({"name": "X", "steps": []}).ok()
 
 
+def test_chord_pattern_empty_steps_errors():
+    assert not validate_chord_pattern({"name": "X", "steps": []}).ok()
+
+
 def test_all_builtins_validate_clean():
     for i, data in enumerate(BUILTIN_RHYTHMS):
         assert validate_rhythm(data, filename=f"{i}.json").ok()
     for i, data in enumerate(BUILTIN_BASS):
         assert validate_bass(data, filename=f"{i}.json").ok()
+    for i, data in enumerate(BUILTIN_CHORD_PATTERNS):
+        assert validate_chord_pattern(data, filename=f"{i}.json").ok()
 
 
 def test_arrows_are_bindable():

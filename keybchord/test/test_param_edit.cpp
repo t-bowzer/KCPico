@@ -14,7 +14,7 @@ TEST(ParamEdit, MenuTitles) {
 }
 
 TEST(ParamEdit, MenuParamLists) {
-    EXPECT_EQ(menuParamCount(EditMenu::Chord), 11);
+    EXPECT_EQ(menuParamCount(EditMenu::Chord), 12);
     EXPECT_EQ(menuParamCount(EditMenu::Strum), 7);
     EXPECT_EQ(menuParamCount(EditMenu::Rhythm), 7);
     EXPECT_EQ(menuParamCount(EditMenu::Bass), 6);
@@ -24,6 +24,7 @@ TEST(ParamEdit, MenuParamLists) {
     EXPECT_EQ(menuParamAt(EditMenu::Chord, 1), ParamId::ChordMode);
     EXPECT_EQ(menuParamAt(EditMenu::Chord, 6), ParamId::ChordRoll);
     EXPECT_EQ(menuParamAt(EditMenu::Chord, 10), ParamId::ChordArpMode);
+    EXPECT_EQ(menuParamAt(EditMenu::Chord, 11), ParamId::ChordPattern);
 
     EXPECT_EQ(menuParamAt(EditMenu::Strum, 0), ParamId::StrumOctave);
     EXPECT_EQ(menuParamAt(EditMenu::Strum, 4), ParamId::StrumMode);
@@ -34,6 +35,7 @@ TEST(ParamEdit, MenuParamLists) {
     EXPECT_EQ(menuParamAt(EditMenu::Bass, 0), ParamId::BassEnable);
 
     // Out of range -> COUNT.
+    EXPECT_EQ(menuParamAt(EditMenu::Chord, 12), ParamId::COUNT);
     EXPECT_EQ(menuParamAt(EditMenu::Strum, 7), ParamId::COUNT);
     EXPECT_EQ(menuParamAt(EditMenu::None, 0), ParamId::COUNT);
 }
@@ -142,7 +144,7 @@ TEST(ParamEdit, StepEnumCyclesBySign) {
 TEST(ParamEdit, ChordModeCycleIncludesArpHold) {
     StateManager s;
 
-    // Held -> Press -> Arp -> ArpHold -> Silent -> Held.
+    // Held -> Press -> Arp -> ArpHold -> Silent -> Pattern -> PatternHold -> Held.
     s.pendingChord.play_mode = PlayMode::Held;
     paramStep(s, ParamId::ChordMode, +1);
     EXPECT_EQ(s.pendingChord.play_mode, PlayMode::PressToPlay);
@@ -152,6 +154,10 @@ TEST(ParamEdit, ChordModeCycleIncludesArpHold) {
     EXPECT_EQ(s.pendingChord.play_mode, PlayMode::ArpHold);
     paramStep(s, ParamId::ChordMode, +1);
     EXPECT_EQ(s.pendingChord.play_mode, PlayMode::Silent);
+    paramStep(s, ParamId::ChordMode, +1);
+    EXPECT_EQ(s.pendingChord.play_mode, PlayMode::Pattern);
+    paramStep(s, ParamId::ChordMode, +1);
+    EXPECT_EQ(s.pendingChord.play_mode, PlayMode::PatternHold);
     paramStep(s, ParamId::ChordMode, +1);
     EXPECT_EQ(s.pendingChord.play_mode, PlayMode::Held);
 

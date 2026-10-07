@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "defaults.h"
 #include "midimsg.h"
 #include "midi_router.h"
 #include "voicing.h"
@@ -211,6 +212,80 @@ void ChordEngine::resetVoicing() {
     prevVoicing_.clear();
 }
 
+void ChordEngine::setPatterns(std::vector<ChordPattern> patterns) {
+    patterns_ = std::move(patterns);
+    if (!patterns_.empty() && state_.pendingChord.pattern >= patterns_.size()) {
+        state_.pendingChord.pattern = 0;
+    }
+}
+
+const ChordPattern* ChordEngine::patternAt(int index) const {
+    if (index < 0 || index >= static_cast<int>(patterns_.size())) return nullptr;
+    return &patterns_[index];
+}
+
+const ChordPattern* ChordEngine::currentPattern() const {
+    int idx = state_.pendingChord.pattern;
+    if (idx < 0 || idx >= static_cast<int>(patterns_.size())) return nullptr;
+    return &patterns_[idx];
+}
+
+void ChordEngine::beginPattern(uint64_t now_us) {
+    patternActive_ = true;
+    patternStep_ = 0;
+    lastPatternClockStep_ = state_.rhythmClock.stepAbs;
+    patternNextUs_ = now_us + stepUs(state_.pendingRhythm.tempo);
+
+    const ChordPattern* pat = currentPattern();
+    int spb = pat ? pat->steps_per_bar : 16;
+    int rhythmSpb = state_.rhythmClock.stepsPerBar.load();
+    uint32_t effective = static_cast<uint32_t>(
+        (rhythmSpb > 0 && rhythmSpb < spb) ? rhythmSpb : spb);
+    if (effective == 0) effective = 16;
+    firePatternStep(0, now_us, effective);
+}
+
+void ChordEngine::firePatternStep(int stepInBar, uint64_t now_us, uint32_t effectiveSteps) {
+    if (!currentChordValid_) return;
+
+    const ChordPattern* pat = currentPattern();
+    if (!pat) return;
+    if (stepInBar < 0 || stepInBar >= static_cast<int>(pat->steps.size())) return;
+
+    uint8_t mask = pat->steps[stepInBar];
+    if (mask == 0) return;  // rest: keep the current notes sustaining
+
+    const ChordParams& p = state_.activeChord;
+    releasePatternNotes();
+
+    std::vector<int> offsets = chordPatternOffsets(currentChord_.type, mask);
+    int root = rootMidi(currentChord_.rootPc, state_.config.base_root_midi, p.octave);
+    for (int off : offsets) {
+        int note = root + off;
+        if (note < 0) note = 0;
+        if (note > 127) note = 127;
+        router_.noteOn(activeChannel_, static_cast<uint8_t>(note), p.velocity);
+        activeNotes_.push_back(static_cast<uint8_t>(note));
+    }
+
+    int sustain = chordPatternStepSustain(*pat, stepInBar);
+    if (sustain > static_cast<int>(effectiveSteps)) sustain = static_cast<int>(effectiveSteps);
+    if (sustain > 0) {
+        patternOffUs_ = now_us +
+            static_cast<uint64_t>(stepUs(state_.pendingRhythm.tempo)) *
+            static_cast<uint64_t>(sustain);
+    } else {
+        patternOffUs_ = now_us + static_cast<uint64_t>(p.note_duration_ms) * 1000ULL;
+    }
+}
+
+void ChordEngine::releasePatternNotes() {
+    for (uint8_t n : activeNotes_) {
+        router_.noteOff(activeChannel_, n);
+    }
+    activeNotes_.clear();
+}
+
 void ChordEngine::update(uint64_t now_us) {
     // Chord roll (VR-9): fire note-ons as their stagger deadlines pass.
     if (!rollPending_.empty()) {
@@ -234,6 +309,34 @@ void ChordEngine::update(uint64_t now_us) {
         }
     }
 
+    if (patternActive_) {
+        // Release sustained pattern notes whose deadline passed (covers rests and
+        // the Block pattern; percussive steps release between steps).
+        if (!activeNotes_.empty() && now_us >= patternOffUs_) {
+            releasePatternNotes();
+        }
+
+        const ChordPattern* pat = currentPattern();
+        int spb = pat ? pat->steps_per_bar : 16;
+        int rhythmSpb = state_.rhythmClock.stepsPerBar.load();
+        uint32_t effective = static_cast<uint32_t>(
+            (rhythmSpb > 0 && rhythmSpb < spb) ? rhythmSpb : spb);
+        if (effective == 0) effective = 16;
+
+        if (followRhythmClock()) {
+            uint32_t stepAbs = state_.rhythmClock.stepAbs;
+            if (stepAbs != lastPatternClockStep_) {
+                lastPatternClockStep_ = stepAbs;
+                patternStep_ = (patternStep_ + 1) % effective;
+                firePatternStep(static_cast<int>(patternStep_), now_us, effective);
+            }
+        } else if (now_us >= patternNextUs_) {
+            patternStep_ = (patternStep_ + 1) % effective;
+            firePatternStep(static_cast<int>(patternStep_), now_us, effective);
+            patternNextUs_ = now_us + stepUs(state_.pendingRhythm.tempo);
+        }
+    }
+
     if (releaseBufferPending_ && now_us >= releaseBufferDeadlineUs_) {
         releaseBufferPending_ = false;
         resolveAndTriggerIfChanged(now_us, false);
@@ -243,7 +346,9 @@ void ChordEngine::update(uint64_t now_us) {
 bool ChordEngine::followRhythmClock() const {
     return state_.rhythmClock.running &&
            (state_.activeChord.play_mode == PlayMode::Arpeggio ||
-            state_.activeChord.play_mode == PlayMode::ArpHold);
+            state_.activeChord.play_mode == PlayMode::ArpHold ||
+            state_.activeChord.play_mode == PlayMode::Pattern ||
+            state_.activeChord.play_mode == PlayMode::PatternHold);
 }
 
 void ChordEngine::allNotesOff() {
@@ -286,7 +391,8 @@ void ChordEngine::onRelease(uint64_t now_us) {
         return;
     }
     if (state_.activeChord.play_mode == PlayMode::Held ||
-        state_.activeChord.play_mode == PlayMode::ArpHold) {
+        state_.activeChord.play_mode == PlayMode::ArpHold ||
+        state_.activeChord.play_mode == PlayMode::PatternHold) {
         return;
     }
     releaseBufferPending_ = true;
@@ -317,9 +423,10 @@ void ChordEngine::resolveAndTriggerIfChanged(uint64_t now_us, bool force) {
     }
 
     if (heldCells_.empty()) {
-        // All keys released. Held/ArpHold sustain; momentary modes release.
+        // All keys released. Held/ArpHold/PatternHold sustain; momentary modes release.
         if (state_.activeChord.play_mode == PlayMode::Held ||
-            state_.activeChord.play_mode == PlayMode::ArpHold) {
+            state_.activeChord.play_mode == PlayMode::ArpHold ||
+            state_.activeChord.play_mode == PlayMode::PatternHold) {
             return;
         }
         releaseChord();
@@ -364,6 +471,13 @@ void ChordEngine::triggerChord(const ResolvedChord& chord, uint64_t now_us) {
             sounding_ = true;
             router_.cc(p.channel, midi::CC_PAN, p.pan);
             beginArp(now_us);
+            break;
+
+        case PlayMode::Pattern:
+        case PlayMode::PatternHold:
+            sounding_ = true;
+            router_.cc(p.channel, midi::CC_PAN, p.pan);
+            beginPattern(now_us);
             break;
 
         case PlayMode::Held:
@@ -501,6 +615,7 @@ void ChordEngine::stopSound() {
     rollPending_.clear();
     sounding_ = false;
     arpActive_ = false;
+    patternActive_ = false;
 }
 
 bool ChordEngine::chordChanged(const ResolvedChord& chord) const {
@@ -510,4 +625,71 @@ bool ChordEngine::chordChanged(const ResolvedChord& chord) const {
         || chord.add9   != currentChord_.add9
         || chord.add11  != currentChord_.add11
         || chord.add13  != currentChord_.add13;
+}
+
+namespace {
+
+// Built-in fallback pattern: full chord held for the bar. Used when no pattern
+// JSON can be loaded from storage.
+ChordPattern builtinBlockPattern() {
+    ChordPattern p;
+    p.name = "Block";
+    p.steps_per_bar = 16;
+    p.steps = {CHORD_MASK_SEVENTH,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
+    p.sustain_steps = {16,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
+    return p;
+}
+
+} // namespace
+
+ChordPatternLibrary loadChordPatterns(StorageAdapter& storage) {
+    ChordPatternLibrary lib;
+    lib.patterns.reserve(CHORD_PATTERN_COUNT + 4);
+    lib.names.reserve(CHORD_PATTERN_COUNT + 4);
+
+    // 1. Built-in patterns, in fixed order (indices 0..CHORD_PATTERN_COUNT-1).
+    // A missing or unparseable file is re-provisioned from the embedded template
+    // so indices stay stable and presets that store a built-in index keep
+    // pointing at the right pattern.
+    for (int i = 0; i < CHORD_PATTERN_COUNT; i++) {
+        std::string path = "/chordpatterns/" + std::string(chordPatternFileName(i));
+        std::string raw;
+        if (storage.exists(path)) raw = storage.readFile(path);
+
+        ChordPattern p;
+        if (!parseChordPattern(raw, p)) {
+            const char* tmpl = defaultChordPatternJson(i);
+            raw = tmpl ? tmpl : "";
+            storage.writeFile(path, raw);
+            parseChordPattern(raw, p);
+        }
+        lib.patterns.push_back(p);
+        lib.names.push_back(p.name.empty() ? chordPatternName(i) : p.name);
+    }
+
+    // 2. User-provided patterns: any other *.json in /chordpatterns/, sorted by
+    // filename. Appended at indices CHORD_PATTERN_COUNT.. up to MAX_CHORD_PATTERNS.
+    auto files = storage.listFiles("/chordpatterns");
+    std::sort(files.begin(), files.end());
+    for (const auto& f : files) {
+        if (static_cast<int>(lib.patterns.size()) >= MAX_CHORD_PATTERNS) break;
+        if (f.size() < 5 || f.compare(f.size() - 5, 5, ".json") != 0) continue;
+        bool builtin = false;
+        for (int i = 0; i < CHORD_PATTERN_COUNT; i++) {
+            if (f == chordPatternFileName(i)) { builtin = true; break; }
+        }
+        if (builtin) continue;
+
+        std::string raw = storage.readFile("/chordpatterns/" + f);
+        ChordPattern p;
+        if (!parseChordPattern(raw, p) || !p.valid()) continue;
+        lib.patterns.push_back(p);
+        lib.names.push_back(p.name.empty() ? f.substr(0, f.size() - 5) : p.name);
+    }
+
+    if (lib.patterns.empty()) {
+        lib.patterns.push_back(builtinBlockPattern());
+        lib.names.push_back("Block");
+    }
+    return lib;
 }

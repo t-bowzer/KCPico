@@ -477,6 +477,49 @@ patterns load.
 > first 12 steps, then wraps — so a walking bass naturally drops its 6th/7th on
 > the fourth beat, and `3/4 Alt` becomes root on beat 1, 5th on beat 3.
 
+### 5.7 Schema (chord patterns)
+
+```json
+{
+  "name": "Alberti",
+  "steps_per_bar": 16,
+  "steps": [1, 0, 0, 0, 4, 0, 0, 0, 2, 0, 0, 0, 4, 0, 0, 0]
+}
+```
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `name` | string | Display name (shown in the Chord menu / preset `chord.pattern`). |
+| `steps_per_bar` | int | Length of the `steps` array; 4 steps = 1 beat (16th-note grid). |
+| `steps[]` | int array | Chord-degree **bitmask**: `0` = rest, bit0 (`1`) = root, bit1 (`2`) = 3rd, bit2 (`4`) = 5th, bit3 (`8`) = 7th. Combine bits for multi-note steps (e.g. `7` = root+3rd+5th, `15` = all four). Degree 3 (bit3) plays the chord's 7th when present, otherwise the root an octave up on triads. |
+| `sustain_steps[]` | int array (optional) | Parallel array giving each step's length in 16th steps. `0`/absent = percussive (uses `chord.note_duration_ms`). |
+
+### 5.8 The 9 built-in chord patterns
+
+These ship in firmware and are written to `/chordpatterns/` on first boot (and
+re-provisioned if you delete one):
+
+| Index | File | Name | Steps |
+|-------|------|------|-------|
+| 0 | `block.json` | Block | full chord held for the bar |
+| 1 | `alberti.json` | Alberti | root-5th-3rd-5th on quarter notes |
+| 2 | `broken_up.json` | Broken Up | root-3rd-5th-7th on quarter notes |
+| 3 | `broken_down.json` | Broken Down | 7th-5th-3rd-root on quarter notes |
+| 4 | `pulse.json` | Pulse | full triad on every 8th note |
+| 5 | `oom_pah.json` | Oom-Pah | root, then 3rd+5th, alternating beats |
+| 6 | `roll.json` | Roll | root-3rd-5th-3rd on 8th notes |
+| 7 | `split.json` | Split | root on beat 1, 3rd+5th+7th on beats 2–4 |
+| 8 | `arpeggio.json` | Arpeggio | root-3rd-5th-7th-5th-3rd 16th-note cycle |
+
+### 5.9 Adding your own chord patterns
+
+Like bass patterns: drop any extra `*.json` file into `/chordpatterns/`. They
+are loaded after the 9 built-ins (indices 9, 10, …), ordered alphabetically by
+filename, named by their `name` field, selected via the Chord menu / `chord.pattern`
+in a preset (or `chord_pattern` in the keymap). A preset referencing a deleted or
+renamed pattern falls back to the first pattern (Block). The firmware caps the
+total at **32** patterns, and skips any file with an empty `steps` array.
+
 ---
 
 ## 6. Reference tables

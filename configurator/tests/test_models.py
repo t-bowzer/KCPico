@@ -6,8 +6,13 @@ from pathlib import Path
 import pytest
 
 from keybchord_configurator.models.bass import BASS_NAMES, BassPattern
+from keybchord_configurator.models.chordpattern import CHORD_PATTERN_NAMES, ChordPattern
 from keybchord_configurator.models.config import AppConfig
-from keybchord_configurator.models.defaults import BUILTIN_BASS, BUILTIN_RHYTHMS
+from keybchord_configurator.models.defaults import (
+    BUILTIN_BASS,
+    BUILTIN_CHORD_PATTERNS,
+    BUILTIN_RHYTHMS,
+)
 from keybchord_configurator.models.keymap import KeymapConfig, default_keymap
 from keybchord_configurator.models.preset import DRUM_PIECES, PresetSlot
 from keybchord_configurator.models.rhythm import RHYTHM_NAMES, RhythmPattern
@@ -78,12 +83,32 @@ def test_bass_example_roundtrip():
 def test_builtin_tables_consistent():
     assert len(BUILTIN_RHYTHMS) == len(RHYTHM_NAMES) == 12
     assert len(BUILTIN_BASS) == len(BASS_NAMES) == 9
+    assert len(BUILTIN_CHORD_PATTERNS) == len(CHORD_PATTERN_NAMES) == 9
     for i, data in enumerate(BUILTIN_RHYTHMS):
         pattern = RhythmPattern.from_dict(data)
         assert pattern.name == RHYTHM_NAMES[i]
     for i, data in enumerate(BUILTIN_BASS):
         pattern = BassPattern.from_dict(data)
         assert pattern.name == BASS_NAMES[i]
+    for i, data in enumerate(BUILTIN_CHORD_PATTERNS):
+        pattern = ChordPattern.from_dict(data)
+        assert pattern.name == CHORD_PATTERN_NAMES[i]
+
+
+def test_chord_pattern_roundtrip():
+    data = {"name": "Alberti", "steps_per_bar": 16,
+            "steps": [1, 0, 0, 0, 4, 0, 0, 0, 2, 0, 0, 0, 4, 0, 0, 0]}
+    pattern = ChordPattern.from_dict(data)
+    assert pattern.name == "Alberti"
+    assert pattern.steps[0] == 1
+    assert pattern.steps[4] == 4
+    assert pattern.valid()
+    assert pattern.to_dict()["steps"] == data["steps"]
+
+
+def test_chord_pattern_clamps_bitmask():
+    pattern = ChordPattern.from_dict({"name": "X", "steps": [1, 99, -3, 7]})
+    assert pattern.steps == [1, 15, 0, 7]
 
 
 def test_keymap_default_roundtrip():

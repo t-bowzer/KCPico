@@ -2,6 +2,7 @@
 
 #include "base.h"
 #include "bass.h"
+#include "chordpattern.h"
 #include "config.h"
 #include "keymap_config.h"
 #include "presets.h"
@@ -241,6 +242,75 @@ const char* const kBassJson[BASS_COUNT] = {
 })",
 };
 
+// Shipped chord patterns (spec 6.10), embedded in code (pretty-printed). `steps`
+// are chord-degree bitmasks (bit0=root, bit1=3rd, bit2=5th, bit3=7th; 0=rest) on
+// the 16th-note grid; `sustain_steps` (optional) gives a note's length in steps.
+const char* const kChordPatternJson[CHORD_PATTERN_COUNT] = {
+    // Block: hold the full chord (all four degrees) for the whole bar.
+    R"({
+  "name": "Block",
+  "steps_per_bar": 16,
+  "steps": [15,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+  "sustain_steps": [16,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0]
+})",
+
+    // Alberti: root-5th-3rd-5th on quarter-note beats (the M13 demo pattern).
+    R"({
+  "name": "Alberti",
+  "steps_per_bar": 16,
+  "steps": [1,0,0,0, 4,0,0,0, 2,0,0,0, 4,0,0,0]
+})",
+
+    // Broken Up: root-3rd-5th-7th on quarter-note beats.
+    R"({
+  "name": "Broken Up",
+  "steps_per_bar": 16,
+  "steps": [1,0,0,0, 2,0,0,0, 4,0,0,0, 8,0,0,0]
+})",
+
+    // Broken Down: 7th-5th-3rd-root on quarter-note beats.
+    R"({
+  "name": "Broken Down",
+  "steps_per_bar": 16,
+  "steps": [8,0,0,0, 4,0,0,0, 2,0,0,0, 1,0,0,0]
+})",
+
+    // Pulse: full triad together on every 8th note.
+    R"({
+  "name": "Pulse",
+  "steps_per_bar": 16,
+  "steps": [7,0,7,0, 7,0,7,0, 7,0,7,0, 7,0,7,0]
+})",
+
+    // Oom-Pah: root alone, then 3rd+5th together, alternating beats.
+    R"({
+  "name": "Oom-Pah",
+  "steps_per_bar": 16,
+  "steps": [1,0,0,0, 6,0,0,0, 1,0,0,0, 6,0,0,0]
+})",
+
+    // Roll: root-3rd-5th-3rd on every 8th note (rolling arpeggio).
+    R"({
+  "name": "Roll",
+  "steps_per_bar": 16,
+  "steps": [1,0,2,0, 4,0,2,0, 1,0,2,0, 4,0,2,0]
+})",
+
+    // Split: root on beat 1, then 3rd+5th+7th together on beats 2-4.
+    R"({
+  "name": "Split",
+  "steps_per_bar": 16,
+  "steps": [1,0,0,0, 14,0,0,0, 14,0,0,0, 14,0,0,0]
+})",
+
+    // Arpeggio: root-3rd-5th-7th-5th-3rd across each half-bar (16th notes).
+    R"({
+  "name": "Arpeggio",
+  "steps_per_bar": 16,
+  "steps": [1,2,4,8, 4,2,0,0, 1,2,4,8, 4,2,0,0]
+})",
+};
+
 } // namespace
 
 
@@ -248,6 +318,7 @@ void provisionDefaults(StorageAdapter& storage) {
     storage.mkdir("/presets");
     storage.mkdir("/rhythms");
     storage.mkdir("/bass");
+    storage.mkdir("/chordpatterns");
     // Global config (defaults).
     AppConfig::defaults().save(storage);
 
@@ -272,6 +343,12 @@ void provisionDefaults(StorageAdapter& storage) {
         storage.writeFile("/bass/" + std::string(bassFileName(i)),
                           kBassJson[i]);
     }
+
+    // 9 named chord patterns.
+    for (int i = 0; i < CHORD_PATTERN_COUNT; i++) {
+        storage.writeFile("/chordpatterns/" + std::string(chordPatternFileName(i)),
+                          kChordPatternJson[i]);
+    }
 }
 
 const char* defaultRhythmJson(int index) {
@@ -282,4 +359,9 @@ const char* defaultRhythmJson(int index) {
 const char* defaultBassJson(int index) {
     if (index < 0 || index >= BASS_COUNT) return nullptr;
     return kBassJson[index];
+}
+
+const char* defaultChordPatternJson(int index) {
+    if (index < 0 || index >= CHORD_PATTERN_COUNT) return nullptr;
+    return kChordPatternJson[index];
 }

@@ -5,6 +5,7 @@
 
 #include "base.h"
 #include "chords.h"
+#include "chordpattern.h"
 #include "keymap.h"
 #include "state.h"
 
@@ -27,6 +28,12 @@ public:
     // the active arpeggio step sequence so a mode switch (e.g. out of Random)
     // never leaves a stale/empty sequence behind.
     void onArpModeChanged();
+
+    // Install the chord pattern library (indices align with the name list).
+    void setPatterns(std::vector<ChordPattern> patterns);
+
+    // The pattern at `index` (null if out of range).
+    const ChordPattern* patternAt(int index) const;
 
     // Clears the voice-leading memory (prevVoicing_) so the next triggered chord
     // is voiced from root position at the configured octave. A currently-held or
@@ -80,6 +87,14 @@ private:
     uint32_t lastRhythmStep_ = 0;
     uint32_t rngState_ = 0x12345678u;   // seeded LCG for Random mode
 
+    // Chord-pattern state (spec 6.10).
+    std::vector<ChordPattern> patterns_;
+    bool patternActive_ = false;
+    uint32_t patternStep_ = 0;        // next step index within the bar
+    uint32_t lastPatternClockStep_ = 0;
+    uint64_t patternNextUs_ = 0;      // free-run step deadline (rhythm stopped)
+    uint64_t patternOffUs_ = 0;       // absolute deadline to release pattern notes
+
     // Chord roll (VR-9): staggered note-ons not yet fired.
     struct PendingNoteOn { uint8_t note; uint64_t deadline; };
     std::vector<PendingNoteOn> rollPending_;
@@ -106,5 +121,18 @@ private:
     bool followRhythmClock() const;
     bool chordChanged(const ResolvedChord& chord) const;
 
+    const ChordPattern* currentPattern() const;
+    void beginPattern(uint64_t now_us);
+    void firePatternStep(int stepInBar, uint64_t now_us, uint32_t effectiveSteps);
+    void releasePatternNotes();
+
     static std::vector<int> arpSequence(ArpMode mode, size_t n);
 };
+
+// Loads the full chord pattern set from storage: the 9 built-in patterns first
+// (in fixed order, self-healing missing/corrupt files from the embedded
+// templates), then any additional user-provided /chordpatterns/*.json files
+// (sorted by filename, appended at indices CHORD_PATTERN_COUNT..). Falls back to
+// a single built-in pattern on total failure. `names` matches `patterns` in
+// order.
+ChordPatternLibrary loadChordPatterns(StorageAdapter& storage);

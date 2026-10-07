@@ -7,6 +7,7 @@
 
 #include "base.h"
 #include "bass.h"
+#include "chordpattern.h"
 #include "keymap.h"
 #include "rhythm.h"
 
@@ -92,6 +93,7 @@ const ParamName kParamNames[] = {
     {"chord_min_interval", ParamId::ChordMinInterval},
     {"chord_inversion", ParamId::ChordInversion},
     {"arp_mode", ParamId::ChordArpMode},
+    {"chord_pattern", ParamId::ChordPattern},
     {"strum_octave", ParamId::StrumOctave},
     {"strum_duration", ParamId::StrumDuration},
     {"strum_velocity", ParamId::StrumVelocity},
@@ -130,6 +132,7 @@ struct ValueName {
 
 const ValueName kPlayModeNames[] = {
     {"held", 0}, {"press", 1}, {"arpeggio", 2}, {"arp_hold", 3}, {"silent", 4},
+    {"pattern", 5}, {"pattern_hold", 6},
 };
 const ValueName kVoicingNames[] = {
     {"root", 0}, {"smart", 1}, {"down", 2}, {"up", 3},
@@ -201,7 +204,7 @@ bool parseValue(ParamId id, const std::string& s, int& out) {
 
     switch (id) {
         case ParamId::ChordMode:
-            return lookupValue(kPlayModeNames, 5, s, out);
+            return lookupValue(kPlayModeNames, 7, s, out);
         case ParamId::ChordVoicing:
             return lookupValue(kVoicingNames, 4, s, out);
         case ParamId::ChordInversion:
@@ -220,6 +223,12 @@ bool parseValue(ParamId id, const std::string& s, int& out) {
         }
         case ParamId::BassPattern: {
             int idx = bassIndex(s);
+            if (idx < 0) return false;
+            out = idx;
+            return true;
+        }
+        case ParamId::ChordPattern: {
+            int idx = chordPatternIndex(s);
             if (idx < 0) return false;
             out = idx;
             return true;

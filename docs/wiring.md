@@ -50,6 +50,12 @@ flowchart LR
         D2["DIN pin 2 GND"]
     end
 
+    subgraph TRS["3.5mm TRS MIDI OUT (Type-A)"]
+        TIP["tip = data (pin 5)"]
+        RING["ring = source (pin 4)"]
+        SLEEVE["sleeve = GND (pin 2)"]
+    end
+
     subgraph LCD["LCD1602 plus PCF8574 at 3V3"]
         LSDA["SDA"]
         LSCL["SCL"]
@@ -76,6 +82,10 @@ flowchart LR
     V33 ---|"33 ohm"| D4
     GND --- D2
 
+    GP8 ---|"10 ohm (shared)"| TIP
+    V33 ---|"33 ohm (shared)"| RING
+    GND --- SLEEVE
+
     GP4 --- LSDA
     GP5 --- LSCL
     V33 --- LVCC
@@ -96,6 +106,10 @@ flowchart LR
   In firmware, call `Serial2.setTX(8)` before `Serial2.begin(31250)`. The RP2040 UART TX
   is push-pull (not open-drain) — a benign deviation that works with standard
   opto-isolated inputs; optional ferrite beads on the DIN signal pins reduce RFI.
+- **TRS MIDI OUT (3.5mm, Type-A):** wired **in parallel** with the DIN loop and
+  shares the same 10 ohm / 33 ohm resistors (not duplicated). Type-A: **tip** =
+  DIN pin 5 (data, `GP8`), **ring** = DIN pin 4 (source, `3V3`), **sleeve** =
+  DIN pin 2 (GND). Both jacks drive a downstream synth simultaneously.
 - **LCD1602/PCF8574:** I2C0 on `GP4` (SDA) / `GP5` (SCL); **powered at 3.3V** so the I2C
   bus stays 3.3V-safe. Pull-ups from the backpack or 4.7 kohm to 3.3V. Firmware
   auto-probes address `0x27` then `0x3F`, falling back to the null LCD adapter if absent.
@@ -106,6 +120,9 @@ flowchart LR
 - **Back-feed rule:** do **not** inject a regulated 5V into `VSYS` while also powered from
   native USB unless that external `VSYS` feed has **its own series Schottky diode**. Pick
   one power path. (The onboard D1 only covers `VBUS`->`VSYS`.)
+- **Master power switch (recommended, not required):** the Pico's micro-USB is soldered
+  directly to `VBUS`, so there is no on-board break point. A switch that cuts the Pico *and*
+  the keyboard lives **off-board** — an inline USB power switch or a switched PSU (not drawn).
 - **3V3(OUT) budget:** the LCD runs off `3V3(OUT)` (~300 mA rail shared with the RP2040);
   keep a backlit LCD within budget or power its backlight separately.
 

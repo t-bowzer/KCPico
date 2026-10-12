@@ -19,7 +19,7 @@ The filesystem is presented as a USB Mass Storage drive named **"KeybChord"**:
 3. On your PC the **"KeybChord"** drive mounts. Edit/add files there.
 4. Eject the drive and power-cycle **without** holding `Ctrl`.
 
-> The keyboard stays on the separate PIO-USB host port; the drive is on the
+> The keyboard stays on the separate CH559 host coprocessor; the drive is on the
 > native USB port. While the drive is mounted the firmware must not write to the
 > filesystem, so preset Save/Clear is suppressed until you eject and reboot.
 

@@ -30,11 +30,23 @@ flowchart LR
         VSYS["VSYS pin 39"]
         V33["3V3 OUT pin 36"]
         GND["GND pins 3, 8, etc"]
-        GP0["GP0 pin 1"]
-        GP1["GP1 pin 2"]
+        GP0["GP0 UART0 TX pin 1"]
+        GP1["GP1 UART0 RX pin 2"]
         GP4["GP4 pin 6"]
         GP5["GP5 pin 7"]
         GP8["GP8 pin 11"]
+    end
+
+    subgraph CH559["CH559L USB host coprocessor"]
+        C_RX["RXD1 pin 27"]
+        C_TX["TXD1 pin 28"]
+        C_HP["HP host D+ pin 29"]
+        C_HM["HM host D- pin 30"]
+        C_DP["DP pin 31"]
+        C_DM["DM pin 32"]
+        C_VIN5["VIN5 pin 41"]
+        C_VDD["VDD33 pin 42"]
+        C_GN["GND pin 18"]
     end
 
     subgraph KBD["USB-A receptacle keyboard host"]
@@ -43,6 +55,8 @@ flowchart LR
         KVB["VBUS, recept pin 1"]
         KGN["GND, recept pin 4"]
     end
+
+    PROG["Programming header 4-pin (DP, DM, GND, 3V3)"]
 
     subgraph DIN["DIN-5 MIDI OUT"]
         D5["DIN pin 5"]
@@ -75,8 +89,15 @@ flowchart LR
     VBUS --- CAP
     GND --- CAP
 
-    GP0 ---|"22 ohm"| KDP
-    GP1 ---|"22 ohm"| KDM
+    GP0 ---|"TX"| C_RX
+    GP1 ---|"RX"| C_TX
+    V33 --- C_VIN5
+    V33 --- C_VDD
+    GND --- C_GN
+    C_HP ---|"22 ohm"| KDP
+    C_HM ---|"22 ohm"| KDM
+    C_DP --- PROG
+    C_DM --- PROG
 
     GP8 ---|"10 ohm"| D5
     V33 ---|"33 ohm"| D4
@@ -97,9 +118,16 @@ flowchart LR
 ## Legend & notes
 
 - **All resistors 1/4 W (0.25 W)** — actual dissipation is only milliwatts.
-- **USB host:** `GP0`=D+, `GP1`=D- with a **22 ohm** series resistor on each line
-  (the only series elements; the keyboard supplies device-side pull-ups). Set via the
-  `PIO_USB_DP_PIN_DEFAULT=0` build flag.
+- **USB host (CH559L coprocessor on UART0):** the keyboard is hosted by a dedicated
+  **CH559L** (WCH 8051 MCU with a hardware USB host controller). It enumerates the
+  keyboard (hubs + report/NKRO), parses HID reports, and forwards key events to the Pico
+  over **UART0** — `GP0`=TX (→ CH559 `RXD1` pin 27), `GP1`=RX (← CH559 `TXD1` pin 28).
+  The CH559 **HP** (pin 29) / **HM** (pin 30) run to the receptacle through **22 Ω** series
+  resistors (the only series elements; the keyboard supplies device-side pull-ups). `DP`
+  (pin 31) / `DM` (pin 32) go to a **4-pin programming header** for flashing the CH559 via
+  its USB bootloader. **Power:** `VIN5` (pin 41) and `VDD33` (pin 42) both to `3V3(OUT)`
+  (0.1 µF decoupling; at a <3.6 V supply the internal LDO is bypassed), `GND` (pin 18) to
+  ground. Runs off its **internal oscillator** (no crystal). `RST` is pin 3.
 - **DIN MIDI OUT (3.3V loop):** driven directly from the 3.3V `GP8` TX pin —
   **10 ohm** in series with `GP8` to DIN pin 5, **33 ohm** from `3V3(OUT)` to DIN pin 4,
   GND to DIN pin 2. Standards-compliant per the MIDI 1.0 Electrical Spec update (2014).
@@ -127,7 +155,61 @@ flowchart LR
   keep a backlit LCD within budget or power its backlight separately.
 
 For reference designs and precedent (rppicomidi, Adafruit MIDI FeatherWing, PJRC/Teensy,
-MIDI.org 2014 update, Pico-PIO-USB, Pico datasheet power section), see the spec.
+MIDI.org 2014 update, CH559 datasheet / HIDman / atc1441 CH559sdccUSBHost, Pico datasheet
+power section), see the spec.
+
+## Flashing the CH559
+
+The CH559 is programmed over **USB** (its `DP`/`DM` device port), not UART. Only **D+,
+D-, GND** are needed from the PC — the board self-powers at 3.3 V, so do **not** connect
+the PC's 5 V `VBUS` into the board.
+
+**Board-side connector (recommended):** a **4-pin 0.1" (2.54 mm) male header** — `DP`
+(pin 31), `DM` (pin 32), `GND`, and `3V3` (the 4th pin is optional, used only as a power
+reference). Through-hole and trivial to hand-solder. The header's `GND`/`3V3` are the
+Pico's ground and `3V3(OUT)` (the same rail that powers the CH559); the `3V3` pin is a
+reference only — do not feed power into it and never connect the PC's 5 V `VBUS`.
+
+**Cable/programmer:** a **USB-A male plug breakout** (a small board with a USB-A plug and
+labelled `VBUS`/`D+`/`D-`/`GND` pads). Solder a 4-pin female dupont/JST-XH pigtail to it —
+`D+`→DP, `D-`→DM, `GND`→GND, and leave `VBUS` unconnected — then plug the USB-A straight
+into the PC. Avoid a raw USB-A↔A cable (host-to-host hazard); a labelled breakout or a cut
+cable is the safe route.
+
+**Bootloader entry (first flash):** CH55x enters its USB bootloader by pulling **D+ (DP)
+high through ~10 kΩ** during reset. So also place two tactile buttons (or two shortable
+pads) on the board: **BOOT** (10 kΩ `DP`→3V3) and **RESET** (pin 3). After the first
+flash, `ch55xtool`/ch55xduino re-enters the bootloader over USB automatically, so the
+buttons/pads are mainly for initial programming.
+
+**Software:**
+- [`ch55xtool`](https://github.com/MarsTechHAN/ch552tool) — Python, cross-platform:
+  `python3 ch55xtool.py -f firmware.bin`.
+- [`WCHISPTool`](https://www.wch.cn/downloads/WCHISPTool_Setup_exe.html) — WCH's Windows tool.
+- Firmware base: [`atc1441/CH559sdccUSBHost`](https://github.com/atc1441/CH559sdccUSBHost)
+  (SDCC) or WCH's `CH559EVT` host examples.
+
+**Parts / sources:**
+- **USB-A plug breakout** (the PC-side plug with labelled pads):
+  [Adafruit 4448 — USB Type A Plug Breakout Cable w/ female jumpers](https://www.adafruit.com/product/4448)
+  (ready-made pigtail, recommended) or
+  [Adafruit 1387 — USB DIY Connector Shell (Type A Male Plug)](https://www.adafruit.com/product/1387)
+  (bare shell; solder your own wires). Generic "USB A plug breakout" modules are also
+  available from AliExpress/Amazon.
+- **Board header + pigtail:** a 1×4 **0.1" (2.54 mm) male pin header** — e.g.
+  [Adafruit 392 — Break-away 0.1" 36-pin strip male header](https://www.adafruit.com/product/392)
+  (snap off 4 pins) — plus female dupont jumpers to mate with it, e.g.
+  [Adafruit 1951 — Premium Female/Female Jumper Wires, 20×3"](https://www.adafruit.com/product/1951)
+  or [Adafruit 266 — 40×6"](https://www.adafruit.com/product/266). (JST-XH pigtails are an
+  alternative from Digi-Key/LCSC.)
+- **Tactile switches:** 2× 6×6 mm tactile pushbutton (BOOT/RESET) — e.g.
+  [Adafruit 367 — Tactile Switch Buttons](https://www.adafruit.com/product/367) or any
+  Digi-Key/LCSC equivalent.
+- **Passives (board):** 1× 10 kΩ resistor (BOOT pull-up) and 2× 0.1 µF capacitors
+  (`VIN5`/`VDD33` decoupling) — generic parts.
+
+**Procedure:** hold **BOOT**, tap **RESET**, release **BOOT** → the CH559 enumerates as a
+USB bootloader device on the PC → run `ch55xtool -f <firmware>.bin` → done.
 
 ## Regenerating the PNG
 
@@ -141,4 +223,9 @@ npx @mermaid-js/mermaid-cli -i wiring.mmd -o wiring.png -b white -s 2
 On a headless Linux box you may need a Chromium/`chrome-headless-shell` for Puppeteer
 and a puppeteer config passing `--no-sandbox`. If Mermaid renders in your Markdown
 viewer, editing the source block and re-exporting is all that's needed to refresh the PNG.
+
+Headless alternative without node/docker: POST the Mermaid text to
+`https://kroki.io/mermaid/png`, or use mermaid.ink by encoding
+`{"code":"<mermaid>","mermaid":"{\"theme\":\"default\"}"}` with zlib + base64url and
+fetching `https://mermaid.ink/img/pako:<b64>?type=png&bgColor=FFFFFF`.
 

@@ -1,0 +1,13 @@
+# SDCC build artifacts
+*.rel
+*.ihx
+*.hex
+*.bin
+*.lst
+*.asm
+*.sym
+*.map
+*.mem
+*.lk
+*.rst
+*.adb

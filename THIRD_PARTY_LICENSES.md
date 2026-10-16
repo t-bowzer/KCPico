@@ -14,6 +14,7 @@ accompanies any distribution of the firmware (source or binary).
 | TinyUSB core | hathach | MIT | Runtime (USB stack) |
 | FatFs | ChaN | FatFs (permissive) | Runtime (filesystem) |
 | Pico PIO USB | sekigon-gonnoc | MIT | Runtime (keyboard host) |
+| CH559 USB-host firmware | atc1441 | GPL-3.0 | CH559 coprocessor (separate chip, see below) |
 | ArduinoJson | Benoit Blanchon | MIT | Runtime |
 | GoogleTest | Google Inc. | BSD-3-Clause | Native tests only |
 | MIDI Library (forty7) | Francois Best | MIT | Not linked (transitive) |
@@ -34,6 +35,24 @@ The complete source for these components is available from the Arduino project:
 
 This project distributes its own source code (this repository) so that the LGPL
 requirements to provide source and permit relinking are satisfied.
+
+---
+
+## GNU General Public License v3.0
+
+The **CH559 USB-host firmware** (`firmware/ch559/`) is a fork of
+[atc1441/CH559sdccUSBHost](https://github.com/atc1441/CH559sdccUSBHost) and is
+licensed under the GNU General Public License version 3.0. The full text is
+reproduced in `firmware/ch559/LICENSE` and is available at:
+
+- https://www.gnu.org/licenses/gpl-3.0.html
+
+This firmware is an **independent program that runs on a separate CH559 chip**
+and communicates with the RP2040 over a UART link. It is not linked with, and
+does not form a single combined work with, the MIT-licensed RP2040 firmware;
+therefore it does not impose GPL-3.0 obligations on the rest of this repository.
+Source is provided in-tree (`firmware/ch559/`) to satisfy the GPL requirement to
+offer corresponding source.
 
 ---
 

@@ -2,115 +2,230 @@
 
 Visual companion to the canonical pin map. The pin/power tables in
 **Spec §2.2** ([KeybChord_Pico_Spec.md](KeybChord_Pico_Spec.md)) remain
-**authoritative** for exact pins and component values; this diagram is a rendered
+**authoritative** for exact pins and component values; this page is a rendered
 connection view of those tables.
 
 This is a **logical connection diagram** (which wire goes where), not a physical
 breadboard layout. All resistors are **1/4 W (0.25 W)**.
 
-## Combined wiring diagram
+## Connection tables
 
-A pre-rendered image is below (use this if your Markdown viewer does not render Mermaid).
-The Mermaid source follows it and is the editable source of truth; regenerate the PNG
-after editing (see "Regenerating the PNG").
+The tables below are the routing view — "which terminal goes where". For exact
+pin functions and power specs, see Spec §2.2.
+
+### Raspberry Pi Pico (RP2040)
+
+| Pico pin | Signal | Routes to |
+|---|---|---|
+| `VBUS` (40) | 5 V | keyboard USB-A receptacle `VBUS` (pin 1) |
+| `3V3 OUT` (36) | 3.3 V rail | CH559 `VIN5` (41) + `VDD33` (42); LCD `VCC`; programming header `3V3`; MIDI source (`DIN 4` / `TRS ring`) via **33 Ω**; BOOT pull-up via **10 kΩ** |
+| `GND` (3, 8, …) | ground | CH559 `GND` (18); keyboard `GND` (pin 4); LCD `GND`; programming header `GND`; MIDI `GND` (`DIN 2` / `TRS sleeve`); RESET switch |
+| `GP0` (1) | UART0 TX | CH559 `RXD1` (27) |
+| `GP1` (2) | UART0 RX | CH559 `TXD1` (28) |
+| `GP4` (6) | I2C0 SDA | LCD/PCF8574 `SDA` |
+| `GP5` (7) | I2C0 SCL | LCD/PCF8574 `SCL` |
+| `GP8` (11) | UART1 TX | `DIN 5` via **10 Ω**; `TRS tip` via **10 Ω** (shared) |
+
+### CH559L
+
+| CH559 pin | Signal | Routes to |
+|---|---|---|
+| `RXD1` (27) | UART RX | Pico `GP0` (TX) |
+| `TXD1` (28) | UART TX | Pico `GP1` (RX) |
+| `HP` (29) | host D+ | USB-A `D+` (pin 3) via **22 Ω** |
+| `HM` (30) | host D− | USB-A `D−` (pin 2) via **22 Ω** |
+| `DP` (31) | device D+ | programming header `DP`; BOOT button via **10 kΩ** to `3V3` |
+| `DM` (32) | device D− | programming header `DM` |
+| `VIN5` (41) | 3.3 V | Pico `3V3 OUT`; **0.1 µF** decoupling to `GND` |
+| `VDD33` (42) | 3.3 V | Pico `3V3 OUT`; **0.1 µF** decoupling to `GND` |
+| `GND` (18) | ground | Pico `GND` |
+| `RST` (3) | reset | RESET button → `GND` |
+
+### USB-A receptacle (keyboard host)
+
+| Receptacle pin | Routes to |
+|---|---|
+| 1 `VBUS` | Pico `VBUS` (5 V) |
+| 2 `D−` | CH559 `HM` (30) via **22 Ω** |
+| 3 `D+` | CH559 `HP` (29) via **22 Ω** |
+| 4 `GND` | Pico `GND` |
+
+### Programming header (4-pin 0.1")
+
+| Header pin | Routes to |
+|---|---|
+| `DP` | CH559 `DP` (31) |
+| `DM` | CH559 `DM` (32) |
+| `GND` | Pico `GND` |
+| `3V3` | Pico `3V3 OUT` (reference only) |
+
+### DIN-5 MIDI OUT
+
+| Pin | Routes to |
+|---|---|
+| 2 `GND` | Pico `GND` |
+| 4 (source) | Pico `3V3 OUT` via **33 Ω** |
+| 5 (data) | Pico `GP8` via **10 Ω** |
+
+### 3.5 mm TRS MIDI OUT (Type-A, shared with DIN)
+
+| Contact | Routes to |
+|---|---|
+| tip (data) | Pico `GP8` via **10 Ω** (shared) |
+| ring (source) | Pico `3V3 OUT` via **33 Ω** (shared) |
+| sleeve (GND) | Pico `GND` |
+
+### LCD1602 + PCF8574
+
+| Pin | Routes to |
+|---|---|
+| `SDA` | Pico `GP4` |
+| `SCL` | Pico `GP5` |
+| `VCC` | Pico `3V3 OUT` |
+| `GND` | Pico `GND` |
+
+## Wiring diagram
+
+A single consolidated diagram renders below, with every wire in one place. It is drawn
+with **Graphviz `dot`** using orthogonal (right-angle) edges, so the wires never cross
+and read like a schematic; each box is one board/connector. The DOT source is the
+editable source of truth — regenerate the PNG after editing (see "Regenerating the PNG").
 
 ![KeybChord Pico wiring diagram](wiring.png)
 
 <details>
-<summary>Mermaid source (editable)</summary>
+<summary>DOT source (editable)</summary>
 
-```mermaid
-flowchart LR
-    SRC["5V supply, 1A or more"]
-    USBC["Pico native micro-USB"]
+```dot
+digraph KeybChord {
+    graph [rankdir=LR, splines=ortho, nodesep=0.5, bgcolor="white", ranksep=0.9, fontname="Helvetica"];
+    node [shape=box, style="rounded", fontname="Helvetica", fontsize=11];
+    edge [fontname="Helvetica", fontsize=9, color="#333333"];
 
-    subgraph PICO["Raspberry Pi Pico RP2040"]
-        VBUS["VBUS pin 40"]
-        D1["onboard Schottky D1: VBUS to VSYS"]
-        VSYS["VSYS pin 39"]
-        V33["3V3 OUT pin 36"]
-        GND["GND pins 3, 8, etc"]
-        GP0["GP0 UART0 TX pin 1"]
-        GP1["GP1 UART0 RX pin 2"]
-        GP4["GP4 pin 6"]
-        GP5["GP5 pin 7"]
-        GP8["GP8 pin 11"]
-    end
+    subgraph cluster_power {
+        label="Power";
+        SRC [label="5V supply\n≥1A"];
+        USBC [label="Pico\nmicro-USB"];
+        VBUS [label="VBUS (40)"];
+        D1 [label="Schottky D1"];
+        VSYS [label="VSYS (39)"];
+        V33 [label="3V3 OUT (36)"];
+        GND [label="GND (3,8,…)"];
+        CAP [label="100µF"];
+    }
 
-    subgraph CH559["CH559L USB host coprocessor"]
-        C_RX["RXD1 pin 27"]
-        C_TX["TXD1 pin 28"]
-        C_HP["HP host D+ pin 29"]
-        C_HM["HM host D- pin 30"]
-        C_DP["DP pin 31"]
-        C_DM["DM pin 32"]
-        C_VIN5["VIN5 pin 41"]
-        C_VDD["VDD33 pin 42"]
-        C_GN["GND pin 18"]
-    end
+    subgraph cluster_pico {
+        label="Raspberry Pi Pico";
+        GP0 [label="GP0\nUART0 TX (1)"];
+        GP1 [label="GP1\nUART0 RX (2)"];
+        GP4 [label="GP4\nSDA (6)"];
+        GP5 [label="GP5\nSCL (7)"];
+        GP8 [label="GP8\nUART1 TX (11)"];
+    }
 
-    subgraph KBD["USB-A receptacle keyboard host"]
-        KDP["D plus, recept pin 3"]
-        KDM["D minus, recept pin 2"]
-        KVB["VBUS, recept pin 1"]
-        KGN["GND, recept pin 4"]
-    end
+    subgraph cluster_ch559 {
+        label="CH559L host";
+        CRX [label="RXD1 (27)"];
+        CTX [label="TXD1 (28)"];
+        CHP [label="HP (29)"];
+        CHM [label="HM (30)"];
+        CDP [label="DP (31)"];
+        CDM [label="DM (32)"];
+        CV5 [label="VIN5 (41)"];
+        CVD [label="VDD33 (42)"];
+        C_VIN [label="0.1µF"];
+        C_VDD [label="0.1µF"];
+        CGN [label="GND (18)"];
+        CRST [label="RST (3)"];
+    }
 
-    PROG["Programming header 4-pin (DP, DM, GND, 3V3)"]
+    subgraph cluster_kbd {
+        label="USB-A receptacle";
+        KVB [label="VBUS (1)"];
+        KDP [label="D+ (3)"];
+        KDM [label="D− (2)"];
+        KGN [label="GND (4)"];
+    }
 
-    subgraph DIN["DIN-5 MIDI OUT"]
-        D5["DIN pin 5"]
-        D4["DIN pin 4"]
-        D2["DIN pin 2 GND"]
-    end
+    subgraph cluster_prog {
+        label="Programming header (4-pin)";
+        PDP [label="DP"];
+        PDM [label="DM"];
+        PGN [label="GND"];
+        PV3 [label="3V3"];
+    }
 
-    subgraph TRS["3.5mm TRS MIDI OUT (Type-A)"]
-        TIP["tip = data (pin 5)"]
-        RING["ring = source (pin 4)"]
-        SLEEVE["sleeve = GND (pin 2)"]
-    end
+    BOOT [label="BOOT button"];
+    RESET [label="RESET button"];
+    R_HP [label="22Ω"];
+    R_HM [label="22Ω"];
+    R_BOOT [label="10kΩ"];
 
-    subgraph LCD["LCD1602 plus PCF8574 at 3V3"]
-        LSDA["SDA"]
-        LSCL["SCL"]
-        LVCC["VCC 3V3"]
-        LGND["GND"]
-    end
+    subgraph cluster_midi {
+        label="MIDI OUT (DIN-5 + TRS, parallel)";
+        R10 [label="10Ω"];
+        R33 [label="33Ω"];
+        MDATA [label="data bus"];
+        MSRC [label="source bus"];
+        DIN5 [label="DIN 5"];
+        DIN4 [label="DIN 4"];
+        DIN2 [label="DIN 2 GND"];
+        TIP [label="TRS tip"];
+        RING [label="TRS ring"];
+        SLEEVE [label="TRS sleeve"];
+    }
 
-    CAP["Bulk cap 100uF across 5V rail near receptacle"]
+    subgraph cluster_lcd {
+        label="LCD1602 + PCF8574";
+        LSDA [label="SDA"];
+        LSCL [label="SCL"];
+        LVCC [label="VCC"];
+        LGND [label="GND"];
+    }
 
-    SRC --> USBC
-    USBC -->|"5V"| VBUS
-    VBUS --> D1
-    D1 --> VSYS
-    VSYS -->|"onboard 3V3 regulator"| V33
-    VBUS -->|"5V"| KVB
-    GND --- KGN
-    VBUS --- CAP
-    GND --- CAP
+    SRC -> USBC -> VBUS;
+    VBUS -> D1 -> VSYS -> V33;
+    VBUS -> KVB [label="5V"];
+    VBUS -> CAP -> GND;
 
-    GP0 ---|"TX"| C_RX
-    GP1 ---|"RX"| C_TX
-    V33 --- C_VIN5
-    V33 --- C_VDD
-    GND --- C_GN
-    C_HP ---|"22 ohm"| KDP
-    C_HM ---|"22 ohm"| KDM
-    C_DP --- PROG
-    C_DM --- PROG
+    GP0 -> CRX [label="TX"];
+    GP1 -> CTX [label="RX"];
+    CHP -> R_HP;
+    R_HP -> KDP;
+    CHM -> R_HM;
+    R_HM -> KDM;
+    CDP -> PDP;
+    CDM -> PDM;
+    GP8 -> R10;
+    R10 -> MDATA;
+    MDATA -> DIN5;
+    MDATA -> TIP;
+    GP4 -> LSDA;
+    GP5 -> LSCL;
 
-    GP8 ---|"10 ohm"| D5
-    V33 ---|"33 ohm"| D4
-    GND --- D2
+    V33 -> CV5;
+    V33 -> CVD;
+    CV5 -> C_VIN -> GND;
+    CVD -> C_VDD -> GND;
+    V33 -> LVCC;
+    V33 -> PV3;
+    V33 -> R33;
+    R33 -> MSRC;
+    MSRC -> DIN4;
+    MSRC -> RING;
+    V33 -> R_BOOT;
+    R_BOOT -> BOOT;
+    BOOT -> CDP;
 
-    GP8 ---|"10 ohm (shared)"| TIP
-    V33 ---|"33 ohm (shared)"| RING
-    GND --- SLEEVE
-
-    GP4 --- LSDA
-    GP5 --- LSCL
-    V33 --- LVCC
-    GND --- LGND
+    GND -> CGN;
+    GND -> KGN;
+    GND -> LGND;
+    GND -> PGN;
+    GND -> DIN2;
+    GND -> SLEEVE;
+    GND -> RESET;
+    RESET -> CRST;
+}
 ```
 
 </details>
@@ -128,6 +243,9 @@ flowchart LR
   its USB bootloader. **Power:** `VIN5` (pin 41) and `VDD33` (pin 42) both to `3V3(OUT)`
   (0.1 µF decoupling; at a <3.6 V supply the internal LDO is bypassed), `GND` (pin 18) to
   ground. Runs off its **internal oscillator** (no crystal). `RST` is pin 3.
+  **Programming aids (drawn):** a **BOOT** tactile button pulls `DP` up to `3V3` through a
+  **10 kΩ** resistor (hold it during reset to enter the USB bootloader), and a **RESET**
+  tactile button grounds `RST` (pin 3) to reset the CH559.
 - **DIN MIDI OUT (3.3V loop):** driven directly from the 3.3V `GP8` TX pin —
   **10 ohm** in series with `GP8` to DIN pin 5, **33 ohm** from `3V3(OUT)` to DIN pin 4,
   GND to DIN pin 2. Standards-compliant per the MIDI 1.0 Electrical Spec update (2014).
@@ -184,10 +302,12 @@ buttons/pads are mainly for initial programming.
 
 **Software:**
 - [`ch55xtool`](https://github.com/MarsTechHAN/ch552tool) — Python, cross-platform:
-  `python3 ch55xtool.py -f firmware.bin`.
+  `python3 ch55xtool.py -f ch559.bin`.
 - [`WCHISPTool`](https://www.wch.cn/downloads/WCHISPTool_Setup_exe.html) — WCH's Windows tool.
-- Firmware base: [`atc1441/CH559sdccUSBHost`](https://github.com/atc1441/CH559sdccUSBHost)
-  (SDCC) or WCH's `CH559EVT` host examples.
+- Firmware source: **`firmware/ch559/`** in this repo (a fork of
+  [`atc1441/CH559sdccUSBHost`](https://github.com/atc1441/CH559sdccUSBHost), built
+  with SDCC — `make` produces `ch559.hex`/`ch559.bin`). WCH's `CH559EVT` host
+  examples are an alternative base.
 
 **Parts / sources:**
 - **USB-A plug breakout** (the PC-side plug with labelled pads):
@@ -213,19 +333,20 @@ USB bootloader device on the PC → run `ch55xtool -f <firmware>.bin` → done.
 
 ## Regenerating the PNG
 
-`wiring.png` is rendered from the Mermaid source above using the Mermaid CLI:
+`wiring.png` is rendered from the DOT block above using Graphviz `dot` (orthogonal
+splines). Easiest is the Kroki web API:
 
 ```bash
-# Extract the mermaid block to wiring.mmd, then:
-npx @mermaid-js/mermaid-cli -i wiring.mmd -o wiring.png -b white -s 2
+# Extract the ```dot block to wiring.dot, then:
+curl -s -X POST https://kroki.io/graphviz/png \
+  -H "Content-Type: text/plain" --data-binary @wiring.dot -o docs/wiring.png
 ```
 
-On a headless Linux box you may need a Chromium/`chrome-headless-shell` for Puppeteer
-and a puppeteer config passing `--no-sandbox`. If Mermaid renders in your Markdown
-viewer, editing the source block and re-exporting is all that's needed to refresh the PNG.
+Or render locally if Graphviz is installed:
 
-Headless alternative without node/docker: POST the Mermaid text to
-`https://kroki.io/mermaid/png`, or use mermaid.ink by encoding
-`{"code":"<mermaid>","mermaid":"{\"theme\":\"default\"}"}` with zlib + base64url and
-fetching `https://mermaid.ink/img/pako:<b64>?type=png&bgColor=FFFFFF`.
+```bash
+dot -Tpng -Gbgcolor=white -o docs/wiring.png wiring.dot
+```
 
+The `rankdir=LR` + `splines=ortho` combination is what keeps the edges at right angles
+and crossing-free; preserve it when editing.

@@ -1,6 +1,8 @@
 #include "input_usbhost.h"
 
-#ifndef KEYBCHORD_NATIVE
+// Compiled only for the legacy PIO-USB build (not KEYBCHORD_CH559, which uses
+// InputCh559, and not KEYBCHORD_NATIVE).
+#if !defined(KEYBCHORD_NATIVE) && !defined(KEYBCHORD_CH559)
 
 #include <Arduino.h>
 #include <cstdio>
@@ -206,8 +208,7 @@ void InputUsbHost::onUmount(uint8_t dev_addr, uint8_t instance) {
         mounted_ = false;
         report_id_ = 0;
         reportReceived_ = false;
-        for (auto& k : prev_keys_) k = 0;
-        prev_mods_ = 0;
+        report_.reset();
         led_state_ = 0;
     }
 }
@@ -219,56 +220,9 @@ void InputUsbHost::onReport(uint8_t dev_addr, uint8_t instance,
         return;
     }
 
-    // A report-protocol keyboard prefixes the report with its Report ID; drop
-    // it so the rest parses as the standard 8-byte boot-format layout.
-    uint8_t off = 0;
-    if (report_id_ != 0 && len > 0 && report[0] == report_id_) {
-        off = 1;
-    }
-
-    if (len < off + 8) {
-        tuh_hid_receive_report(dev_addr, instance);
-        return;
-    }
-
     reportReceived_ = true;
-
-    uint8_t modifiers = report[off];
     uint64_t received_us = time_us_64();
-    uint8_t mod_changed = modifiers ^ prev_mods_;
-    for (int bit = 0; bit < 8; bit++) {
-        if (mod_changed & (1 << bit)) {
-            bool pressed = modifiers & (1 << bit);
-            uint8_t usage = modifierBitToUsage(bit);
-            pushEvent(usage, pressed, modifiers, received_us);
-        }
-    }
-    prev_mods_ = modifiers;
-
-    uint8_t currentKeys[MAX_KEYS];
-    for (size_t i = 0; i < MAX_KEYS && (off + 2 + i) < len; i++) {
-        currentKeys[i] = report[off + 2 + i];
-    }
-
-    for (size_t i = 0; i < MAX_KEYS; i++) {
-        if (currentKeys[i] == 0) continue;
-        bool found = false;
-        for (size_t j = 0; j < MAX_KEYS; j++) {
-            if (prev_keys_[j] == currentKeys[i]) { found = true; break; }
-        }
-        if (!found) pushEvent(currentKeys[i], true, modifiers, received_us);
-    }
-
-    for (size_t i = 0; i < MAX_KEYS; i++) {
-        if (prev_keys_[i] == 0) continue;
-        bool found = false;
-        for (size_t j = 0; j < MAX_KEYS; j++) {
-            if (currentKeys[j] == prev_keys_[i]) { found = true; break; }
-        }
-        if (!found) pushEvent(prev_keys_[i], false, modifiers, received_us);
-    }
-
-    for (size_t i = 0; i < MAX_KEYS; i++) prev_keys_[i] = currentKeys[i];
+    report_.apply(report, len, report_id_, received_us, eventQueue_);
     tuh_hid_receive_report(dev_addr, instance);
 }
 
@@ -305,19 +259,5 @@ bool InputUsbHost::setLed(uint8_t led_usage, bool on) {
                               HID_REPORT_TYPE_OUTPUT, &led_state_, 1);
 }
 
-void InputUsbHost::pushEvent(uint8_t usage, bool pressed, uint8_t mods,
-                             uint64_t received_us) {
-    eventQueue_.push_back({usage, pressed, mods, received_us});
-}
 
-uint8_t InputUsbHost::modifierBitToUsage(int bit) {
-    static const uint8_t map[8] = {
-        0xE1, 0xE2, 0xE3, 0xE4,
-        0xE5, 0xE6, 0xE7, 0xE8
-    };
-    return map[bit];
-}
-
-
-
-#endif // !KEYBCHORD_NATIVE
+#endif // !KEYBCHORD_NATIVE && !KEYBCHORD_CH559

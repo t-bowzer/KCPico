@@ -1,6 +1,7 @@
 #pragma once
 
 #include "base.h"
+#include "hid_report.h"
 
 
 class InputUsbHost : public InputAdapter {
@@ -17,20 +18,16 @@ public:
     void onReport(uint8_t dev_addr, uint8_t instance, const uint8_t* report, uint16_t len);
 
 private:
-    static constexpr size_t MAX_KEYS = 6;
     bool    mounted_  = false;
     bool    reportReceived_ = false;
     uint8_t dev_addr_  = 0;
     uint8_t instance_  = 0;
     uint8_t report_id_ = 0;   // keyboard input report ID (0 = none, boot protocol)
-    uint8_t prev_mods_ = 0;
-    uint8_t prev_keys_[MAX_KEYS]{};
     uint8_t led_state_ = 0;
 
-    std::vector<KeyEvent> eventQueue_;
+    hid_report::BootReportParser report_;
 
-    void pushEvent(uint8_t usage, bool pressed, uint8_t mods, uint64_t received_us);
-    static uint8_t modifierBitToUsage(int bit);
+    std::vector<KeyEvent> eventQueue_;
 };
 
 

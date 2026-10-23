@@ -107,4 +107,9 @@ unsigned char checkRootHubConnections();
 void resetHubDevices(unsigned char hubindex);
 void pollHIDdevice();
 
+// Relay the keyboard LED output report (bit0=NumLock, bit1=CapsLock,
+// bit2=ScrollLock) to the first enumerated keyboard via SET_REPORT. Called from
+// uart.c when the RP2040 sends the 0xED command.
+void setHidKeyboardLed(unsigned char led);
+
 #endif

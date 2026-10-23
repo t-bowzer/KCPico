@@ -11,8 +11,11 @@ void initClock();
 void delayUs(unsigned short n);
 void delay(unsigned short n);
 void initUART0(unsigned long baud, int alt);
+void initUART1(unsigned long baud);
 unsigned char UART0Receive();
 void UART0Send(unsigned char b);
+unsigned char UART1Receive();
+void UART1Send(unsigned char b);
 
 #define PIN_MODE_INPUT 0
 #define PIN_MODE_INPUT_PULLUP 1

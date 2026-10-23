@@ -54,6 +54,44 @@ void initUART0(unsigned long baud, int alt)
 	TI = 1;
 }
 
+/**
+ * Initialize UART1 port with the given baud rate.
+ * pins: tx = P2.7, rx = P2.6 (RXD1/TXD1 on P2.6/P2.7).
+ * Fsys must already be 48 MHz (call initClock() first).
+ */
+void initUART1(unsigned long baud)
+{
+    unsigned long x;
+    unsigned char x2;
+
+    // 8 data bits, no parity, 1 stop bit.
+    SER1_LCR = MASK_U1_WORD_SZ;
+
+    // Baud divisor: x = round(FREQ_SYS / (8 * DIV * baud)), DIV = 1.
+    // The CH559 UART1 uses 8x oversampling (not the 16550's 16x), so the
+    // divisor is FREQ_SYS/(8*baud); using /16 halves it and doubles the baud.
+    x = 10 * FREQ_SYS / baud / 8;
+    x2 = (unsigned char)(x % 10);
+    x /= 10;
+    if (x2 >= 5) x++;
+
+    SER1_LCR |= bLCR_DLAB;
+    SER1_DIV = 1;
+    SER1_DLM = (unsigned char)(x >> 8);
+    SER1_DLL = (unsigned char)(x & 0xFF);
+    SER1_LCR &= ~bLCR_DLAB;
+
+    // Pin mode 010: RXD1/TXD1 on P2.6/P2.7. The 3-bit pin-mode field is
+    // [RS485EN : PIN_MOD1 : PIN_MOD0] (SER1_IER bits 6:4); "010" selects
+    // P2.6/P2.7, so PIN_MOD1 (0x20) must be set (PIN_MOD0 would be "001" =
+    // P4.0/P4.4). Written AFTER DLAB is cleared because SER1_IER shares SFR
+    // address 0x91 with SER1_DLM.
+    SER1_IER = (SER1_IER & ~MASK_U1_PIN_MOD) | bIER_PIN_MOD1;
+
+    // Enable the FIFO and flush both sides.
+    SER1_FCR = bFCR_FIFO_EN | bFCR_R_FIFO_CLR | bFCR_T_FIFO_CLR;
+}
+
 unsigned char UART0Receive()
 {
     while(RI == 0);
@@ -66,6 +104,18 @@ void UART0Send(unsigned char b)
 	SBUF = b;
 	while(TI == 0);
 	TI = 1;
+}
+
+unsigned char UART1Receive()
+{
+    while((SER1_LSR & bLSR_DATA_RDY) == 0);
+    return SER1_FIFO;
+}
+
+void UART1Send(unsigned char b)
+{
+    while((SER1_LSR & bLSR_T_FIFO_EMP) == 0);
+    SER1_THR = b;
 }
 
 /**
@@ -134,22 +184,20 @@ unsigned char digitalRead(unsigned char port, unsigned char pin)
 }
 */
 /**
- * stdio printf directed to UART0 using putchar and getchar
+ * stdio printf directed to UART1 using putchar and getchar
  */
 
 int putchar(int c)
 {
-    while (!TI);
-    TI = 0;
-    SBUF = c & 0xFF;
+    while ((SER1_LSR & bLSR_T_FIFO_EMP) == 0);
+    SER1_THR = c & 0xFF;
     return c;
 }
 
 int getchar() 
 {
-    while(!RI);
-    RI = 0;
-    return SBUF;
+    while ((SER1_LSR & bLSR_DATA_RDY) == 0);
+    return SER1_FIFO;
 }
 
 /*******************************************************************************

@@ -11,6 +11,7 @@ typedef unsigned char  __data             UINT8D;
 #include "util.h"
 #include "USBHost.h"
 #include "uart.h"
+#include "config.h"
 
 SBIT(LED, 0x90, 6);
 
@@ -18,7 +19,7 @@ void main()
 {
     unsigned char s;
     initClock();
-    initUART0(1000000, 1);
+    initUART1(CH559_UART_BAUD);
     DEBUG_OUT("Startup\n");
     resetHubDevices(0);
     resetHubDevices(1);

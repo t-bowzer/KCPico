@@ -26,7 +26,7 @@ ARTIFACTS := $(PROJECT).ihx $(PROJECT).hex $(PROJECT).bin
 
 all: $(PROJECT).hex $(PROJECT).bin
 
-%.rel: %.c CH559.h compiler.h
+%.rel: %.c CH559.h
 	$(SDCC) -c $(CFLAGS) $<
 
 $(PROJECT).ihx: $(RELS)

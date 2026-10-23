@@ -18,6 +18,14 @@ __code unsigned char SetupSetUsbConfig[] = { USB_REQ_TYP_OUT, USB_SET_CONFIGURAT
 __code unsigned char  SetHIDIdleRequest[] = {USB_REQ_TYP_CLASS | USB_REQ_RECIP_INTERF, HID_SET_IDLE, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 __code unsigned char  GetHIDReport[] = {USB_REQ_TYP_IN | USB_REQ_RECIP_INTERF, USB_GET_DESCRIPTOR, 0x00, USB_DESCR_TYP_REPORT, 0 /*interface*/, 0x00, 0xff, 0x00};
 
+// SET_PROTOCOL = 0 (boot protocol): makes the keyboard report the standard
+// 8-byte boot format (modifier + reserved + 6 keycodes), no report ID.
+__code unsigned char  SetHIDBootProtocolRequest[] = {USB_REQ_TYP_CLASS | USB_REQ_RECIP_INTERF, HID_SET_PROTOCOL, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+// SET_REPORT (output, report ID 0): the 1-byte keyboard LED report
+// (bit0=NumLock, bit1=CapsLock, bit2=ScrollLock) is sent in the data stage.
+__code unsigned char  SetKeyboardLedRequest[] = {USB_REQ_TYP_CLASS | USB_REQ_RECIP_INTERF, HID_SET_REPORT, 0x00, 0x02, 0x00, 0x00, 0x01, 0x00};
+
 __at(0x0000) unsigned char __xdata RxBuffer[MAX_PACKET_SIZE];
 __at(0x0100) unsigned char __xdata TxBuffer[MAX_PACKET_SIZE];
 
@@ -385,6 +393,43 @@ unsigned char setUsbConfig( unsigned char cfg )
     return( hostCtrlTransfer(0, 0, 0) );            
 }
 
+// SET_PROTOCOL = boot on the given interface. No data stage (status-only OUT).
+unsigned char setHidBootProtocol( unsigned char interface )
+{
+	PXUSB_SETUP_REQ pSetupReq = ((PXUSB_SETUP_REQ)TxBuffer);
+    fillTxBuffer(SetHIDBootProtocolRequest, sizeof(SetHIDBootProtocolRequest));
+    pSetupReq->wIndexL = interface;
+    return( hostCtrlTransfer(0, 0, 0) );
+}
+
+// SET_REPORT (output) on the given interface with a 1-byte LED report. This is
+// a control write with a data stage, so it cannot reuse hostCtrlTransfer (whose
+// OUT data path does not copy a payload). The three stages are done explicitly.
+unsigned char setKeyboardLedTransfer( unsigned char interface, unsigned char led )
+{
+    PXUSB_SETUP_REQ pSetupReq = ((PXUSB_SETUP_REQ)TxBuffer);
+    unsigned char s;
+
+    fillTxBuffer(SetKeyboardLedRequest, sizeof(SetKeyboardLedRequest));
+    pSetupReq->wIndexL = interface;
+
+    // SETUP stage (DATA0).
+    UH_TX_LEN = sizeof(USB_SETUP_REQ);
+    s = hostTransfer((unsigned char)(USB_PID_SETUP << 4), 0, 10000);
+    if (s != ERR_SUCCESS) return s;
+
+    // DATA stage: one OUT byte, DATA1 toggle.
+    TxBuffer[0] = led;
+    UH_TX_LEN = 1;
+    UH_TX_CTRL = bUH_T_TOG | bUH_T_AUTO_TOG;
+    s = hostTransfer((unsigned char)(USB_PID_OUT << 4), UH_TX_CTRL, 10000);
+    if (s != ERR_SUCCESS) return s;
+
+    // STATUS stage: zero-length IN.
+    UH_TX_LEN = 0;
+    return hostTransfer((unsigned char)(USB_PID_IN << 4), bUH_R_TOG | bUH_R_AUTO_TOG, 10000);
+}
+
 unsigned char getDeviceString()
 {
     fillTxBuffer(GetDeviceStringRequest, sizeof(GetDeviceStringRequest));                         
@@ -555,6 +600,21 @@ void pollHIDdevice()
 				sendHidPollMSG(MSG_TYPE_DEVICE_POLL,len, HIDdevice[hiddevice].type, hiddevice, HIDdevice[hiddevice].endPoint & 0x7F, RxBuffer,VendorProductID[HIDdevice[hiddevice].rootHub].idVendorL,VendorProductID[HIDdevice[hiddevice].rootHub].idVendorH,VendorProductID[HIDdevice[hiddevice].rootHub].idProductL,VendorProductID[HIDdevice[hiddevice].rootHub].idProductH);
 			}
 		}
+		}
+	}
+}
+
+// Relay the 1-byte keyboard LED report to the first enumerated keyboard.
+void setHidKeyboardLed(unsigned char led)
+{
+	__xdata unsigned char hiddevice;
+	for (hiddevice = 0; hiddevice < MAX_HID_DEVICES; hiddevice++)
+	{
+		if (HIDdevice[hiddevice].connected && HIDdevice[hiddevice].type == REPORT_USAGE_KEYBOARD)
+		{
+			selectHubPort(HIDdevice[hiddevice].rootHub, 0);
+			setKeyboardLedTransfer(HIDdevice[hiddevice].interface, led);
+			return;
 		}
 	}
 }
@@ -875,6 +935,11 @@ unsigned char initializeRootHubConnection(unsigned char rootHubIndex)
 											HIDdevice[hiddevice].rootHub = rootHubIndex;
 											DEBUG_OUT("Got endpoint for the HIDdevice 0x%02x\n", HIDdevice[hiddevice].endPoint);
 											getHIDDeviceReport(hiddevice);
+											// Force the boot protocol once we know it is a keyboard, so it
+											// reports the standard 8-byte boot format (no report ID).
+											if (HIDdevice[hiddevice].type == REPORT_USAGE_KEYBOARD) {
+												setHidBootProtocol(HIDdevice[hiddevice].interface);
+											}
 										}
 									}
 									break;

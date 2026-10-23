@@ -5,31 +5,24 @@
 #include "CH559.h"
 #include "util.h"
 #include "uart.h"
+#include "USBHost.h"
 
-uint8_t __xdata uartRxBuff[64];
-uint8_t __xdata rxPos = 0;
+static unsigned char rxExpectLed = 0;
 
-
+// Reads UART1 command bytes from the RP2040. The only command we accept is the
+// LED SET_REPORT relay: 0xED followed by the one-byte LED output report. All
+// other bytes are ignored (the upstream 'kb' bootloader command is intentionally
+// dropped — bootloader entry on this fork is via the BOOT button / DP pull-up).
 void processUart(){
-    while(RI){
-            RI=0;
-            uartRxBuff[rxPos] = SBUF;
-            if (uartRxBuff[rxPos]=='\n' || rxPos >= 64){
-                for (uint8_t i = 0; i < rxPos; i ++ )
-                    {
-                        printf( "0x%02X ",uartRxBuff[i]);
-                    }
-                    printf("\n");
-                if(uartRxBuff[0]=='k'){
-                //if(uartRxBuff[1]==0x61)LED=0;
-                //if(uartRxBuff[1]==0x73)LED=1;
-                if(uartRxBuff[1]=='b')runBootloader();
-                }
-            rxPos=0;
-            }else{
-            rxPos++;
-            }
+    while (SER1_LSR & bLSR_DATA_RDY) {
+        unsigned char c = SER1_FIFO;
+        if (rxExpectLed) {
+            rxExpectLed = 0;
+            setHidKeyboardLed(c);
+        } else if (c == CH559_CMD_LED) {
+            rxExpectLed = 1;
         }
+    }
 }
 
 void sendProtocolMSG(unsigned char msgtype, unsigned short length, unsigned char type, unsigned char device, unsigned char endpoint, unsigned char __xdata *msgbuffer){

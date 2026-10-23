@@ -48,14 +48,21 @@ programming header.
 
 ## Divergences from upstream
 
-Planned (tracked against the bring-up plan):
+Implemented (tracked against the bring-up plan):
 
-- [ ] Emit the protocol on **UART1** (`RXD1`/`TXD1`, P2.6/P2.7) at 115200 baud
-      (upstream emits on UART0 @ 1 Mbps on P0.2/P0.3).
-- [ ] Relay keyboard **LED SET_REPORT** (output report) so the Pico's beat-LED
-      indicator works.
-- [ ] Set the HID **boot protocol** during enumeration for the standard 8-byte
+- [x] Emit the protocol on **UART1** (`RXD1`/`TXD1`, P2.6/P2.7) at 115200 baud
+      (`CH559_UART_BAUD` in `config.h`; upstream emits on UART0 @ 1 Mbps on
+      P0.2/P0.3).
+- [x] Relay keyboard **LED SET_REPORT** (output report) so the Pico's beat-LED
+      indicator works. The Pico sends `0xED` + 1 LED byte over UART1; the
+      firmware issues a SET_REPORT(output) on the enumerated keyboard.
+- [x] Set the HID **boot protocol** during enumeration for the standard 8-byte
       report format.
+
+> **Note:** the LED SET_REPORT path (control-write with a 1-byte data stage) is
+> implemented but must be validated on hardware (see the bring-up plan §7.2/§7.3,
+> checklist item #10). If it does not work, the beat LED degrades gracefully —
+> the RP2040 adapter returns `false` from `setLed()` until a SET_REPORT succeeds.
 
 ## Files
 

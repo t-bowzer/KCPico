@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFileDialog,
     QFormLayout,
     QHBoxLayout,
     QHeaderView,
@@ -16,6 +17,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSpinBox,
+    QSplitter,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -36,14 +38,18 @@ from ..models.keymap import (
     default_keymap,
 )
 from ..validation.validator import validate_keymap
+from .keyboard_diagram import KeyboardDiagram
+from .keymap_visual import LAYER_ORDER
 
 
 class BindingDialog(QDialog):
     def __init__(self, parent=None, *, binding: Optional[KeyBinding] = None,
                  rhythm_names: Optional[list[str]] = None,
-                 bass_names: Optional[list[str]] = None) -> None:
+                 bass_names: Optional[list[str]] = None,
+                 initial_key: Optional[str] = None,
+                 initial_modifier: Optional[str] = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Edit binding")
+        self.setWindowTitle("Add binding" if binding is None else "Edit binding")
         self.rhythm_names = rhythm_names or []
         self.bass_names = bass_names or []
         self._build()
@@ -59,6 +65,15 @@ class BindingDialog(QDialog):
                 if binding.action.type in ACTION_TYPES else 0)
             self._sync_action_fields()
             self._populate_from_action(binding.action)
+        else:
+            if initial_modifier:
+                idx = self.modifier_combo.findData(initial_modifier)
+                if idx >= 0:
+                    self.modifier_combo.setCurrentIndex(idx)
+            if initial_key:
+                idx = self.key_combo.findText(initial_key)
+                if idx >= 0:
+                    self.key_combo.setCurrentIndex(idx)
 
     def _build(self) -> None:
         layout = QVBoxLayout(self)
@@ -251,6 +266,29 @@ class KeymapEditor(QWidget):
     def _build(self) -> None:
         layout = QVBoxLayout(self)
 
+        top = QWidget()
+        top_layout = QVBoxLayout(top)
+        top_layout.setContentsMargins(0, 0, 0, 0)
+
+        toolbar = QHBoxLayout()
+        toolbar.addWidget(QLabel("Show:"))
+        self.layer_combo = QComboBox()
+        self.layer_combo.addItems(list(LAYER_ORDER))
+        self.layer_combo.currentTextChanged.connect(self._set_layer)
+        toolbar.addWidget(self.layer_combo)
+        toolbar.addStretch(1)
+        self.export_btn = QPushButton("Export diagram...")
+        self.export_btn.clicked.connect(self._export_diagram)
+        toolbar.addWidget(self.export_btn)
+        top_layout.addLayout(toolbar)
+
+        self.diagram = KeyboardDiagram()
+        top_layout.addWidget(self.diagram, 1)
+
+        bottom = QWidget()
+        bottom_layout = QVBoxLayout(bottom)
+        bottom_layout.setContentsMargins(0, 0, 0, 0)
+
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(["Key", "Action", "Target", "Value"])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
@@ -259,8 +297,10 @@ class KeymapEditor(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setSelectionMode(QTableWidget.SingleSelection)
         self.table.doubleClicked.connect(lambda _index: self._edit_binding())
-        layout.addWidget(self.table, 1)
+        self.table.itemSelectionChanged.connect(self._sync_diagram_selection)
+        bottom_layout.addWidget(self.table, 1)
 
         btn_row = QHBoxLayout()
         self.add_btn = QPushButton("Add")
@@ -274,15 +314,57 @@ class KeymapEditor(QWidget):
         for btn in (self.add_btn, self.edit_btn, self.remove_btn, self.reset_btn):
             btn_row.addWidget(btn)
         btn_row.addStretch(1)
-        layout.addLayout(btn_row)
+        bottom_layout.addLayout(btn_row)
 
         self.status_label = QLabel("")
         self.status_label.setWordWrap(True)
-        layout.addWidget(self.status_label)
+        bottom_layout.addWidget(self.status_label)
+
+        splitter = QSplitter(Qt.Vertical)
+        splitter.addWidget(top)
+        splitter.addWidget(bottom)
+        splitter.setChildrenCollapsible(False)
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 1)
+        splitter.setSizes([420, 300])
+        layout.addWidget(splitter, 1)
+
+        self.diagram.bindingSelected.connect(self._select_binding_row)
+        self.diagram.bindingEditRequested.connect(self._edit_binding_index)
+        self.diagram.unboundKeyActivated.connect(self._add_binding_for_key)
+
+    def _set_layer(self, layer: str) -> None:
+        self.diagram.set_layer(layer)
+
+    def _export_diagram(self) -> None:
+        path, selected_filter = QFileDialog.getSaveFileName(
+            self, "Export keyboard diagram", "keybchord-keymap.png",
+            "PNG image (*.png);;SVG image (*.svg)")
+        if not path:
+            return
+        lower = path.lower()
+        if lower.endswith(".png"):
+            wants_svg = False
+        elif lower.endswith(".svg"):
+            wants_svg = True
+        else:
+            wants_svg = selected_filter.startswith("SVG")
+        if wants_svg and not lower.endswith(".svg"):
+            path += ".svg"
+        elif not wants_svg and not lower.endswith(".png"):
+            path += ".png"
+        try:
+            if wants_svg:
+                self.diagram.export_svg(path)
+            else:
+                self.diagram.export_png(path)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Export failed", str(exc))
 
     def refresh(self) -> None:
         if self._tree is None:
             return
+        selected = self._selected_row()
         self.table.setRowCount(len(self._tree.keymap.bindings))
         for i, binding in enumerate(self._tree.keymap.bindings):
             combo = (f"{binding.modifier}+" if binding.modifier else "") + binding.key
@@ -290,6 +372,18 @@ class KeymapEditor(QWidget):
             self._set_item(i, 1, binding.action.type)
             self._set_item(i, 2, binding.action.param or binding.action.menu or "")
             self._set_item(i, 3, self._value_text(binding.action))
+        self.diagram.set_keymap(
+            self._tree.keymap,
+            rhythm_names=self._tree.rhythm_names(),
+            bass_names=self._tree.bass_names(),
+            chord_pattern_names=self._tree.chord_pattern_names(),
+        )
+        if 0 <= selected < self.table.rowCount():
+            self.table.selectRow(selected)
+            self.diagram.set_selected_binding(selected)
+        else:
+            self.table.clearSelection()
+            self.diagram.set_selected_binding(-1)
         self._update_status()
 
     def _set_item(self, row: int, col: int, text: str) -> None:
@@ -326,6 +420,45 @@ class KeymapEditor(QWidget):
         rows = self.table.selectionModel().selectedRows()
         return rows[0].row() if rows else -1
 
+    def _select_binding_row(self, index: int) -> None:
+        if 0 <= index < self.table.rowCount():
+            self.table.selectRow(index)
+            item = self.table.item(index, 0)
+            if item is not None:
+                self.table.scrollToItem(item)
+            self.diagram.set_selected_binding(index)
+        else:
+            self.table.clearSelection()
+            self.diagram.set_selected_binding(-1)
+
+    def _sync_diagram_selection(self) -> None:
+        rows = self.table.selectionModel().selectedRows()
+        self.diagram.set_selected_binding(rows[0].row() if rows else -1)
+
+    def _edit_binding_index(self, index: int) -> None:
+        if self._tree is None:
+            return
+        if not 0 <= index < len(self._tree.keymap.bindings):
+            return
+        self._select_binding_row(index)
+        self._edit_binding()
+
+    def _add_binding_for_key(self, key: str, modifier: Optional[str]) -> None:
+        if self._tree is None:
+            return
+        dialog = BindingDialog(
+            self,
+            rhythm_names=self._tree.rhythm_names(),
+            bass_names=self._tree.bass_names(),
+            initial_key=key,
+            initial_modifier=modifier,
+        )
+        if dialog.exec() == QDialog.Accepted:
+            self._tree.keymap.bindings.append(dialog.result_binding())
+            self.refresh()
+            self._select_binding_row(len(self._tree.keymap.bindings) - 1)
+            self.changed.emit()
+
     def _add_binding(self) -> None:
         if self._tree is None:
             return
@@ -334,6 +467,7 @@ class KeymapEditor(QWidget):
         if dialog.exec() == QDialog.Accepted:
             self._tree.keymap.bindings.append(dialog.result_binding())
             self.refresh()
+            self._select_binding_row(len(self._tree.keymap.bindings) - 1)
             self.changed.emit()
 
     def _edit_binding(self) -> None:
@@ -348,6 +482,7 @@ class KeymapEditor(QWidget):
         if dialog.exec() == QDialog.Accepted:
             self._tree.keymap.bindings[row] = dialog.result_binding()
             self.refresh()
+            self._select_binding_row(row)
             self.changed.emit()
 
     def _remove_binding(self) -> None:
@@ -358,6 +493,8 @@ class KeymapEditor(QWidget):
             return
         del self._tree.keymap.bindings[row]
         self.refresh()
+        if self._tree.keymap.bindings:
+            self._select_binding_row(min(row, len(self._tree.keymap.bindings) - 1))
         self.changed.emit()
 
     def _reset_default(self) -> None:

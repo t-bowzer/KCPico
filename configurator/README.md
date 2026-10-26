@@ -14,7 +14,9 @@ device's mass-storage drive.
   steps) with velocity editing.
 - **Bass editor** — step-grid editor for bass patterns (chord-degree + sustain).
 - **Keymap editor** — map non-reserved keys and combos to parameters, with live
-  validation and coverage checking.
+  validation and coverage checking, plus a live ANSI 104-key overlay of the
+  keymap (fixed chord/strum maps, modifier layers, click-to-select / double-click
+  to edit, and PNG/SVG export).
 - **JSON validator** — validate every file against the same rules the firmware
   enforces (bounds, enums, reserved keys, required keymap coverage).
 - **Backup / restore** — save the whole configuration to a `.zip`, or restore

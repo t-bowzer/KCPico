@@ -2,7 +2,7 @@
 	(version "E")
 	(design
 		(source "C:\\Users\\tabow\\OneDrive\\Documents\\KCPico_CAD\\KCPico\\KCPico.kicad_sch")
-		(date "2026-10-14T16:22:02")
+		(date "2026-10-23T01:47:46")
 		(tool "Eeschema 10.0.5")
 		(sheet
 			(number "1")
@@ -1007,7 +1007,7 @@
 			(libsource
 				(lib "Switch")
 				(part "SW_Omron_B3FS")
-				(description "Push button switch, generic, two pins")
+				(description "Omron B3FS 6x6mm single pole normally-open tactile switch")
 			)
 			(property
 				(name "Sheetname")
@@ -1061,7 +1061,7 @@
 			(libsource
 				(lib "Switch")
 				(part "SW_Omron_B3FS")
-				(description "Push button switch, generic, two pins")
+				(description "Omron B3FS 6x6mm single pole normally-open tactile switch")
 			)
 			(property
 				(name "Sheetname")
@@ -1084,6 +1084,60 @@
 				(tstamps "/")
 			)
 			(tstamps "923dc0c3-c24d-416a-9659-10d28a604018")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "SW3")
+			(value "SW_Omron_B3FS")
+			(footprint "Button_Switch_THT:SW_TH_Tactile_Omron_B3F-100x")
+			(datasheet "https://omronfs.omron.com/en_US/ecb/products/pdf/en-b3fs.pdf")
+			(description "Omron B3FS 6x6mm single pole normally-open tactile switch")
+			(fields
+				(field
+					(name "Footprint") "Button_Switch_THT:SW_TH_Tactile_Omron_B3F-100x")
+				(field
+					(name "Datasheet") "https://omronfs.omron.com/en_US/ecb/products/pdf/en-b3fs.pdf")
+				(field
+					(name "Description") "Omron B3FS 6x6mm single pole normally-open tactile switch")
+			)
+			(libsource
+				(lib "Switch")
+				(part "SW_Omron_B3FS")
+				(description "Omron B3FS 6x6mm single pole normally-open tactile switch")
+			)
+			(property
+				(name "Sheetname")
+				(value "Root")
+			)
+			(property
+				(name "Sheetfile")
+				(value "KCPico.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "switch normally-open pushbutton push-button")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "SW*Omron*B3FS*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "c424e805-fec5-4587-b61a-9d96492ad63d")
 			(units
 				(unit
 					(name "A")
@@ -2310,6 +2364,12 @@
 				(pintype "passive")
 			)
 			(node
+				(ref "SW3")
+				(pin "1")
+				(pinfunction "1_1")
+				(pintype "passive")
+			)
+			(node
 				(ref "U1")
 				(pin "18")
 				(pinfunction "GND/VSS_18")
@@ -2554,6 +2614,23 @@
 		)
 		(net
 			(code "16")
+			(name "Net-(U1-P1.3{slash}AIN3)")
+			(class "Default")
+			(node
+				(ref "SW3")
+				(pin "2")
+				(pinfunction "2_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "U1")
+				(pin "46")
+				(pinfunction "P1.3/AIN3_46")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "17")
 			(name "Net-(U1-P5.4{slash}HM{slash}ALE{slash}XB)")
 			(class "Default")
 			(node
@@ -2569,7 +2646,7 @@
 			)
 		)
 		(net
-			(code "17")
+			(code "18")
 			(name "Net-(U1-P5.5{slash}HP{slash}!A15{slash}XA)")
 			(class "Default")
 			(node
@@ -2585,7 +2662,7 @@
 			)
 		)
 		(net
-			(code "18")
+			(code "19")
 			(name "Net-(U1-P5.7{slash}RST)")
 			(class "Default")
 			(node
@@ -2602,7 +2679,7 @@
 			)
 		)
 		(net
-			(code "19")
+			(code "20")
 			(name "unconnected-(A1-3V3_EN-Pad37)")
 			(class "Default")
 			(node
@@ -2613,7 +2690,7 @@
 			)
 		)
 		(net
-			(code "20")
+			(code "21")
 			(name "unconnected-(A1-ADC_VREF-Pad35)")
 			(class "Default")
 			(node
@@ -2624,7 +2701,7 @@
 			)
 		)
 		(net
-			(code "21")
+			(code "22")
 			(name "unconnected-(A1-GPIO2-Pad4)")
 			(class "Default")
 			(node
@@ -2635,7 +2712,7 @@
 			)
 		)
 		(net
-			(code "22")
+			(code "23")
 			(name "unconnected-(A1-GPIO3-Pad5)")
 			(class "Default")
 			(node
@@ -2646,7 +2723,7 @@
 			)
 		)
 		(net
-			(code "23")
+			(code "24")
 			(name "unconnected-(A1-GPIO6-Pad9)")
 			(class "Default")
 			(node
@@ -2657,7 +2734,7 @@
 			)
 		)
 		(net
-			(code "24")
+			(code "25")
 			(name "unconnected-(A1-GPIO7-Pad10)")
 			(class "Default")
 			(node
@@ -2668,7 +2745,7 @@
 			)
 		)
 		(net
-			(code "25")
+			(code "26")
 			(name "unconnected-(A1-GPIO9-Pad12)")
 			(class "Default")
 			(node
@@ -2679,7 +2756,7 @@
 			)
 		)
 		(net
-			(code "26")
+			(code "27")
 			(name "unconnected-(A1-GPIO10-Pad14)")
 			(class "Default")
 			(node
@@ -2690,7 +2767,7 @@
 			)
 		)
 		(net
-			(code "27")
+			(code "28")
 			(name "unconnected-(A1-GPIO11-Pad15)")
 			(class "Default")
 			(node
@@ -2701,7 +2778,7 @@
 			)
 		)
 		(net
-			(code "28")
+			(code "29")
 			(name "unconnected-(A1-GPIO12-Pad16)")
 			(class "Default")
 			(node
@@ -2712,7 +2789,7 @@
 			)
 		)
 		(net
-			(code "29")
+			(code "30")
 			(name "unconnected-(A1-GPIO13-Pad17)")
 			(class "Default")
 			(node
@@ -2723,7 +2800,7 @@
 			)
 		)
 		(net
-			(code "30")
+			(code "31")
 			(name "unconnected-(A1-GPIO14-Pad19)")
 			(class "Default")
 			(node
@@ -2734,7 +2811,7 @@
 			)
 		)
 		(net
-			(code "31")
+			(code "32")
 			(name "unconnected-(A1-GPIO15-Pad20)")
 			(class "Default")
 			(node
@@ -2745,7 +2822,7 @@
 			)
 		)
 		(net
-			(code "32")
+			(code "33")
 			(name "unconnected-(A1-GPIO16-Pad21)")
 			(class "Default")
 			(node
@@ -2756,7 +2833,7 @@
 			)
 		)
 		(net
-			(code "33")
+			(code "34")
 			(name "unconnected-(A1-GPIO17-Pad22)")
 			(class "Default")
 			(node
@@ -2767,7 +2844,7 @@
 			)
 		)
 		(net
-			(code "34")
+			(code "35")
 			(name "unconnected-(A1-GPIO18-Pad24)")
 			(class "Default")
 			(node
@@ -2778,7 +2855,7 @@
 			)
 		)
 		(net
-			(code "35")
+			(code "36")
 			(name "unconnected-(A1-GPIO19-Pad25)")
 			(class "Default")
 			(node
@@ -2789,7 +2866,7 @@
 			)
 		)
 		(net
-			(code "36")
+			(code "37")
 			(name "unconnected-(A1-GPIO20-Pad26)")
 			(class "Default")
 			(node
@@ -2800,7 +2877,7 @@
 			)
 		)
 		(net
-			(code "37")
+			(code "38")
 			(name "unconnected-(A1-GPIO21-Pad27)")
 			(class "Default")
 			(node
@@ -2811,7 +2888,7 @@
 			)
 		)
 		(net
-			(code "38")
+			(code "39")
 			(name "unconnected-(A1-GPIO22-Pad29)")
 			(class "Default")
 			(node
@@ -2822,7 +2899,7 @@
 			)
 		)
 		(net
-			(code "39")
+			(code "40")
 			(name "unconnected-(A1-GPIO26_ADC0-Pad31)")
 			(class "Default")
 			(node
@@ -2833,7 +2910,7 @@
 			)
 		)
 		(net
-			(code "40")
+			(code "41")
 			(name "unconnected-(A1-GPIO27_ADC1-Pad32)")
 			(class "Default")
 			(node
@@ -2844,7 +2921,7 @@
 			)
 		)
 		(net
-			(code "41")
+			(code "42")
 			(name "unconnected-(A1-GPIO28_ADC2-Pad34)")
 			(class "Default")
 			(node
@@ -2855,7 +2932,7 @@
 			)
 		)
 		(net
-			(code "42")
+			(code "43")
 			(name "unconnected-(A1-RUN-Pad30)")
 			(class "Default")
 			(node
@@ -2866,7 +2943,7 @@
 			)
 		)
 		(net
-			(code "43")
+			(code "44")
 			(name "unconnected-(A1-VSYS-Pad39)")
 			(class "Default")
 			(node
@@ -2877,7 +2954,7 @@
 			)
 		)
 		(net
-			(code "44")
+			(code "45")
 			(name "unconnected-(J3-Pin_1-Pad1)")
 			(class "Default")
 			(node
@@ -2888,7 +2965,7 @@
 			)
 		)
 		(net
-			(code "45")
+			(code "46")
 			(name "unconnected-(J3-Pin_3-Pad3)")
 			(class "Default")
 			(node
@@ -2899,7 +2976,7 @@
 			)
 		)
 		(net
-			(code "46")
+			(code "47")
 			(name "unconnected-(U1-P0.0{slash}AD0{slash}UDTR-Pad40)")
 			(class "Default")
 			(node
@@ -2910,7 +2987,7 @@
 			)
 		)
 		(net
-			(code "47")
+			(code "48")
 			(name "unconnected-(U1-P0.1{slash}AD1{slash}URTS-Pad39)")
 			(class "Default")
 			(node
@@ -2921,7 +2998,7 @@
 			)
 		)
 		(net
-			(code "48")
+			(code "49")
 			(name "unconnected-(U1-P0.2{slash}AD2{slash}RXD_-Pad38)")
 			(class "Default")
 			(node
@@ -2932,7 +3009,7 @@
 			)
 		)
 		(net
-			(code "49")
+			(code "50")
 			(name "unconnected-(U1-P0.3{slash}AD3{slash}TXD_-Pad37)")
 			(class "Default")
 			(node
@@ -2943,7 +3020,7 @@
 			)
 		)
 		(net
-			(code "50")
+			(code "51")
 			(name "unconnected-(U1-P0.4{slash}AD4{slash}UCTS-Pad36)")
 			(class "Default")
 			(node
@@ -2954,7 +3031,7 @@
 			)
 		)
 		(net
-			(code "51")
+			(code "52")
 			(name "unconnected-(U1-P0.5{slash}AD5{slash}UDSR-Pad35)")
 			(class "Default")
 			(node
@@ -2965,7 +3042,7 @@
 			)
 		)
 		(net
-			(code "52")
+			(code "53")
 			(name "unconnected-(U1-P0.6{slash}AD6{slash}URI-Pad34)")
 			(class "Default")
 			(node
@@ -2976,7 +3053,7 @@
 			)
 		)
 		(net
-			(code "53")
+			(code "54")
 			(name "unconnected-(U1-P0.7{slash}AD7{slash}UDCD-Pad33)")
 			(class "Default")
 			(node
@@ -2987,7 +3064,7 @@
 			)
 		)
 		(net
-			(code "54")
+			(code "55")
 			(name "unconnected-(U1-P1.0{slash}AIN0{slash}T2{slash}CAP1-Pad43)")
 			(class "Default")
 			(node
@@ -2998,7 +3075,7 @@
 			)
 		)
 		(net
-			(code "55")
+			(code "56")
 			(name "unconnected-(U1-P1.1{slash}AIN1{slash}T2EX{slash}CAP2-Pad44)")
 			(class "Default")
 			(node
@@ -3009,24 +3086,13 @@
 			)
 		)
 		(net
-			(code "56")
+			(code "57")
 			(name "unconnected-(U1-P1.2{slash}AIN2{slash}PWM3{slash}CAP3-Pad45)")
 			(class "Default")
 			(node
 				(ref "U1")
 				(pin "45")
 				(pinfunction "P1.2/AIN2/PWM3/CAP3_45")
-				(pintype "bidirectional")
-			)
-		)
-		(net
-			(code "57")
-			(name "unconnected-(U1-P1.3{slash}AIN3-Pad46)")
-			(class "Default")
-			(node
-				(ref "U1")
-				(pin "46")
-				(pinfunction "P1.3/AIN3_46")
 				(pintype "bidirectional")
 			)
 		)

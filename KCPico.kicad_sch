@@ -4170,6 +4170,12 @@
 		(uuid "29f7902b-18a4-4397-a53a-6371a2e19b99")
 	)
 	(junction
+		(at 69.85 107.95)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "33c5afd4-cbe9-4b51-84b4-76b3d2384d51")
+	)
+	(junction
 		(at 148.59 31.75)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -4256,6 +4262,16 @@
 			(type default)
 		)
 		(uuid "008e3001-fc83-487b-b80d-53c690dbb7a4")
+	)
+	(wire
+		(pts
+			(xy 69.85 107.95) (xy 81.28 107.95)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "01274ecc-3bd3-40f3-992b-a3dd9431e077")
 	)
 	(wire
 		(pts
@@ -4649,6 +4665,16 @@
 	)
 	(wire
 		(pts
+			(xy 93.98 127) (xy 80.01 127)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "56872bd9-9368-4d8e-afe7-3b079be48d4e")
+	)
+	(wire
+		(pts
 			(xy 172.72 170.18) (xy 165.1 170.18)
 		)
 		(stroke
@@ -4819,6 +4845,26 @@
 	)
 	(wire
 		(pts
+			(xy 69.85 129.54) (xy 69.85 107.95)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7ff154d5-16ef-4c65-ada4-ca5526283f94")
+	)
+	(wire
+		(pts
+			(xy 80.01 127) (xy 80.01 129.54)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "81378828-5423-42f8-984e-4aef36db14d9")
+	)
+	(wire
+		(pts
 			(xy 137.16 127) (xy 175.26 127)
 		)
 		(stroke
@@ -4939,7 +4985,7 @@
 	)
 	(wire
 		(pts
-			(xy 44.45 107.95) (xy 81.28 107.95)
+			(xy 44.45 107.95) (xy 69.85 107.95)
 		)
 		(stroke
 			(width 0)
@@ -5206,6 +5252,16 @@
 			(type default)
 		)
 		(uuid "dba71327-441c-4489-a306-481df8abe2a9")
+	)
+	(wire
+		(pts
+			(xy 93.98 128.27) (xy 93.98 127)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ddaa03a6-8f8d-48ad-a91d-c34581f0a7a0")
 	)
 	(wire
 		(pts
@@ -6358,6 +6414,86 @@
 			(project "KCPico"
 				(path "/ea41da54-d267-4f6f-b358-bca6d6d0aa3e"
 					(reference "J2")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Switch:SW_Omron_B3FS")
+		(at 74.93 129.54 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "c424e805-fec5-4587-b61a-9d96492ad63d")
+		(property "Reference" "SW3"
+			(at 74.93 121.92 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "SW_Omron_B3FS"
+			(at 74.93 124.46 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Button_Switch_THT:SW_TH_Tactile_Omron_B3F-100x"
+			(at 74.93 124.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://omronfs.omron.com/en_US/ecb/products/pdf/en-b3fs.pdf"
+			(at 74.93 124.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Omron B3FS 6x6mm single pole normally-open tactile switch"
+			(at 74.93 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "8e9c6021-446f-4b72-b596-8c3cca61abba")
+		)
+		(pin "2"
+			(uuid "180c79c8-eea6-4aee-8fdd-5e86d2742aed")
+		)
+		(instances
+			(project "KCPico"
+				(path "/ea41da54-d267-4f6f-b358-bca6d6d0aa3e"
+					(reference "SW3")
 					(unit 1)
 				)
 			)

@@ -41,6 +41,10 @@ public:
     // should be forwarded to the chord/strum engines.
     bool handleKeyEvent(const KeyEvent& ev, uint64_t now_us);
 
+    // Applies the per-preset macro bound to top-row key index 0..9 (1..9,0).
+    // The whole command list is applied before mode/arp/pattern callbacks fire.
+    void triggerMacro(uint8_t keyIndex, uint64_t now_us);
+
     void update(uint64_t now_us);
 
 private:

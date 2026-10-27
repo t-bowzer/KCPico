@@ -10,13 +10,17 @@ device's mass-storage drive.
 
 - **Presets** — browse and edit all 10 banks × 8 slots (chord / strum / bass /
   rhythm / drum sections).
+- **Macros** — per-preset top-row number-key mode (strum or macro) and an ordered
+  macro-command editor (set/toggle/cycle/inc/dec and per-drum mute), with the
+  firmware's per-key and per-preset limits enforced.
 - **Rhythm editor** — step-grid editor for drum patterns (tracks × 16th-note
   steps) with velocity editing.
 - **Bass editor** — step-grid editor for bass patterns (chord-degree + sustain).
 - **Keymap editor** — map non-reserved keys and combos to parameters, with live
   validation and coverage checking, plus a live ANSI 104-key overlay of the
   keymap (fixed chord/strum maps, modifier layers, click-to-select / double-click
-  to edit, and PNG/SVG export).
+  to edit, and PNG/SVG export). A synced preset selector shows the top row as
+  strum or per-preset macros, with the macro editor embedded in the same tab.
 - **JSON validator** — validate every file against the same rules the firmware
   enforces (bounds, enums, reserved keys, required keymap coverage).
 - **Backup / restore** — save the whole configuration to a `.zip`, or restore

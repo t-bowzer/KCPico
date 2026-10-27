@@ -55,6 +55,7 @@ from ..models.bounds import (
     OCTAVE_MIN,
     PAN_MAX,
     PAN_MIN,
+    PARAM_SPECS,
     RHYTHM_COUNT,
     STRUM_ROOT_MAX,
     STRUM_ROOT_MIN,
@@ -87,9 +88,24 @@ from ..models.keymap import (
     REQUIRED_MENUS,
     RESERVED_NAMED_KEYS,
 )
+from ..models.macro import (
+    DRUM_PIECE_KEYS,
+    MAX_MACRO_COMMANDS_PER_KEY,
+    MAX_MACRO_COMMANDS_PER_PRESET,
+    MACRO_COMMAND_TYPES,
+    NUMBER_KEY_LABELS,
+)
 from ..models.preset import DRUM_PIECES
 from ..models.rhythm import RHYTHM_NAMES
 from .errors import ValidationResult
+
+
+MACRO_PARAM_NAMES: frozenset[str] = frozenset(KEYMAP_PARAM_NAMES) | frozenset(
+    key for key in PARAM_SPECS if key.startswith("drum_")
+)
+DRUM_VELOCITY_PARAMS: frozenset[str] = frozenset(
+    key + "_vel" for key in DRUM_PIECE_KEYS
+)
 
 
 # --- helpers --------------------------------------------------------------
@@ -477,6 +493,115 @@ def validate_preset_bank(data: Any, *, rhythm_names: Optional[list[str]] = None,
     return result
 
 
+def _macro_value(param: str, value: Any, rhythm_names: list[str],
+                 bass_names: list[str],
+                 chord_pattern_names: list[str]) -> Optional[int]:
+    if _is_int(value):
+        return value
+    if not _is_str(value):
+        return None
+    if param in DRUM_VELOCITY_PARAMS:
+        if value == "off":
+            return DRUM_VELOCITY_OFF
+        if value == "auto":
+            return 0
+    return _parse_keymap_value(param, value, rhythm_names, bass_names,
+                               chord_pattern_names)
+
+
+def _macro_on_off(value: Any) -> Optional[bool]:
+    if _is_bool(value):
+        return value
+    if _is_int(value):
+        return value != 0
+    if _is_str(value):
+        if value in ("on", "true", "1"):
+            return True
+        if value in ("off", "false", "0"):
+            return False
+    return None
+
+
+def _validate_macro_command(result: ValidationResult, where: str, data: Any,
+                            rhythm_names: list[str], bass_names: list[str],
+                            chord_pattern_names: list[str]) -> None:
+    if not isinstance(data, dict):
+        result.add_error(f"{where}: not an object")
+        return
+    typ = data.get("type")
+    if not _is_str(typ) or typ not in MACRO_COMMAND_TYPES:
+        result.add_error(f"{where}: unknown macro command type '{typ}'")
+        return
+
+    if typ == "drum_mute":
+        piece = data.get("piece")
+        if not _is_str(piece) or piece not in DRUM_PIECE_KEYS:
+            result.add_error(f"{where}: drum_mute 'piece' is invalid")
+        if "value" not in data:
+            result.add_error(f"{where}: drum_mute 'value' is required")
+        elif _macro_on_off(data["value"]) is None:
+            result.add_error(f"{where}: drum_mute 'value' must be on/off")
+        return
+
+    param = data.get("param")
+    if not _is_str(param) or param not in MACRO_PARAM_NAMES:
+        result.add_error(f"{where}: unknown macro param '{param}'")
+        return
+
+    if typ == "set":
+        fields = ("value",)
+    elif typ == "toggle":
+        fields = ("a", "b")
+    else:
+        fields = ()
+    for field in fields:
+        if field not in data:
+            result.add_error(f"{where}: '{field}' is required")
+        elif _macro_value(param, data[field], rhythm_names, bass_names,
+                          chord_pattern_names) is None:
+            result.add_error(f"{where}: invalid value '{data[field]}' for '{field}'")
+
+
+def _validate_macros(result: ValidationResult, where: str, slot: dict,
+                     rhythm_names: list[str], bass_names: list[str],
+                     chord_pattern_names: list[str]) -> None:
+    mode = slot.get("number_keys")
+    if mode is not None:
+        if not _is_str(mode):
+            result.add_error(f"{where}: 'number_keys' must be a string")
+        elif mode not in ("strum", "macro"):
+            result.add_error(f"{where}: 'number_keys' must be 'strum' or 'macro'")
+
+    macros = slot.get("macros")
+    if macros is None:
+        return
+    if not isinstance(macros, dict):
+        result.add_error(f"{where}: 'macros' must be an object")
+        return
+
+    total = 0
+    for label, commands in macros.items():
+        key_where = f"{where}.macros[{label}]"
+        if label not in NUMBER_KEY_LABELS:
+            result.add_error(f"{key_where}: unknown number key (use 1..9,0)")
+        if not isinstance(commands, list):
+            result.add_error(f"{key_where}: must be an array")
+            continue
+        if len(commands) > MAX_MACRO_COMMANDS_PER_KEY:
+            result.add_error(
+                f"{key_where}: {len(commands)} commands exceeds the "
+                f"{MAX_MACRO_COMMANDS_PER_KEY}/key limit")
+        total += len(commands)
+        for i, cmd in enumerate(commands):
+            _validate_macro_command(result, f"{key_where}[{i}]", cmd,
+                                    rhythm_names, bass_names,
+                                    chord_pattern_names)
+    if total > MAX_MACRO_COMMANDS_PER_PRESET:
+        result.add_error(
+            f"{where}: {total} macro commands exceeds the "
+            f"{MAX_MACRO_COMMANDS_PER_PRESET}/preset limit")
+
+
 def _validate_preset_slot(result: ValidationResult, where: str, slot: dict,
                           rhythm_names: list[str], bass_names: list[str],
                           chord_pattern_names: list[str]) -> None:
@@ -565,6 +690,9 @@ def _validate_preset_slot(result: ValidationResult, where: str, slot: dict,
             result.add_error(f"{where}: 'rhythm.drums' must be an object")
     elif rhythm is not None:
         result.add_error(f"{where}: 'rhythm' must be an object")
+
+    _validate_macros(result, where, slot, rhythm_names, bass_names,
+                     chord_pattern_names)
 
 
 # --- patterns -------------------------------------------------------------

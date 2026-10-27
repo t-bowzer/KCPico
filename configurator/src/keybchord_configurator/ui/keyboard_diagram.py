@@ -36,6 +36,9 @@ from .keymap_visual import (
     combo_label,
     describe_key,
     format_action,
+    is_macro_key,
+    macro_command_label,
+    macro_key_cell_text,
 )
 
 _BACKGROUND = "#1e1e1e"
@@ -46,6 +49,9 @@ _UNBOUND_FILL = "#2a2a2a"
 _UNBOUND_BORDER = "#3a3a3f"
 _UNBOUND_TEXT = "#bdbdbd"
 _STRUM_FILL = "#273130"
+_MACRO_FILL = "#2f2938"
+_MACRO_BORDER = "#9b7bc4"
+_MACRO_TEXT = "#d9c9ee"
 _RESERVED_FILL = "#232323"
 _OTHER_FILL = "#242424"
 _FIXED_BORDER = "#343434"
@@ -58,6 +64,8 @@ class KeyboardDiagram(QWidget):
     bindingSelected = Signal(int)
     bindingEditRequested = Signal(int)
     unboundKeyActivated = Signal(str, object)
+    macroKeySelected = Signal(str)
+    macroKeyEditRequested = Signal(str)
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
@@ -67,6 +75,9 @@ class KeyboardDiagram(QWidget):
         self._rhythm_names: list[str] = []
         self._bass_names: list[str] = []
         self._chord_pattern_names: list[str] = []
+        self._macro_config = None
+        self._macro_preset_label = ""
+        self._selected_macro_key = ""
         self._layer = LAYER_ALL
         self._selected = -1
         self._hover_key = ""
@@ -86,6 +97,21 @@ class KeyboardDiagram(QWidget):
         self._chord_pattern_names = list(chord_pattern_names)
         self._selected = -1
         self.update()
+
+    def set_macro_context(self, macro_config, preset_label: str = "") -> None:
+        self._macro_config = macro_config
+        self._macro_preset_label = preset_label
+        if not is_macro_key(self._selected_macro_key, macro_config):
+            self._selected_macro_key = ""
+        self.update()
+
+    def set_selected_macro_key(self, label: str) -> None:
+        self._selected_macro_key = label
+        self.update()
+
+    def _macro_key_active(self, spec: KeySpec) -> bool:
+        return (self._layer in (LAYER_ALL, LAYER_NONE)
+                and is_macro_key(spec.name, self._macro_config))
 
     def set_layer(self, layer: str) -> None:
         self._layer = layer if layer in LAYER_ORDER else LAYER_ALL
@@ -217,6 +243,8 @@ class KeyboardDiagram(QWidget):
             ("Super", MODIFIER_COLORS["Super"]),
             ("Fixed", _FIXED_TEXT),
         ]
+        if is_macro_key("1", self._macro_config):
+            items.append(("Macro", _MACRO_BORDER))
         painter.setPen(Qt.NoPen)
         for label, color in items:
             painter.setBrush(QColor(color))
@@ -233,8 +261,11 @@ class KeyboardDiagram(QWidget):
             x += metrics.horizontalAdvance(label) + 14.0
             painter.setPen(Qt.NoPen)
         painter.setPen(QColor("#8a8a8a"))
+        right_text = f"Layer: {self._layer}"
+        if is_macro_key("1", self._macro_config) and self._macro_preset_label:
+            right_text += f"  |  Macros: {self._macro_preset_label}"
         painter.drawText(
-            rect, Qt.AlignRight | Qt.AlignVCenter, f"Layer: {self._layer}"
+            rect, Qt.AlignRight | Qt.AlignVCenter, right_text
         )
 
     def _font(self, pixel_size: int, *, bold: bool = False) -> QFont:
@@ -284,20 +315,26 @@ class KeyboardDiagram(QWidget):
         index = self._display_binding(spec.name) if spec.kind == "bindable" else -1
         hardcoded = self._hardcoded_text(spec.name)
         suppressed = self._fixed_suppressed(spec)
+        is_macro = self._macro_key_active(spec)
         fill, border, text_color = self._key_colors(spec, index)
+        if is_macro:
+            fill, border, text_color = _MACRO_FILL, _MACRO_BORDER, _MACRO_TEXT
 
         if spec.name == self._hover_key:
             border = _HOVER
         if self._selected >= 0 and self._selected < len(self._bindings):
             if self._bindings[self._selected].key == spec.name:
                 border = _SELECTED
+        if is_macro and spec.name == self._selected_macro_key:
+            border = _SELECTED
 
         painter.setPen(QPen(QColor(border), max(1.0, unit * 0.025)))
         painter.setBrush(QColor(fill))
         radius = max(2.0, unit * 0.10)
         painter.drawRoundedRect(rect, radius, radius)
 
-        show_key_label = spec.kind in ("bindable", "chord", "strum") or bool(hardcoded)
+        show_key_label = (spec.kind in ("bindable", "chord", "strum")
+                          or bool(hardcoded) or is_macro)
         if show_key_label:
             key_font = self._font(max(5, int(unit * 0.16)))
             painter.setFont(key_font)
@@ -321,6 +358,12 @@ class KeyboardDiagram(QWidget):
             self._draw_wrapped_text(
                 painter, text_rect, "Off", text_color,
                 max(6, int(unit * 0.20)),
+            )
+        elif is_macro:
+            self._draw_wrapped_text(
+                painter, text_rect,
+                macro_key_cell_text(self._macro_config, spec.name), text_color,
+                max(6, int(unit * 0.21)),
             )
         elif spec.kind == "chord":
             self._draw_chord_text(painter, text_rect, spec)
@@ -508,6 +551,29 @@ class KeyboardDiagram(QWidget):
         )
 
     def _tooltip_for(self, spec: KeySpec) -> str:
+        if self._macro_key_active(spec):
+            commands = (self._macro_config.keys.get(spec.name, [])
+                        if self._macro_config is not None else [])
+            where = f" for {self._macro_preset_label}" if self._macro_preset_label else ""
+            lines = [
+                f"{spec.label} ({spec.name})",
+                f"Per-preset macro{where} ({len(commands)} commands)",
+            ]
+            if commands:
+                for command in commands:
+                    lines.append(
+                        "- " + macro_command_label(
+                            command,
+                            rhythm_names=self._rhythm_names,
+                            bass_names=self._bass_names,
+                            chord_pattern_names=self._chord_pattern_names,
+                        ).detail
+                    )
+            else:
+                lines.append("Empty macro")
+            lines.append("Double-click to edit this macro key")
+            return "\n".join(lines)
+
         lines = [f"{spec.label} ({spec.name})", describe_key(spec)]
         if self._fixed_suppressed(spec):
             lines.append("Suppressed while Super is held")
@@ -560,7 +626,15 @@ class KeyboardDiagram(QWidget):
         if event.button() != Qt.LeftButton:
             return
         spec = self._key_at(event.position())
-        if spec is None or spec.kind != "bindable":
+        if spec is None:
+            return
+        if self._macro_key_active(spec):
+            self._selected_macro_key = spec.name
+            self.set_selected_binding(-1)
+            self.macroKeySelected.emit(spec.name)
+            self.update()
+            return
+        if spec.kind != "bindable":
             return
         index = self._binding_for_click(spec.name)
         self.set_selected_binding(index)
@@ -570,7 +644,16 @@ class KeyboardDiagram(QWidget):
         if event.button() != Qt.LeftButton:
             return
         spec = self._key_at(event.position())
-        if spec is None or spec.kind != "bindable":
+        if spec is None:
+            return
+        if self._macro_key_active(spec):
+            self._selected_macro_key = spec.name
+            self.set_selected_binding(-1)
+            self.macroKeySelected.emit(spec.name)
+            self.macroKeyEditRequested.emit(spec.name)
+            self.update()
+            return
+        if spec.kind != "bindable":
             return
         indices = self._by_key.get(spec.name, [])
         index = self._binding_for_click(spec.name)
@@ -599,7 +682,9 @@ class KeyboardDiagram(QWidget):
         if spec.name != self._hover_key:
             self._hover_key = spec.name
             self.setCursor(
-                Qt.PointingHandCursor if spec.kind == "bindable" else Qt.ArrowCursor
+                Qt.PointingHandCursor
+                if spec.kind == "bindable" or self._macro_key_active(spec)
+                else Qt.ArrowCursor
             )
             QToolTip.showText(
                 event.globalPosition().toPoint(), self._tooltip_for(spec), self

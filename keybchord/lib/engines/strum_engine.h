@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 #include "base.h"
@@ -16,6 +17,7 @@ public:
     StrumEngine(StateManager& state, MidiRouter& router);
 
     void handleKeyEvent(const KeyEvent& ev, uint64_t now_us);
+    void setMacroTrigger(std::function<void(uint8_t, uint64_t)> cb);
     void update(uint64_t now_us);
     void allNotesOff();
 
@@ -36,6 +38,7 @@ private:
     StateManager& state_;
     MidiRouter&   router_;
     KeymapResolver keymap_;
+    std::function<void(uint8_t, uint64_t)> macroTrigger_;
 
     StrumNote notes_[MAX_STRUM_NOTES];
 

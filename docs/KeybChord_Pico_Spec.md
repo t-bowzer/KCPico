@@ -176,7 +176,7 @@ The system is a set of cooperating modules coordinated by a central state manage
 - **FR-C11** **Panic / all-notes-off:** `Super+Esc` immediately sends All-Sound-Off (CC120) and All-Notes-Off (CC123) on all channels to the DIN output, and clears internal active-note state. Used to recover from stuck notes.
 
 ### 4.2 Strum Plate
-- **FR-S1** Number keys simulate the strum plate, playing the notes of the currently selected chord spread across octaves.
+- **FR-S1** Number keys simulate the strum plate, playing the notes of the currently selected chord spread across octaves. Per preset, the **top-row** keys `1`…`0` may instead be macro keys (FR-S9); the numpad is always the strum plate.
 - **FR-S2** Two layouts:
   - *Full:* number row (top-of-keyboard number keys `1 2 3 4 5 6 7 8 9 0`) and/or full numpad. The numpad strum set is `Num Lock / * 0 . 1 2 3 4 5 6 7 8 9` (the top-row keys `Num Lock`, `/`, `*` are included). The numpad `Keypad +` / `Keypad -` keys are **NOT** part of the strum plate; they adjust the strum octave (see 5.5).
   - *Limited strum keys* (toggle): numpad center path `0 → . → 2 → 3 → 5 → 6 → 8 → 9 → / → *` for a more realistic feel.
@@ -186,6 +186,7 @@ The system is a set of cooperating modules coordinated by a central state manage
 - **FR-S4** Strum notes are derived from the active chord voicing (including in Silent mode).
 - **FR-S5** Unlike Held-mode chords (FR-C9), the strum plate picks up parameter and chord edits **immediately** — the next strummed note reflects current parameters and the currently-selected chord, with no latching.
 - **FR-S6** Numpad strum keys are identified via their raw HID **keypad usage codes** and behave identically **regardless of the keyboard's Num Lock state** (the firmware interprets keypad usages directly; Num Lock is ignored). The firmware never asserts Num Lock as a precondition.
+- **FR-S9** **Per-preset top-row macros:** when `number_keys` is `"macro"`, the top-row keys `1`…`9`,`0` trigger ordered per-preset command bundles instead of strumming. Each command is a `set` / `toggle` / `cycle` / `inc` / `dec` parameter action or a per-piece `drum_mute`. Macros apply atomically on key-down, with parameter changes committed before mode/arp/pattern callbacks. Limits are 16 commands per key and 48 per preset (excess is truncated by the firmware; the configurator rejects it). `Super+1`…`Super+8` still loads presets. Macros are configured in the configurator; on-device Save preserves them and Clear resets them.
 
 ### 4.3 Rhythm Function
 - **FR-R1** Selectable rhythm modes providing backing percussion, including original Omnichord rhythms plus additional patterns (Section 7).
@@ -199,7 +200,7 @@ The system is a set of cooperating modules coordinated by a central state manage
 - **FR-R8** **Keyboard-LED BPM indicator:** the keyboard's **Scroll Lock** LED can flash in time with the Rhythm Engine clock as a visual tempo indicator. Default behavior: a short quarter-note flash on every beat, with a longer accented flash on beat 1 of the bar. The LED is driven by sending a **HID Output Report (SET_REPORT)** to the hosted keyboard. It blinks only while the Rhythm Engine is enabled (follows the active clock), and is disabled if `led.bpm_indicator` is off. Scroll Lock is used because it is not mapped to any chord/strum/function key; Caps Lock and Num Lock LEDs are left untouched to avoid confusion (Caps is a chord root; numpad state is irrelevant per FR-S6). This is best-effort visual feedback and must degrade gracefully if the LED is unavailable (missing keyboard, keyboard that rejects the output report, USB write failure) without affecting timing or MIDI output.
 
 ### 4.4 Presets
-- **FR-P1** Presets store chord, strum, bass, and rhythm parameters plus MIDI channel assignments.
+- **FR-P1** Presets store chord, strum, bass, and rhythm parameters plus MIDI channel assignments, the top-row `number_keys` mode, and macro definitions.
 - **FR-P2** 80 slots: 10 banks × 8 presets.
 - **FR-P3** **Cursor navigation:** `Home` / `End` move a preset **cursor** (wraps across all 80 slots). The cursor auto-resets to the active slot after `display.cursor_timeout_ms` of idleness (default 5 s). `Enter` loads the slot under the cursor.
 - **FR-P4** Move the cursor to the previous/next bank: `Super + Home/End` (wraps; the slot position is preserved).
@@ -261,10 +262,10 @@ The Omnichord exposes 36 chord buttons: three quality rows (Major / Minor / 7th)
 **Left-adjacent combinations** (newer Omnichord models): pressing a Major key together with the **7th key one column to its left** yields **sus4**; pressing a Major key together with the **Minor key one column to its left** yields **add9**. See 6.3 for the full rule and the leftmost-column special case.
 
 ### 5.2 Strum Plate (number keys / numpad)
-The three main letter rows plus their bounding modifiers are fully consumed by the chord grid (5.1). The strum plate therefore uses the **number row** and/or the **numpad**. Numpad keys are identified by their raw keypad HID usages and are **Num-Lock-independent** (FR-S6).
+The three main letter rows plus their bounding modifiers are fully consumed by the chord grid (5.1). The strum plate therefore uses the **number row** and/or the **numpad**. Numpad keys are identified by their raw keypad HID usages and are **Num-Lock-independent** (FR-S6). The top row is strum by default; a preset can set `number_keys` to `"macro"` to use `1`…`0` as macro keys (FR-S9), leaving the numpad as the strum plate.
 | Keys | Function |
 |------|----------|
-| Number row `1 2 3 4 5 6 7 8 9 0` | Strum across chord notes (Full layout) |
+| Number row `1 2 3 4 5 6 7 8 9 0` | Strum across chord notes (Full layout), or trigger macros when the preset's `number_keys` is `"macro"` |
 | Numpad digits + decimal `0 . 1 2 3 4 5 6 7 8 9` + `Num Lock` `/` `*` | Strum (Full layout). `Keypad +`/`Keypad -` are excluded — they adjust the strum octave (5.5). `Num Lock`, `/` and `*` (the numpad top row) extend the full strum plate. |
 | Limited strum path `0 . 2 3 5 6 8 9 / *` | Strum (Limited layout, when enabled) |
 
@@ -684,6 +685,8 @@ All config/preset/pattern files live on the Pico's **LittleFS** filesystem in on
 ```json
 {
   "name": "Ballad Pad",
+  "number_keys": "strum",
+  "macros": {},
   "chord": {
     "play_mode": "held",
     "octave": 0,
@@ -743,6 +746,8 @@ All config/preset/pattern files live on the Pico's **LittleFS** filesystem in on
 }
 ```
 > `rhythm.swing` is a **signed integer −75..+75** (Section 7.3), not a float. The `chord.extensions` object has been removed: add9/add11/add13 are now held modifiers (FR-C7) and are not persisted. `play_mode` is one of `held` / `press_to_play` / `arpeggio` / `arp_hold` / `silent` / `pattern` / `pattern_hold` (Rhythm mode was replaced by the walking bass, FR-B1). `bass.pattern` is a bass pattern **name** per FR-B5. `chord.pattern` is a chord pattern **name** (`Block` / `Alberti` / `Broken Up` / `Broken Down` / `Pulse` / `Oom-Pah` / `Roll` / `Split` / `Arpeggio`, or a user file's `name`) per 6.10.
+>
+> `number_keys` is `"strum"` (default) or `"macro"`. `macros` maps top-row labels `"1"`…`"9"`,`"0"` to ordered command arrays; see the Custom Configuration Guide §3.7 for the command schema and the 16/key + 48/preset limits. Missing fields load as strum with no macros.
 
 ### 8.3 Combination, Chord-Type & Root-Order Tables
 The Omnichord combination matrix (6.3), chord interval formulas (6.2), the circle-of-fifths root order (5.1, `chord_root_order`), the keymap, and per-parameter defaults are stored as editable JSON on LittleFS (shipped from repo `data/`) so behavior/layout can be tuned without recompiling. To minimize flash writes and RAM, large static tables may alternatively be compiled into flash as C++ constants with JSON overrides — see the roadmap for the chosen persistence strategy (default: JSON on LittleFS via ArduinoJson).

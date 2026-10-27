@@ -116,3 +116,37 @@ def test_keymap_default_roundtrip():
     data = km.to_dict()
     assert data["bindings"][0]["keys"] == ["F1"]
     assert KeymapConfig.from_dict(data).to_dict() == data
+
+
+def test_preset_macros_default_and_roundtrip():
+    from keybchord_configurator.models.enums import NumberKeyMode
+    from keybchord_configurator.models.macro import MacroCommand
+
+    slot = PresetSlot.defaults()
+    data = slot.to_dict()
+    assert data["number_keys"] == "strum"
+    assert data["macros"] == {}
+
+    slot.macros.number_keys = NumberKeyMode.MACRO
+    slot.macros.keys["1"] = [
+        MacroCommand(type="set", param="rhythm_mute", value="off"),
+        MacroCommand(type="drum_mute", piece="kick", value="on"),
+    ]
+    slot.macros.keys["0"] = [
+        MacroCommand(type="toggle", param="rhythm_enable", a=1, b=0),
+    ]
+
+    loaded = PresetSlot.from_dict(slot.to_dict())
+    assert loaded.macros.number_keys == NumberKeyMode.MACRO
+    assert len(loaded.macros.keys["1"]) == 2
+    assert loaded.macros.keys["1"][0].param == "rhythm_mute"
+    assert loaded.macros.keys["1"][1].piece == "kick"
+    assert loaded.macros.keys["0"][0].type == "toggle"
+
+
+def test_old_preset_without_macros_loads_defaults():
+    from keybchord_configurator.models.enums import NumberKeyMode
+
+    slot = PresetSlot.from_dict({"name": "Old", "chord": {"velocity": 80}})
+    assert slot.macros.number_keys == NumberKeyMode.STRUM
+    assert slot.macros.keys == {}

@@ -14,8 +14,10 @@ out a DIN-5 connector — no computer required.
   arpeggio), **Pattern**/**Pattern-hold** (user chord patterns, below), and
   Silent, with 5 arpeggio patterns (up / down / up-down / alternating / random)
   and chord roll.
-- **Strum plate** — the number row + numpad, with follow-chord / scale / piano
-  note pools.
+- **Strum plate** — top-row number keys + numpad, with follow-chord / scale /
+  piano note pools. Per preset, the top row can instead become **macro keys**.
+- **Macros** — each preset can map the top-row keys `1`–`0` to an ordered bundle
+  of parameter changes (set/toggle/cycle/inc/dec and per-drum mute).
 - **Chord patterns** — 9 built-in polyphonic patterns (Block, Alberti, Pulse,
   …) played in lockstep with the rhythm, all editable as JSON (`/chordpatterns/`).
 - **Rhythm engine** — 12 built-in drum patterns (Rock, Waltz, Swing, Bossa Nova,
@@ -68,8 +70,9 @@ On first boot the firmware self-provisions its config, presets, and rhythms.
 ## Using it
 
 - Plug a standard USB keyboard into the host port. The three keyboard rows play
-  chords (see the chord-grid mapping in the spec); the number row / numpad is
-  the strum plate.
+  chords (see the chord-grid mapping in the spec); the numpad is the strum
+  plate. By default the top-row number keys also strum; a preset can switch them
+  to macro keys instead.
 - `F1`–`F8` are quick settings; `F9`–`F12` open the Chord/Strum/Rhythm/Bass
   menus. `Home`/`End` browse presets, `Insert`→`Enter` saves, `Space` is tap
   tempo, `Super`+`Esc` is panic.

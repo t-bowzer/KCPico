@@ -97,6 +97,8 @@ covering 10 banks × 8 slots = 80 presets. Editing one object changes that slot.
 ```json
 {
   "name": "Ballad Pad",
+  "number_keys": "strum",
+  "macros": {},
   "chord": {
     "play_mode": "held",
     "octave": 0,
@@ -220,6 +222,53 @@ Each `*_note` remaps a standard GM percussion sound to a different note; each
 |---------|------|-------|---------|-------|
 | `kick`, `snare`, `hihat`, `open_hat`, `rimshot`, `clap`, `crash`, `ride`, `bongo`, `conga_lo`, `conga_hi`, `clave`, `shaker` | int | 0–127 | 36, 38, 42, 46, 37, 39, 49, 51, 61, 62, 63, 75, 82 | GM percussion note. |
 | the matching `*_vel` | int | 0–128 | `0` | `0` = Auto (follow pattern), 1–127 = fixed, **128 = Off** (mute the piece). |
+
+### 3.7 `number_keys` and `macros` — per-preset top-row macros
+
+`number_keys` selects what the **top-row** number keys `1 2 3 4 5 6 7 8 9 0`
+do in this preset. The numpad is always the strum plate.
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `number_keys` | string | `"strum"` | `"strum"` = top row strums; `"macro"` = top row triggers macros. |
+| `macros` | object | `{}` | Keyed by top-row label `"1"`…`"9"`, `"0"`; each value is an ordered command array. |
+
+Macro keys trigger on key-down (no modifiers); `Super+1`…`Super+8` still loads
+presets. A command is one of:
+
+```json
+{
+  "number_keys": "macro",
+  "macros": {
+    "1": [
+      { "type": "set", "param": "rhythm_mute", "value": "off" },
+      { "type": "drum_mute", "piece": "kick", "value": "on" },
+      { "type": "set", "param": "tempo", "value": 88 }
+    ],
+    "2": [
+      { "type": "toggle", "param": "rhythm_enable", "a": 1, "b": 0 }
+    ]
+  }
+}
+```
+
+| Command `type` | Fields | Notes |
+|----------------|--------|-------|
+| `set` | `param`, `value` | Absolute value, using the keymap parameter/value names below. |
+| `toggle` | `param`, `a`, `b` | If the value equals `a`, set `b`; otherwise set `a`. |
+| `cycle` | `param` | Advance one step (same as a keymap `cycle` action). |
+| `inc` / `dec` | `param` | Step the value up/down using its normal increment. |
+| `drum_mute` | `piece`, `value` | `piece` is one of `kick`, `snare`, `hihat`, `open_hat`, `rimshot`, `clap`, `crash`, `ride`, `bongo`, `conga_lo`, `conga_hi`, `clave`, `shaker`; `value` is `on`/`off`. Mute-off sets the piece to Auto velocity (`0`). |
+
+Limits: **16 commands per key** and **48 commands per preset**. The firmware
+truncates excess commands; the configurator rejects them. Parameter names and
+value strings match the keymap names in §4.3/§4.4, plus the per-drum parameters
+`drum_kick`, `drum_kick_vel`, … (note / velocity). The firmware writes macro
+values as integers, but `on`/`off`, enum names, and pattern names are accepted
+when editing by hand.
+
+> On-device preset Save preserves the preset's macro configuration; Clear
+> resets it to `number_keys: "strum"` with no macros.
 
 ---
 

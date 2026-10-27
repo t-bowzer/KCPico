@@ -156,3 +156,77 @@ def test_keymap_ext_bad_value_rejected():
     ]}
     result = validate_keymap(data)
     assert any("must be 9, 11, or 13" in e for e in result.errors)
+
+
+def _macro_slot(**macro_fields):
+    from keybchord_configurator.models.preset import PresetSlot
+    data = PresetSlot.defaults().to_dict()
+    data.update(macro_fields)
+    return data
+
+
+def test_macros_valid_slot():
+    data = _macro_slot(
+        number_keys="macro",
+        macros={
+            "1": [
+                {"type": "set", "param": "rhythm_mute", "value": "off"},
+                {"type": "set", "param": "tempo", "value": 88},
+                {"type": "drum_mute", "piece": "kick", "value": "on"},
+            ],
+            "2": [{"type": "toggle", "param": "rhythm_enable", "a": 1, "b": 0}],
+        },
+    )
+    result = validate_preset_bank([data] * 8)
+    assert result.ok(), result.errors
+
+
+def test_macros_reject_bad_mode_type_and_piece():
+    data = _macro_slot(
+        number_keys="nope",
+        macros={
+            "1": [
+                {"type": "explode", "param": "tempo"},
+                {"type": "set", "param": "not_a_param", "value": 1},
+                {"type": "drum_mute", "piece": "not_a_drum", "value": "on"},
+            ],
+        },
+    )
+    result = validate_preset_bank([data] * 8)
+    text = "\n".join(result.errors)
+    assert "number_keys" in text
+    assert "unknown macro command type" in text
+    assert "unknown macro param" in text
+    assert "drum_mute 'piece'" in text
+
+
+def test_macros_reject_over_limits():
+    from keybchord_configurator.models.macro import (
+        MAX_MACRO_COMMANDS_PER_KEY,
+        MAX_MACRO_COMMANDS_PER_PRESET,
+    )
+
+    per_key = [{"type": "set", "param": "tempo", "value": 88}] * (
+        MAX_MACRO_COMMANDS_PER_KEY + 1)
+    data = _macro_slot(number_keys="macro", macros={"1": per_key})
+    result = validate_preset_bank([data] * 8)
+    assert any("key limit" in e for e in result.errors)
+
+    macros = {}
+    remaining = MAX_MACRO_COMMANDS_PER_PRESET
+    for label in ("1", "2", "3", "4"):
+        macros[label] = [{"type": "set", "param": "tempo", "value": 88}] * \
+            min(MAX_MACRO_COMMANDS_PER_KEY, remaining + 1)
+        remaining -= len(macros[label])
+    data = _macro_slot(number_keys="macro", macros=macros)
+    result = validate_preset_bank([data] * 8)
+    assert any("preset limit" in e for e in result.errors)
+
+
+def test_macros_reject_unknown_number_key():
+    data = _macro_slot(
+        number_keys="macro",
+        macros={"99": [{"type": "set", "param": "tempo", "value": 88}]},
+    )
+    result = validate_preset_bank([data] * 8)
+    assert any("unknown number key" in e for e in result.errors)

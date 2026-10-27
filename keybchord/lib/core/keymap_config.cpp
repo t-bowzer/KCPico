@@ -263,6 +263,22 @@ void addCoverageError(std::vector<std::string>& errors, bool present, const char
 } // namespace
 
 
+bool keymapLookupParamName(const std::string& name, ParamId& id) {
+    return lookupParamName(name, id);
+}
+
+const char* keymapParamName(ParamId id) {
+    for (const auto& p : kParamNames) {
+        if (id == p.id) return p.name;
+    }
+    return nullptr;
+}
+
+bool keymapParseParamValue(ParamId id, const std::string& value, int& out) {
+    return parseValue(id, value, out);
+}
+
+
 const KeyAction* KeymapConfig::find(uint8_t modifierMask, uint8_t usage) const {
     for (const auto& b : bindings) {
         if (b.modifierMask == modifierMask && b.usage == usage) return &b.action;

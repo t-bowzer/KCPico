@@ -9,6 +9,10 @@
 StrumEngine::StrumEngine(StateManager& state, MidiRouter& router)
     : state_(state), router_(router), keymap_(&state.keymap) {}
 
+void StrumEngine::setMacroTrigger(std::function<void(uint8_t, uint64_t)> cb) {
+    macroTrigger_ = std::move(cb);
+}
+
 StrumLayout StrumEngine::activeLayout() const {
     return state_.pendingStrum.limited_keys ? StrumLayout::Limited
                                             : StrumLayout::Full;
@@ -40,6 +44,21 @@ void StrumEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
 
     switch (a.cmd) {
         case KeyCmd::StrumKey:
+            // In Macro mode the top-row number keys trigger macros; the numpad
+            // remains the strum plate. Release still clears any strum note that
+            // was sounding from before a preset/mode change.
+            if (ev.hid_usage >= 0x1E && ev.hid_usage <= 0x27 &&
+                state_.pendingMacros.numberKeys == NumberKeyMode::Macro) {
+                if (ev.pressed) {
+                    if (keymapComboMask(ev.modifiers) == 0 && macroTrigger_) {
+                        macroTrigger_(static_cast<uint8_t>(ev.hid_usage - 0x1E),
+                                      now_us);
+                    }
+                } else {
+                    releaseStrum(ev.hid_usage, now_us);
+                }
+                break;
+            }
             if (ev.pressed) playStrum(ev.hid_usage, now_us);
             else            releaseStrum(ev.hid_usage, now_us);
             break;

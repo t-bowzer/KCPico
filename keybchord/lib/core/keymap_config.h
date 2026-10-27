@@ -40,3 +40,9 @@ struct KeymapLoadResult {
 // The canonical default keymap, as JSON (written to /keymap.json on first boot
 // by provisionDefaults). Kept in sync with KeymapConfig::defaults().
 std::string keymapDefaultJson();
+
+// Shared parameter-name/value parsing (also used by per-preset macros so the
+// keymap and macros accept identical spellings).
+bool keymapLookupParamName(const std::string& name, ParamId& id);
+const char* keymapParamName(ParamId id);
+bool keymapParseParamValue(ParamId id, const std::string& value, int& out);

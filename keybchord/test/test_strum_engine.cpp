@@ -222,3 +222,62 @@ TEST_F(StrumEngineTest, RetriggerRearticulatesWithNoteOffFirst) {
     EXPECT_TRUE(ops[1].second);   // then note 79 ...
     EXPECT_TRUE(ops[1].first);    // ... a note-on
 }
+
+// Per-preset macro mode: top-row number keys do not strum and instead invoke
+// the macro trigger; the numpad remains the strum plate.
+TEST_F(StrumEngineTest, MacroModeTopRowTriggersMacroAndNumpadStillStrums) {
+    state_.pendingMacros.numberKeys = NumberKeyMode::Macro;
+
+    int triggeredIndex = -1;
+    int triggerCount = 0;
+    strum_->setMacroTrigger([&](uint8_t index, uint64_t) {
+        triggeredIndex = index;
+        triggerCount++;
+    });
+
+    chord_->handleKeyEvent(key(0x17, true), 0);  // C major
+
+    midi_.clear();
+    strum_->handleKeyEvent(key(0x1E, true), 0);  // top-row 1 -> macro index 0
+    EXPECT_EQ(triggeredIndex, 0);
+    EXPECT_EQ(triggerCount, 1);
+    EXPECT_EQ(lastNoteOnOnChannel(2), -1);
+
+    strum_->handleKeyEvent(key(0x1E, false), 0); // release must not retrigger
+    EXPECT_EQ(triggerCount, 1);
+
+    strum_->handleKeyEvent(key(0x27, true), 0);  // top-row 0 -> macro index 9
+    EXPECT_EQ(triggeredIndex, 9);
+    EXPECT_EQ(triggerCount, 2);
+
+    // Numpad key still strums the chord pool.
+    midi_.clear();
+    strum_->handleKeyEvent(key(0x59, true), 0);  // Keypad 1 -> pool[2]
+    EXPECT_EQ(lastNoteOnOnChannel(2), 79);
+    EXPECT_EQ(triggerCount, 2);
+}
+
+// Modified top-row presses in macro mode are ignored (Super combos are resolved
+// as preset load before reaching the strum engine).
+TEST_F(StrumEngineTest, MacroModeIgnoresCtrlAltNumberCombos) {
+    state_.pendingMacros.numberKeys = NumberKeyMode::Macro;
+
+    int triggerCount = 0;
+    strum_->setMacroTrigger([&](uint8_t, uint64_t) { triggerCount++; });
+
+    strum_->handleKeyEvent(key(0x1E, true, 0x01), 0);  // Ctrl+1
+    strum_->handleKeyEvent(key(0x1E, true, 0x04), 0);  // Alt+1
+    EXPECT_EQ(triggerCount, 0);
+}
+
+// Strum mode remains the default and still plays the top row.
+TEST_F(StrumEngineTest, StrumModeTopRowStillStrums) {
+    int triggerCount = 0;
+    strum_->setMacroTrigger([&](uint8_t, uint64_t) { triggerCount++; });
+
+    chord_->handleKeyEvent(key(0x17, true), 0);  // C major
+    strum_->handleKeyEvent(key(0x1E, true), 0);  // top-row 1
+
+    EXPECT_EQ(triggerCount, 0);
+    EXPECT_EQ(lastNoteOnOnChannel(2), 72);
+}

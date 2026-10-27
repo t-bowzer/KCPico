@@ -16,6 +16,7 @@ PresetSlot PresetSlot::defaults() {
     p.strum  = StrumParams::defaults();
     p.bass   = BassParams::defaults();
     p.rhythm = RhythmParams::defaults();
+    p.macros = MacroConfig::defaults();
     return p;
 }
 
@@ -61,18 +62,20 @@ bool PresetSlot::sameParams(const PresetSlot& other) const {
         && rhythm.muted   == other.rhythm.muted
         && rhythm.channel == other.rhythm.channel
         && rhythm.pattern == other.rhythm.pattern
-        && rhythm.drums   == other.rhythm.drums;
+        && rhythm.drums   == other.rhythm.drums
+        && macros         == other.macros;
 }
 
 PresetSlot makePreset(const ChordParams& chord, const StrumParams& strum,
                       const BassParams& bass, const RhythmParams& rhythm,
-                      const std::string& name) {
+                      const std::string& name, const MacroConfig& macros) {
     PresetSlot p;
     p.name   = name;
     p.chord  = chord;
     p.strum  = strum;
     p.bass   = bass;
     p.rhythm = rhythm;
+    p.macros = macros;
     return p;
 }
 
@@ -113,6 +116,177 @@ static std::string bankPath(int bank) {
 }
 
 namespace {
+
+bool parseMacroValue(JsonVariant v, ParamId id, int16_t& out) {
+    std::string s;
+    if (v.is<const char*>()) {
+        s = v.as<std::string>();
+    } else if (v.is<int>()) {
+        s = std::to_string(v.as<int>());
+    } else {
+        return false;
+    }
+    int value = 0;
+    if (!macroParseParamValue(id, s, value)) return false;
+    out = static_cast<int16_t>(value);
+    return true;
+}
+
+bool parseMacroBool(JsonVariant v, int16_t& out) {
+    if (v.is<bool>()) { out = v.as<bool>() ? 1 : 0; return true; }
+    if (v.is<int>()) { out = v.as<int>() != 0 ? 1 : 0; return true; }
+    if (v.is<const char*>()) {
+        std::string s = v.as<std::string>();
+        if (s == "on" || s == "true" || s == "1")  { out = 1; return true; }
+        if (s == "off" || s == "false" || s == "0") { out = 0; return true; }
+    }
+    return false;
+}
+
+bool parseMacroCommand(JsonVariant v, MacroCommand& out) {
+    if (!v.is<JsonObject>()) return false;
+    auto obj = v.as<JsonObject>();
+    if (!obj.containsKey("type") || !obj["type"].is<const char*>()) return false;
+
+    std::string type = obj["type"].as<std::string>();
+    MacroCommand cmd;
+    if (type == "set") {
+        if (!obj.containsKey("param") || !obj["param"].is<const char*>()) return false;
+        if (!macroLookupParamName(obj["param"].as<std::string>(), cmd.param)) return false;
+        if (!obj.containsKey("value") || !parseMacroValue(obj["value"], cmd.param, cmd.valueA)) {
+            return false;
+        }
+        cmd.op = MacroOp::Set;
+    } else if (type == "toggle") {
+        if (!obj.containsKey("param") || !obj["param"].is<const char*>()) return false;
+        if (!macroLookupParamName(obj["param"].as<std::string>(), cmd.param)) return false;
+        if (!obj.containsKey("a") || !parseMacroValue(obj["a"], cmd.param, cmd.valueA)) {
+            return false;
+        }
+        if (!obj.containsKey("b") || !parseMacroValue(obj["b"], cmd.param, cmd.valueB)) {
+            return false;
+        }
+        cmd.op = MacroOp::Toggle;
+    } else if (type == "cycle" || type == "inc" || type == "dec") {
+        if (!obj.containsKey("param") || !obj["param"].is<const char*>()) return false;
+        if (!macroLookupParamName(obj["param"].as<std::string>(), cmd.param)) return false;
+        cmd.op = (type == "cycle") ? MacroOp::Cycle
+               : (type == "inc")   ? MacroOp::Inc
+                                   : MacroOp::Dec;
+    } else if (type == "drum_mute") {
+        if (!obj.containsKey("piece") || !obj["piece"].is<const char*>()) return false;
+        int piece = macroDrumPieceIndex(obj["piece"].as<std::string>());
+        if (piece < 0) return false;
+        if (!obj.containsKey("value") || !parseMacroBool(obj["value"], cmd.valueA)) {
+            return false;
+        }
+        cmd.op        = MacroOp::DrumMute;
+        cmd.drumPiece = static_cast<uint8_t>(piece);
+        cmd.param     = macroDrumPieceVelocityParam(piece);
+    } else {
+        return false;
+    }
+
+    out = cmd;
+    return true;
+}
+
+void parseMacroConfig(JsonObject obj, MacroConfig& cfg) {
+    cfg = MacroConfig::defaults();
+
+    if (obj.containsKey("number_keys") && obj["number_keys"].is<const char*>()) {
+        std::string mode = obj["number_keys"].as<std::string>();
+        cfg.numberKeys = (mode == "macro") ? NumberKeyMode::Macro
+                                           : NumberKeyMode::Strum;
+    }
+
+    if (!obj.containsKey("macros") || !obj["macros"].is<JsonObject>()) return;
+    auto macros = obj["macros"].as<JsonObject>();
+
+    int total = 0;
+    for (int i = 0; i < MACRO_KEY_COUNT; i++) {
+        const char* label = macroKeyLabel(i);
+        if (!label || !macros.containsKey(label)) continue;
+        if (!macros[label].is<JsonArray>()) continue;
+        for (JsonVariant cv : macros[label].as<JsonArray>()) {
+            if (static_cast<int>(cfg.keys[i].size()) >= MAX_MACRO_COMMANDS_PER_KEY ||
+                total >= MAX_MACRO_COMMANDS_PER_PRESET) {
+                break;
+            }
+            MacroCommand cmd;
+            if (!parseMacroCommand(cv, cmd)) continue;
+            cfg.keys[i].push_back(cmd);
+            total++;
+        }
+    }
+}
+
+const char* macroOpName(MacroOp op) {
+    switch (op) {
+        case MacroOp::Set:      return "set";
+        case MacroOp::Toggle:   return "toggle";
+        case MacroOp::Cycle:    return "cycle";
+        case MacroOp::Inc:      return "inc";
+        case MacroOp::Dec:      return "dec";
+        case MacroOp::DrumMute: return "drum_mute";
+        default:                return nullptr;
+    }
+}
+
+void writeMacroCommand(JsonObject obj, const MacroCommand& cmd) {
+    const char* type = macroOpName(cmd.op);
+    if (!type) return;
+    obj["type"] = type;
+
+    if (cmd.op == MacroOp::DrumMute) {
+        const char* piece = macroDrumPieceKey(cmd.drumPiece);
+        if (!piece) return;
+        obj["piece"] = piece;
+        obj["value"] = (cmd.valueA != 0) ? "on" : "off";
+        return;
+    }
+
+    const char* param = macroParamName(cmd.param);
+    if (!param) return;
+    obj["param"] = param;
+
+    switch (cmd.op) {
+        case MacroOp::Set:
+            obj["value"] = cmd.valueA;
+            break;
+        case MacroOp::Toggle:
+            obj["a"] = cmd.valueA;
+            obj["b"] = cmd.valueB;
+            break;
+        default:
+            break;
+    }
+}
+
+void writeMacroConfig(JsonObject obj, const MacroConfig& cfg) {
+    obj["number_keys"] =
+        (cfg.numberKeys == NumberKeyMode::Macro) ? "macro" : "strum";
+
+    auto macros = obj["macros"].to<JsonObject>();
+    int total = 0;
+    for (int i = 0; i < MACRO_KEY_COUNT; i++) {
+        const char* label = macroKeyLabel(i);
+        if (!label || cfg.keys[i].empty()) continue;
+
+        auto arr = macros[label].to<JsonArray>();
+        int perKey = 0;
+        for (const auto& cmd : cfg.keys[i]) {
+            if (perKey >= MAX_MACRO_COMMANDS_PER_KEY ||
+                total >= MAX_MACRO_COMMANDS_PER_PRESET) {
+                break;
+            }
+            auto co = arr.add<JsonObject>();
+            writeMacroCommand(co, cmd);
+            perKey++;
+            total++;
+        }
+    }
+}
 
 const char* playModeName(PlayMode m) {
     switch (m) {
@@ -413,6 +587,8 @@ PresetSlot loadPreset(StorageAdapter& storage, int bank, int slot) {
         }
     }
 
+    parseMacroConfig(obj, p.macros);
+
     return p;
 }
 
@@ -446,6 +622,7 @@ bool savePreset(StorageAdapter& storage, int bank, int slot, const PresetSlot& p
 
     auto obj = arr[slot];
     obj["name"] = preset.name;
+    writeMacroConfig(obj, preset.macros);
 
     auto chord = obj["chord"].to<JsonObject>();
     chord["channel"]          = preset.chord.channel;

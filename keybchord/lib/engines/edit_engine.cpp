@@ -169,6 +169,49 @@ void EditEngine::applyParamAction(const KeyAction& a, uint8_t usage, bool inMenu
     }
 }
 
+void EditEngine::triggerMacro(uint8_t keyIndex, uint64_t now_us) {
+    const char* label = macroKeyLabel(keyIndex);
+    if (!label) return;
+
+    const auto& commands = state_.pendingMacros.commandsFor(keyIndex);
+    bool modeChanged = false;
+    bool arpChanged = false;
+    bool patternChanged = false;
+    bool edited = false;
+
+    for (const auto& cmd : commands) {
+        if (cmd.param == ParamId::COUNT && cmd.op != MacroOp::DrumMute) continue;
+
+        switch (cmd.op) {
+            case MacroOp::Set:      paramSet(state_, cmd.param, cmd.valueA); break;
+            case MacroOp::Toggle:   paramToggle(state_, cmd.param, cmd.valueA, cmd.valueB); break;
+            case MacroOp::Cycle:    paramCycle(state_, cmd.param); break;
+            case MacroOp::Inc:      paramStep(state_, cmd.param, +1); break;
+            case MacroOp::Dec:      paramStep(state_, cmd.param, -1); break;
+            case MacroOp::DrumMute:
+                paramSet(state_, cmd.param,
+                         cmd.valueA != 0 ? param_bounds::DRUM_VELOCITY_OFF : 0);
+                break;
+            default:
+                continue;
+        }
+
+        edited = true;
+        if (cmd.param == ParamId::ChordMode) modeChanged = true;
+        if (cmd.param == ParamId::ChordArpMode) arpChanged = true;
+        if (cmd.param == ParamId::RhythmPattern) patternChanged = true;
+    }
+
+    if (modeChanged && modeChanged_) modeChanged_();
+    if (arpChanged && arpModeChanged_) arpModeChanged_();
+    if (patternChanged && patternChanged_) patternChanged_();
+    if (edited && anyEdit_) anyEdit_();
+
+    display_.showValue(std::string("Macro ") + label,
+                       std::to_string(commands.size()) + " settings",
+                       false, now_us);
+}
+
 void EditEngine::toggleDrumMute(int slot, uint64_t now_us) {
     const RhythmPattern* p = patternProvider_
         ? patternProvider_(state_.pendingRhythm.pattern) : nullptr;

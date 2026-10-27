@@ -61,6 +61,7 @@ from .enums import (
     parse_strum_mode,
     parse_voicing_mode,
 )
+from .macro import MacroConfig
 
 # (json key, display label, default GM note) for the 13 percussion pieces.
 DRUM_PIECES: tuple[tuple[str, str, int], ...] = (
@@ -343,6 +344,7 @@ class PresetSlot:
     strum: StrumParams = field(default_factory=StrumParams.defaults)
     bass: BassParams = field(default_factory=BassParams.defaults)
     rhythm: RhythmParams = field(default_factory=RhythmParams.defaults)
+    macros: MacroConfig = field(default_factory=MacroConfig.defaults)
 
     @classmethod
     def defaults(cls) -> "PresetSlot":
@@ -360,16 +362,19 @@ class PresetSlot:
         p.strum = StrumParams.from_dict(data.get("strum"))
         p.bass = BassParams.from_dict(data.get("bass"))
         p.rhythm = RhythmParams.from_dict(data.get("rhythm"))
+        p.macros = MacroConfig.from_dict(data)
         return p
 
     def to_dict(self) -> dict:
-        return {
+        out = {
             "name": self.name,
             "chord": self.chord.to_dict(),
             "strum": self.strum.to_dict(),
             "bass": self.bass.to_dict(),
             "rhythm": self.rhythm.to_dict(),
         }
+        out.update(self.macros.to_dict())
+        return out
 
     def display_name(self, bank: int, slot: int) -> str:
         if self.name and self.name != "Default":

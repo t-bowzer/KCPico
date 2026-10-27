@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSpinBox,
     QSplitter,
+    QTabWidget,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -40,6 +41,7 @@ from ..models.keymap import (
 from ..validation.validator import validate_keymap
 from .keyboard_diagram import KeyboardDiagram
 from .keymap_visual import LAYER_ORDER
+from .macro_editor import MacroEditor
 
 
 class BindingDialog(QDialog):
@@ -253,14 +255,20 @@ class BindingDialog(QDialog):
 
 class KeymapEditor(QWidget):
     changed = Signal()
+    presetSelectionChanged = Signal(int, int)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._tree: ConfigTree | None = None
+        self._preset_bank = 0
+        self._preset_slot = 0
+        self._syncing_preset = False
         self._build()
 
     def set_tree(self, tree: ConfigTree) -> None:
         self._tree = tree
+        self._refresh_preset_combo()
+        self.set_preset(self._preset_bank, self._preset_slot)
         self.refresh()
 
     def _build(self) -> None:
@@ -271,6 +279,12 @@ class KeymapEditor(QWidget):
         top_layout.setContentsMargins(0, 0, 0, 0)
 
         toolbar = QHBoxLayout()
+        toolbar.addWidget(QLabel("Preset:"))
+        self.preset_combo = QComboBox()
+        self.preset_combo.setMinimumWidth(190)
+        self.preset_combo.currentIndexChanged.connect(self._on_preset_combo_changed)
+        toolbar.addWidget(self.preset_combo)
+        toolbar.addSpacing(12)
         toolbar.addWidget(QLabel("Show:"))
         self.layer_combo = QComboBox()
         self.layer_combo.addItems(list(LAYER_ORDER))
@@ -284,6 +298,8 @@ class KeymapEditor(QWidget):
 
         self.diagram = KeyboardDiagram()
         top_layout.addWidget(self.diagram, 1)
+
+        self.bottom_tabs = QTabWidget()
 
         bottom = QWidget()
         bottom_layout = QVBoxLayout(bottom)
@@ -320,9 +336,15 @@ class KeymapEditor(QWidget):
         self.status_label.setWordWrap(True)
         bottom_layout.addWidget(self.status_label)
 
+        self.macro_editor = MacroEditor()
+        self.macro_editor.changed.connect(self._on_macro_changed)
+        self.macro_editor.keySelected.connect(self.diagram.set_selected_macro_key)
+        self.bottom_tabs.addTab(bottom, "Keymap")
+        self.bottom_tabs.addTab(self.macro_editor, "Macros")
+
         splitter = QSplitter(Qt.Vertical)
         splitter.addWidget(top)
-        splitter.addWidget(bottom)
+        splitter.addWidget(self.bottom_tabs)
         splitter.setChildrenCollapsible(False)
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 1)
@@ -332,6 +354,87 @@ class KeymapEditor(QWidget):
         self.diagram.bindingSelected.connect(self._select_binding_row)
         self.diagram.bindingEditRequested.connect(self._edit_binding_index)
         self.diagram.unboundKeyActivated.connect(self._add_binding_for_key)
+        self.diagram.macroKeySelected.connect(self._select_macro_key)
+        self.diagram.macroKeyEditRequested.connect(self._edit_macro_key)
+
+    def current_preset(self) -> tuple[int, int]:
+        return self._preset_bank, self._preset_slot
+
+    def set_preset(self, bank: int, slot: int) -> None:
+        self._preset_bank = max(0, min(9, bank))
+        self._preset_slot = max(0, min(7, slot))
+        self._syncing_preset = True
+        index = self.preset_combo.findData(
+            f"{self._preset_bank}:{self._preset_slot}")
+        if index >= 0:
+            self.preset_combo.setCurrentIndex(index)
+        self._syncing_preset = False
+        self._refresh_macro_context()
+
+    def refresh_macros(self) -> None:
+        self._refresh_macro_context()
+
+    def _refresh_preset_combo(self) -> None:
+        self._syncing_preset = True
+        try:
+            self.preset_combo.clear()
+            if self._tree is None:
+                return
+            for bank, slots in enumerate(self._tree.banks):
+                for slot, preset in enumerate(slots):
+                    name = preset.display_name(bank, slot)
+                    self.preset_combo.addItem(
+                        f"B{bank + 1}:P{slot + 1}  {name}",
+                        f"{bank}:{slot}")
+            index = self.preset_combo.findData(
+                f"{self._preset_bank}:{self._preset_slot}")
+            if index >= 0:
+                self.preset_combo.setCurrentIndex(index)
+        finally:
+            self._syncing_preset = False
+
+    def _on_preset_combo_changed(self, _index: int) -> None:
+        if self._syncing_preset or self._tree is None:
+            return
+        data = self.preset_combo.currentData()
+        if not isinstance(data, str) or ":" not in data:
+            return
+        bank_s, slot_s = data.split(":", 1)
+        self._preset_bank = int(bank_s)
+        self._preset_slot = int(slot_s)
+        self._refresh_macro_context()
+        self.presetSelectionChanged.emit(self._preset_bank, self._preset_slot)
+
+    def _refresh_macro_context(self) -> None:
+        if self._tree is None:
+            return
+        preset = self._tree.banks[self._preset_bank][self._preset_slot]
+        label = (f"B{self._preset_bank + 1}:P{self._preset_slot + 1}  "
+                 f"{preset.display_name(self._preset_bank, self._preset_slot)}")
+        self.macro_editor.set_config(
+            preset.macros,
+            rhythm_names=self._tree.rhythm_names(),
+            bass_names=self._tree.bass_names(),
+            chord_pattern_names=self._tree.chord_pattern_names())
+        self.diagram.set_macro_context(preset.macros, label)
+
+    def _select_macro_key(self, label: str) -> None:
+        self.bottom_tabs.setCurrentWidget(self.macro_editor)
+        self.macro_editor.select_key(label)
+        self.diagram.set_selected_macro_key(label)
+
+    def _edit_macro_key(self, label: str) -> None:
+        self._select_macro_key(label)
+        self.macro_editor.edit_selected_command()
+
+    def _on_macro_changed(self) -> None:
+        if self._tree is None:
+            return
+        preset = self._tree.banks[self._preset_bank][self._preset_slot]
+        label = (f"B{self._preset_bank + 1}:P{self._preset_slot + 1}  "
+                 f"{preset.display_name(self._preset_bank, self._preset_slot)}")
+        self.diagram.set_macro_context(preset.macros, label)
+        self.changed.emit()
 
     def _set_layer(self, layer: str) -> None:
         self.diagram.set_layer(layer)
@@ -384,6 +487,7 @@ class KeymapEditor(QWidget):
         else:
             self.table.clearSelection()
             self.diagram.set_selected_binding(-1)
+        self._refresh_macro_context()
         self._update_status()
 
     def _set_item(self, row: int, col: int, text: str) -> None:

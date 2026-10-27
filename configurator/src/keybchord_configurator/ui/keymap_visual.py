@@ -10,13 +10,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Iterable, Optional
 
-from ..models.enums import ChordQuality
+from ..models.enums import ChordQuality, NumberKeyMode
 from ..models.keymap import (
     BINDABLE_KEYS,
     BOOL_PARAMS,
     KEYMAP_PARAM_NAMES,
     MODIFIERS,
     PARAM_VALUE_TABLE,
+    KeyAction,
+)
+from ..models.macro import (
+    NUMBER_KEY_LABELS,
+    MacroCommand,
+    MacroConfig,
 )
 from ..models.preset import DRUM_PIECES
 
@@ -557,11 +563,87 @@ def format_action(action: Any, *,
     return ActionLabel(action_type, action_type)
 
 
+def is_macro_key(name: str, macro_config: Optional[MacroConfig]) -> bool:
+    return (
+        macro_config is not None
+        and macro_config.number_keys == NumberKeyMode.MACRO
+        and name in NUMBER_KEY_LABELS
+    )
+
+
+def macro_command_label(
+    command: MacroCommand,
+    *,
+    rhythm_names: Iterable[str] = (),
+    bass_names: Iterable[str] = (),
+    chord_pattern_names: Iterable[str] = (),
+) -> ActionLabel:
+    if command.type == "drum_mute":
+        piece = next(
+            (label for key, label, _note in DRUM_PIECES if key == command.piece),
+            command.piece or "Drum",
+        )
+        on = command.value in (True, "on", 1)
+        short = f"{piece}: {'mute' if on else 'unmute'}"
+        detail = f"{'Mute' if on else 'Unmute'} {piece}"
+        return ActionLabel(short, detail)
+    action = KeyAction(
+        type=command.type,
+        param=command.param,
+        value=command.value,
+        a=command.a,
+        b=command.b,
+    )
+    return format_action(
+        action,
+        rhythm_names=rhythm_names,
+        bass_names=bass_names,
+        chord_pattern_names=chord_pattern_names,
+    )
+
+
+def macro_key_cell_text(macro_config: Optional[MacroConfig], label: str) -> str:
+    if macro_config is None:
+        return "Macro"
+    count = len(macro_config.keys.get(label, []))
+    if count == 0:
+        return "Macro"
+    return f"{count} cmd" if count == 1 else f"{count} cmds"
+
+
+def macro_key_summary(
+    macro_config: Optional[MacroConfig],
+    label: str,
+    *,
+    rhythm_names: Iterable[str] = (),
+    bass_names: Iterable[str] = (),
+    chord_pattern_names: Iterable[str] = (),
+) -> str:
+    if macro_config is None:
+        return "No macro"
+    commands = macro_config.keys.get(label, [])
+    if not commands:
+        return "Empty macro"
+    if len(commands) == 1:
+        return macro_command_label(
+            commands[0],
+            rhythm_names=rhythm_names,
+            bass_names=bass_names,
+            chord_pattern_names=chord_pattern_names,
+        ).short
+    return f"{len(commands)} commands"
+
+
 def combo_label(modifier: Optional[str], key: str) -> str:
     return f"{modifier}+{key}" if modifier else key
 
 
-def describe_key(spec: KeySpec) -> str:
+def describe_key(spec: KeySpec, *, macro_config: Optional[MacroConfig] = None,
+                 preset_label: str = "") -> str:
+    if is_macro_key(spec.name, macro_config):
+        count = len(macro_config.keys.get(spec.name, []))
+        where = f" for {preset_label}" if preset_label else ""
+        return f"Per-preset macro{where} ({count} commands)"
     if spec.kind == "chord" and spec.chord_quality is not None:
         quality = CHORD_QUALITY_LABELS[spec.chord_quality]
         return f"Chord {spec.chord_root} {quality}"

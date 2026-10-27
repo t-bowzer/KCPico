@@ -7,6 +7,7 @@
 #include "display_manager.h"
 #include "edit_engine.h"
 #include "preset_engine.h"
+#include "presets.h"
 #include "state.h"
 #include "storage_stub.h"
 
@@ -395,4 +396,48 @@ TEST_F(PresetEngineTest, SaveNameEditTypesNumbersShiftAndSymbols) {
 
     PresetSlot saved = loadPreset(storage_, 0, 0);
     EXPECT_EQ(saved.name, "A1_- ");
+}
+
+
+TEST_F(PresetEngineTest, LoadCopiesMacroConfigIntoState) {
+    PresetSlot stored = PresetSlot::defaults();
+    stored.macros.numberKeys = NumberKeyMode::Macro;
+    MacroCommand cmd;
+    cmd.op = MacroOp::Set;
+    cmd.param = ParamId::RhythmTempo;
+    cmd.valueA = 88;
+    stored.macros.keys[0].push_back(cmd);
+    ASSERT_TRUE(savePreset(storage_, 0, 0, stored));
+
+    route(key(0x1E, true, SUPER));  // Super+1 -> load slot 0
+
+    EXPECT_EQ(state_.currentBank, 0);
+    EXPECT_EQ(state_.currentSlot, 0);
+    EXPECT_EQ(state_.pendingMacros.numberKeys, NumberKeyMode::Macro);
+    ASSERT_EQ(state_.pendingMacros.keys[0].size(), 1u);
+    EXPECT_EQ(state_.pendingMacros.keys[0][0].param, ParamId::RhythmTempo);
+}
+
+TEST_F(PresetEngineTest, OnDeviceSavePreservesMacrosAndMode) {
+    PresetSlot stored = PresetSlot::defaults();
+    stored.macros.numberKeys = NumberKeyMode::Macro;
+    MacroCommand cmd;
+    cmd.op = MacroOp::Set;
+    cmd.param = ParamId::RhythmMute;
+    cmd.valueA = 0;
+    stored.macros.keys[3].push_back(cmd);
+    ASSERT_TRUE(savePreset(storage_, 0, 0, stored));
+
+    route(key(0x1E, true, SUPER));  // load slot 0
+    state_.pendingRhythm.tempo = 140;
+
+    route(key(INSERT, true));
+    route(key(ENTER, true));
+    route(key(ENTER, true));  // confirm name edit (keep default name)
+
+    PresetSlot reloaded = loadPreset(storage_, 0, 0);
+    EXPECT_EQ(reloaded.rhythm.tempo, 140);
+    EXPECT_EQ(reloaded.macros.numberKeys, NumberKeyMode::Macro);
+    ASSERT_EQ(reloaded.macros.keys[3].size(), 1u);
+    EXPECT_EQ(reloaded.macros.keys[3][0].param, ParamId::RhythmMute);
 }

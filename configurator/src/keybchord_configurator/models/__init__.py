@@ -6,6 +6,7 @@ from .rhythm import RhythmPattern, RhythmTrack
 from .bass import BassPattern
 from .chordpattern import ChordPattern
 from .keymap import KeyAction, KeyBinding, KeymapConfig
+from .macro import MacroCommand, MacroConfig
 
 __all__ = [
     "AppConfig",
@@ -15,6 +16,8 @@ __all__ = [
     "KeyAction",
     "KeyBinding",
     "KeymapConfig",
+    "MacroCommand",
+    "MacroConfig",
     "PresetSlot",
     "RhythmPattern",
     "RhythmTrack",

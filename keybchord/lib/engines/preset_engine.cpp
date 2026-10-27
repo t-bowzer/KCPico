@@ -32,7 +32,8 @@ void PresetEngine::recomputeDirty() {
     PresetSlot stored = loadPresetOrDefault(storage_, state_.currentBank,
                                             state_.currentSlot);
     PresetSlot cur = makePreset(state_.pendingChord, state_.pendingStrum,
-                                state_.pendingBass, state_.pendingRhythm, stored.name);
+                                state_.pendingBass, state_.pendingRhythm, stored.name,
+                                state_.pendingMacros);
     state_.dirty = !cur.sameParams(stored);
 }
 
@@ -84,6 +85,7 @@ void PresetEngine::loadCursor(uint64_t now_us) {
     state_.pendingStrum  = stored.strum;
     state_.pendingBass   = stored.bass;
     state_.pendingRhythm = stored.rhythm;
+    state_.pendingMacros = stored.macros;
 
     state_.currentBank  = bank;
     state_.currentSlot  = slot;
@@ -129,7 +131,7 @@ void PresetEngine::confirmPrompt(uint64_t now_us) {
         PresetSlot existing = loadPresetOrDefault(storage_, bank, slot);
         PresetSlot out = makePreset(state_.pendingChord, state_.pendingStrum,
                                     state_.pendingBass, state_.pendingRhythm,
-                                    existing.name);
+                                    existing.name, state_.pendingMacros);
         savePreset(storage_, bank, slot, out);
         state_.dirty = false;
         state_.currentPresetName = existing.name;
@@ -140,6 +142,7 @@ void PresetEngine::confirmPrompt(uint64_t now_us) {
         state_.pendingStrum  = StrumParams::defaults();
         state_.pendingBass   = BassParams::defaults();
         state_.pendingRhythm = RhythmParams::defaults();
+        state_.pendingMacros = MacroConfig::defaults();
         savePreset(storage_, bank, slot, PresetSlot::defaults());
         state_.dirty = false;
         if (oldMode != state_.pendingChord.play_mode && modeChanged_) {
@@ -225,6 +228,7 @@ void PresetEngine::loadStartupPreset() {
     state_.pendingStrum  = stored.strum;
     state_.pendingBass   = stored.bass;
     state_.pendingRhythm = stored.rhythm;
+    state_.pendingMacros = stored.macros;
     state_.currentPresetName = stored.name;
     state_.dirty = false;
 }

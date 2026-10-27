@@ -95,6 +95,13 @@ class EditMenu(IntEnum):
     DRUM = 4
 
 
+class NumberKeyMode(IntEnum):
+    """Per-preset top-row number-key behaviour."""
+
+    STRUM = 0
+    MACRO = 1
+
+
 class ChordQuality(IntEnum):
     """Chord grid row quality."""
 
@@ -165,6 +172,11 @@ LED_TARGET_JSON: dict[LedTarget, str] = {
     LedTarget.NUM_LOCK: "num_lock",
 }
 
+NUMBER_KEY_MODE_JSON: dict[NumberKeyMode, str] = {
+    NumberKeyMode.STRUM: "strum",
+    NumberKeyMode.MACRO: "macro",
+}
+
 EDIT_MENU_JSON: dict[EditMenu, str] = {
     EditMenu.CHORD: "chord",
     EditMenu.STRUM: "strum",
@@ -186,6 +198,7 @@ STRUM_MODE_BY_JSON: dict[str, StrumMode] = _reverse(STRUM_MODE_JSON)
 SCALE_TYPE_BY_JSON: dict[str, ScaleType] = _reverse(SCALE_TYPE_JSON)
 LED_TARGET_BY_JSON: dict[str, LedTarget] = _reverse(LED_TARGET_JSON)
 EDIT_MENU_BY_JSON: dict[str, EditMenu] = _reverse(EDIT_MENU_JSON)
+NUMBER_KEY_MODE_BY_JSON: dict[str, NumberKeyMode] = _reverse(NUMBER_KEY_MODE_JSON)
 
 
 def parse_enum(name_to_member: dict[str, object], value, default: object):
@@ -226,3 +239,7 @@ def parse_scale_type(value) -> ScaleType:
 
 def parse_led_target(value) -> LedTarget:
     return parse_enum(LED_TARGET_BY_JSON, value, LedTarget.NUM_LOCK)
+
+
+def parse_number_key_mode(value) -> NumberKeyMode:
+    return parse_enum(NUMBER_KEY_MODE_BY_JSON, value, NumberKeyMode.STRUM)

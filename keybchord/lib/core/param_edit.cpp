@@ -642,6 +642,32 @@ int paramIntValue(const StateManager& s, ParamId id) {
         case ParamId::BassVelocity:     return s.pendingBass.velocity;
         case ParamId::BassChannel:      return s.pendingBass.channel;
         case ParamId::BassPattern:      return static_cast<int>(s.pendingBass.pattern);
+        case ParamId::DrumKickNote:     return s.pendingRhythm.drums.kick;
+        case ParamId::DrumKickVel:      return s.pendingRhythm.drums.kick_vel;
+        case ParamId::DrumSnareNote:    return s.pendingRhythm.drums.snare;
+        case ParamId::DrumSnareVel:     return s.pendingRhythm.drums.snare_vel;
+        case ParamId::DrumHihatNote:    return s.pendingRhythm.drums.hihat;
+        case ParamId::DrumHihatVel:     return s.pendingRhythm.drums.hihat_vel;
+        case ParamId::DrumOpenHatNote:  return s.pendingRhythm.drums.open_hat;
+        case ParamId::DrumOpenHatVel:   return s.pendingRhythm.drums.open_hat_vel;
+        case ParamId::DrumRimshotNote:  return s.pendingRhythm.drums.rimshot;
+        case ParamId::DrumRimshotVel:   return s.pendingRhythm.drums.rimshot_vel;
+        case ParamId::DrumClapNote:     return s.pendingRhythm.drums.clap;
+        case ParamId::DrumClapVel:      return s.pendingRhythm.drums.clap_vel;
+        case ParamId::DrumCrashNote:    return s.pendingRhythm.drums.crash;
+        case ParamId::DrumCrashVel:     return s.pendingRhythm.drums.crash_vel;
+        case ParamId::DrumRideNote:     return s.pendingRhythm.drums.ride;
+        case ParamId::DrumRideVel:      return s.pendingRhythm.drums.ride_vel;
+        case ParamId::DrumBongoNote:    return s.pendingRhythm.drums.bongo;
+        case ParamId::DrumBongoVel:     return s.pendingRhythm.drums.bongo_vel;
+        case ParamId::DrumCongaLoNote:  return s.pendingRhythm.drums.conga_lo;
+        case ParamId::DrumCongaLoVel:   return s.pendingRhythm.drums.conga_lo_vel;
+        case ParamId::DrumCongaHiNote:  return s.pendingRhythm.drums.conga_hi;
+        case ParamId::DrumCongaHiVel:   return s.pendingRhythm.drums.conga_hi_vel;
+        case ParamId::DrumClaveNote:    return s.pendingRhythm.drums.clave;
+        case ParamId::DrumClaveVel:     return s.pendingRhythm.drums.clave_vel;
+        case ParamId::DrumShakerNote:   return s.pendingRhythm.drums.shaker;
+        case ParamId::DrumShakerVel:    return s.pendingRhythm.drums.shaker_vel;
         default:                        return 0;
     }
 }
@@ -763,6 +789,111 @@ void paramSet(StateManager& state, ParamId id, int value) {
         case ParamId::BassPattern:
             state.pendingBass.pattern = static_cast<uint8_t>(clamp<int>(
                 value, 0, bassCount() - 1));
+            break;
+
+        case ParamId::DrumKickNote:
+            state.pendingRhythm.drums.kick = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_NOTE_MIN, param_bounds::DRUM_NOTE_MAX));
+            break;
+        case ParamId::DrumKickVel:
+            state.pendingRhythm.drums.kick_vel = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_VELOCITY_MIN, param_bounds::DRUM_VELOCITY_OFF));
+            break;
+        case ParamId::DrumSnareNote:
+            state.pendingRhythm.drums.snare = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_NOTE_MIN, param_bounds::DRUM_NOTE_MAX));
+            break;
+        case ParamId::DrumSnareVel:
+            state.pendingRhythm.drums.snare_vel = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_VELOCITY_MIN, param_bounds::DRUM_VELOCITY_OFF));
+            break;
+        case ParamId::DrumHihatNote:
+            state.pendingRhythm.drums.hihat = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_NOTE_MIN, param_bounds::DRUM_NOTE_MAX));
+            break;
+        case ParamId::DrumHihatVel:
+            state.pendingRhythm.drums.hihat_vel = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_VELOCITY_MIN, param_bounds::DRUM_VELOCITY_OFF));
+            break;
+        case ParamId::DrumOpenHatNote:
+            state.pendingRhythm.drums.open_hat = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_NOTE_MIN, param_bounds::DRUM_NOTE_MAX));
+            break;
+        case ParamId::DrumOpenHatVel:
+            state.pendingRhythm.drums.open_hat_vel = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_VELOCITY_MIN, param_bounds::DRUM_VELOCITY_OFF));
+            break;
+        case ParamId::DrumRimshotNote:
+            state.pendingRhythm.drums.rimshot = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_NOTE_MIN, param_bounds::DRUM_NOTE_MAX));
+            break;
+        case ParamId::DrumRimshotVel:
+            state.pendingRhythm.drums.rimshot_vel = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_VELOCITY_MIN, param_bounds::DRUM_VELOCITY_OFF));
+            break;
+        case ParamId::DrumClapNote:
+            state.pendingRhythm.drums.clap = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_NOTE_MIN, param_bounds::DRUM_NOTE_MAX));
+            break;
+        case ParamId::DrumClapVel:
+            state.pendingRhythm.drums.clap_vel = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_VELOCITY_MIN, param_bounds::DRUM_VELOCITY_OFF));
+            break;
+        case ParamId::DrumCrashNote:
+            state.pendingRhythm.drums.crash = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_NOTE_MIN, param_bounds::DRUM_NOTE_MAX));
+            break;
+        case ParamId::DrumCrashVel:
+            state.pendingRhythm.drums.crash_vel = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_VELOCITY_MIN, param_bounds::DRUM_VELOCITY_OFF));
+            break;
+        case ParamId::DrumRideNote:
+            state.pendingRhythm.drums.ride = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_NOTE_MIN, param_bounds::DRUM_NOTE_MAX));
+            break;
+        case ParamId::DrumRideVel:
+            state.pendingRhythm.drums.ride_vel = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_VELOCITY_MIN, param_bounds::DRUM_VELOCITY_OFF));
+            break;
+        case ParamId::DrumBongoNote:
+            state.pendingRhythm.drums.bongo = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_NOTE_MIN, param_bounds::DRUM_NOTE_MAX));
+            break;
+        case ParamId::DrumBongoVel:
+            state.pendingRhythm.drums.bongo_vel = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_VELOCITY_MIN, param_bounds::DRUM_VELOCITY_OFF));
+            break;
+        case ParamId::DrumCongaLoNote:
+            state.pendingRhythm.drums.conga_lo = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_NOTE_MIN, param_bounds::DRUM_NOTE_MAX));
+            break;
+        case ParamId::DrumCongaLoVel:
+            state.pendingRhythm.drums.conga_lo_vel = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_VELOCITY_MIN, param_bounds::DRUM_VELOCITY_OFF));
+            break;
+        case ParamId::DrumCongaHiNote:
+            state.pendingRhythm.drums.conga_hi = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_NOTE_MIN, param_bounds::DRUM_NOTE_MAX));
+            break;
+        case ParamId::DrumCongaHiVel:
+            state.pendingRhythm.drums.conga_hi_vel = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_VELOCITY_MIN, param_bounds::DRUM_VELOCITY_OFF));
+            break;
+        case ParamId::DrumClaveNote:
+            state.pendingRhythm.drums.clave = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_NOTE_MIN, param_bounds::DRUM_NOTE_MAX));
+            break;
+        case ParamId::DrumClaveVel:
+            state.pendingRhythm.drums.clave_vel = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_VELOCITY_MIN, param_bounds::DRUM_VELOCITY_OFF));
+            break;
+        case ParamId::DrumShakerNote:
+            state.pendingRhythm.drums.shaker = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_NOTE_MIN, param_bounds::DRUM_NOTE_MAX));
+            break;
+        case ParamId::DrumShakerVel:
+            state.pendingRhythm.drums.shaker_vel = static_cast<uint8_t>(clamp<int>(
+                value, param_bounds::DRUM_VELOCITY_MIN, param_bounds::DRUM_VELOCITY_OFF));
             break;
 
         default: break;

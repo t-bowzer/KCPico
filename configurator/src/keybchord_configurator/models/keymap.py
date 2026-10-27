@@ -39,7 +39,7 @@ KEYMAP_PARAM_NAMES: tuple[str, ...] = (
     "strum_octave", "strum_duration", "strum_velocity", "strum_layout",
     "strum_mode", "strum_root", "strum_scale",
     "tempo", "swing", "rhythm_pattern", "rhythm_mute", "rhythm_enable",
-    "rhythm_clock", "rhythm_led",
+    "rhythm_clock", "rhythm_led", "usb_midi",
     "bass_enable", "bass_octave", "bass_duration", "bass_velocity",
     "bass_channel", "bass_pattern",
 )
@@ -48,7 +48,7 @@ KEYMAP_PARAM_NAMES: tuple[str, ...] = (
 BOOL_PARAMS: frozenset[str] = frozenset(
     {
         "strum_layout", "rhythm_mute", "rhythm_enable",
-        "rhythm_clock", "rhythm_led", "bass_enable",
+        "rhythm_clock", "rhythm_led", "usb_midi", "bass_enable",
     }
 )
 

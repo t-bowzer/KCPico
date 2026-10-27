@@ -69,6 +69,11 @@ class MainWindow(QMainWindow):
             editor.changed.connect(self._mark_dirty)
 
         self.presets_editor.connect_signals()
+        self.presets_editor.presetSelectionChanged.connect(
+            self.keymap_editor.set_preset)
+        self.keymap_editor.presetSelectionChanged.connect(
+            self.presets_editor.select_preset)
+        self.tabs.currentChanged.connect(self._on_tab_changed)
         self.validator_view.validate_current_requested.connect(self._validate_current)
         self.backup_view.backup_requested.connect(self._backup)
         self.backup_view.restore_requested.connect(self._restore)
@@ -110,7 +115,15 @@ class MainWindow(QMainWindow):
         self.chordpattern_editor.set_tree(self._tree)
         self.keymap_editor.set_tree(self._tree)
         self.presets_editor.refresh_pattern_lists()
+        bank, slot = self.presets_editor.current_preset()
+        self.keymap_editor.set_preset(bank, slot)
         self._update_title()
+
+    def _on_tab_changed(self, index: int) -> None:
+        if index == self.tabs.indexOf(self.presets_editor):
+            self.presets_editor.refresh_macros()
+        elif index == self.tabs.indexOf(self.keymap_editor):
+            self.keymap_editor.refresh_macros()
 
     def _store_all(self) -> None:
         self.config_editor.store(self._tree.config)

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include "macros.h"
 #include "params.h"
 
 
@@ -20,13 +21,14 @@ struct PresetSlot {
     StrumParams strum;
     BassParams  bass;
     RhythmParams rhythm;
+    MacroConfig macros;
 
     static PresetSlot defaults();
     bool operator==(const PresetSlot& other) const;
     bool operator!=(const PresetSlot& other) const;
 
-    // True when every chord/strum/bass/rhythm field matches, ignoring the name
-    // (used for dirty-state tracking, FR-P11 / AC-20).
+    // True when every chord/strum/bass/rhythm/macro field matches, ignoring the
+    // name (used for dirty-state tracking, FR-P11 / AC-20).
     bool sameParams(const PresetSlot& other) const;
 };
 
@@ -40,7 +42,8 @@ PresetSlot   loadPresetOrDefault(StorageAdapter& storage, int bank, int slot);
 // caller; e.g. the stored slot's name when computing dirty state).
 PresetSlot makePreset(const ChordParams& chord, const StrumParams& strum,
                       const BassParams& bass, const RhythmParams& rhythm,
-                      const std::string& name);
+                      const std::string& name,
+                      const MacroConfig& macros = MacroConfig::defaults());
 
 // Parses a preset location string like "B3:P7" into 0-based bank/slot.
 // Returns false on malformed input or out-of-range values (1..10 / 1..8).

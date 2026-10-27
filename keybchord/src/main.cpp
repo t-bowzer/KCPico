@@ -256,6 +256,9 @@ void setup() {
     g_display->update(nowUs());
 
     g_editEngine = new EditEngine(g_state, *g_display);
+    g_strumEngine->setMacroTrigger([](uint8_t index, uint64_t now_us) {
+        if (g_editEngine) g_editEngine->triggerMacro(index, now_us);
+    });
     g_editEngine->setModeChangedCallback([]() { g_chordEngine->onModeChanged(); });
     g_editEngine->setArpModeChangedCallback([]() { g_chordEngine->onArpModeChanged(); });
     g_editEngine->setPatternChangedCallback([]() { g_rhythmEngine->onPatternChanged(); });

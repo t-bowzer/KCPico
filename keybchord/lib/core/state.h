@@ -47,6 +47,7 @@ public:
     StrumParams  pendingStrum;
     RhythmParams pendingRhythm;
     BassParams   pendingBass;
+    MacroConfig  pendingMacros;
 
     ChordParams  activeChord;
     StrumParams  activeStrum;

@@ -11,6 +11,7 @@ void StateManager::loadDefaults() {
     pendingStrum  = StrumParams::defaults();
     pendingRhythm = RhythmParams::defaults();
     pendingBass   = BassParams::defaults();
+    pendingMacros = MacroConfig::defaults();
     snapshotActive();
     config = AppConfig::defaults();
     keymap = KeymapConfig::defaults();

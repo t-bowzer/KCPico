@@ -31,11 +31,13 @@ from ..models.enums import (
 )
 from ..models.bounds import PARAM_SPECS
 from ..models.preset import DRUM_PIECES, PresetSlot
+from .macro_editor import MacroEditor
 from .widgets import bool_check, enum_combo, int_spin
 
 
 class PresetsEditor(QWidget):
     changed = Signal()
+    presetSelectionChanged = Signal(int, int)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -48,6 +50,22 @@ class PresetsEditor(QWidget):
     def set_tree(self, tree: ConfigTree) -> None:
         self._tree = tree
         self._refresh_bank_list()
+        self._refresh_slot_buttons()
+        self._load()
+
+    def current_preset(self) -> tuple[int, int]:
+        return self._bank, self._slot
+
+    def select_preset(self, bank: int, slot: int) -> None:
+        if self._tree is None:
+            return
+        bank = max(0, min(9, bank))
+        slot = max(0, min(7, slot))
+        self._bank = bank
+        self._slot = slot
+        self.bank_list.blockSignals(True)
+        self.bank_list.setCurrentRow(bank)
+        self.bank_list.blockSignals(False)
         self._refresh_slot_buttons()
         self._load()
 
@@ -85,6 +103,7 @@ class PresetsEditor(QWidget):
         self._build_bass_tab()
         self._build_rhythm_tab()
         self._build_drums_tab()
+        self._build_macros_tab()
         right.addWidget(self.tabs)
         layout.addLayout(right, 1)
 
@@ -201,6 +220,11 @@ class PresetsEditor(QWidget):
         scroll.setWidgetResizable(True)
         self.tabs.addTab(scroll, "Drums")
 
+    def _build_macros_tab(self) -> None:
+        self.macro_editor = MacroEditor()
+        self.macro_editor.changed.connect(self._on_macro_changed)
+        self.tabs.addTab(self.macro_editor, "Macros")
+
     def _form_widget(self):
         from PySide6.QtWidgets import QFormLayout
         box = QGroupBox()
@@ -244,11 +268,13 @@ class PresetsEditor(QWidget):
         self._slot = 0
         self._refresh_slot_buttons()
         self._load()
+        self.presetSelectionChanged.emit(self._bank, self._slot)
 
     def _on_slot_changed(self, slot: int) -> None:
         self._slot = slot
         self._refresh_slot_buttons()
         self._load()
+        self.presetSelectionChanged.emit(self._bank, self._slot)
 
     def _on_name_changed(self, text: str) -> None:
         slot = self._current_slot()
@@ -263,6 +289,21 @@ class PresetsEditor(QWidget):
         self._set_combo_names(self.rhythm_pattern, self._tree.rhythm_names())
         self._set_combo_names(self.bass_pattern, self._tree.bass_names())
         self._set_combo_names(self.chord_pattern, self._tree.chord_pattern_names())
+        self.macro_editor.set_names(
+            self._tree.rhythm_names(), self._tree.bass_names(),
+            self._tree.chord_pattern_names())
+
+    def refresh_macros(self) -> None:
+        if self._tree is None:
+            return
+        slot = self._current_slot()
+        if slot is None:
+            return
+        self.macro_editor.set_config(
+            slot.macros,
+            rhythm_names=self._tree.rhythm_names(),
+            bass_names=self._tree.bass_names(),
+            chord_pattern_names=self._tree.chord_pattern_names())
 
     def _set_combo_names(self, combo: QComboBox, names: list[str]) -> None:
         current = combo.currentText()
@@ -322,6 +363,8 @@ class PresetsEditor(QWidget):
             for key in self._drum_note_spins:
                 self._drum_note_spins[key].setValue(slot.rhythm.drums.notes[key])
                 self._drum_vel_spins[key].setValue(slot.rhythm.drums.velocities[key])
+
+            self.refresh_macros()
         finally:
             self._loading = False
 
@@ -398,3 +441,7 @@ class PresetsEditor(QWidget):
         self.store_current()
         self._refresh_slot_buttons()
         self.changed.emit()
+
+    def _on_macro_changed(self) -> None:
+        if not self._loading:
+            self.changed.emit()

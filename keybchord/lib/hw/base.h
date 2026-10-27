@@ -33,6 +33,11 @@ public:
     // enumerated. Used by the boot-key scan to know when the initial report (and
     // thus the held-keys state) has arrived. Default false (no report yet).
     virtual bool reportReceived() const { return false; }
+
+    // Whether the input backend itself has finished booting. Adapters that run
+    // on a coprocessor (CH559) report false until its first frame arrives, so
+    // the boot-key scan can wait for it. Default true (host-run backends).
+    virtual bool controllerReady() const { return true; }
 };
 
 class MidiOutAdapter {

@@ -17,6 +17,7 @@ public:
     bool setLed(uint8_t led_usage, bool on) override;
     bool connected() const override { return connected_; }
     bool reportReceived() const override { return reportReceived_; }
+    bool controllerReady() const override { return controllerReady_; }
 
 private:
     ch559::FrameParser      parser_;
@@ -25,5 +26,6 @@ private:
 
     bool    connected_ = false;
     bool    reportReceived_ = false;
+    bool    controllerReady_ = false;
     uint8_t led_state_ = 0;
 };

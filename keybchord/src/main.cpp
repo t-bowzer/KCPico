@@ -155,12 +155,22 @@ static BootMode detectBootMode() {
     constexpr uint8_t CTRL_MASK    = 0x11;  // LCtrl | RCtrl
     constexpr uint8_t HID_USAGE_ESC = 0x29;  // keyboard Escape
     constexpr uint64_t kSettleUs   = 300000ULL;  // grace after first report
-    uint64_t deadline = nowUs() + 2000000ULL;  // hard cap (no keyboard present)
+    constexpr uint64_t kControllerWaitUs = 3000000ULL;
+    constexpr uint64_t kReportWaitUs = 4000000ULL;
+    uint64_t controllerDeadline = nowUs() + kControllerWaitUs;
+    uint64_t reportDeadline = 0;
     uint64_t settleDeadline = 0;
+    bool controllerReady = false;
     bool reportSeen = false;
 
-    while (nowUs() < deadline) {
-        bool connected = g_adapters.input->connected();
+    while (true) {
+        uint64_t t = nowUs();
+        if (!controllerReady && g_adapters.input->controllerReady()) {
+            controllerReady = true;
+            reportDeadline = t + kReportWaitUs;
+        }
+        if (!controllerReady && t >= controllerDeadline) break;
+
         auto events = g_adapters.input->poll();
         for (const auto& ev : events) {
             if (!ev.pressed) continue;
@@ -175,11 +185,16 @@ static BootMode detectBootMode() {
         // Esc can arrive in a report right after the first one. Wait for the
         // first report, then keep scanning for a short settle grace before
         // concluding no boot key was held.
-        if (connected && g_adapters.input->reportReceived() && !reportSeen) {
+        if (!controllerReady && g_adapters.input->controllerReady()) {
+            controllerReady = true;
+            reportDeadline = nowUs() + kReportWaitUs;
+        }
+        if (g_adapters.input->reportReceived() && !reportSeen) {
             reportSeen = true;
             settleDeadline = nowUs() + kSettleUs;
         }
         if (reportSeen && nowUs() >= settleDeadline) break;
+        if (controllerReady && !reportSeen && nowUs() >= reportDeadline) break;
         delay(10);
     }
     return BootMode::None;

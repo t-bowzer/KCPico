@@ -15,6 +15,7 @@ static constexpr uint8_t CMD_LED = 0xED;
 bool InputCh559::begin() {
     Serial1.setTX(PIN_CH559_TX);
     Serial1.setRX(PIN_CH559_RX);
+    Serial1.setFIFOSize(2048);
     Serial1.begin(CH559_UART_BAUD, SERIAL_8N1);
     return true;
 }
@@ -26,6 +27,8 @@ std::vector<KeyEvent> InputCh559::poll() {
 
         ch559::Message msg;
         if (!parser_.feed(static_cast<uint8_t>(c), msg)) continue;
+
+        controllerReady_ = true;
 
         switch (msg.type) {
             case ch559::MSG_CONNECTED:
@@ -42,6 +45,7 @@ std::vector<KeyEvent> InputCh559::poll() {
                 // The CH559 firmware forces the boot protocol, so reports carry
                 // no report ID (report_id = 0).
                 if (msg.hid_usage == ch559::HID_USAGE_KEYBOARD) {
+                    connected_ = true;
                     reportReceived_ = true;
                     report_.apply(msg.payload.data(),
                                   static_cast<uint16_t>(msg.payload.size()),

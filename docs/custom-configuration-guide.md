@@ -231,7 +231,7 @@ do in this preset. The numpad is always the strum plate.
 | Key | Type | Default | Notes |
 |-----|------|---------|-------|
 | `number_keys` | string | `"strum"` | `"strum"` = top row strums; `"macro"` = top row triggers macros. |
-| `macros` | object | `{}` | Keyed by top-row label `"1"`…`"9"`, `"0"`; each value is an ordered command array. |
+| `macros` | object | `{}` | Keyed by top-row label `"1"`…`"9"`, `"0"`; each value is a macro object with an optional `name` and an ordered `commands` array. Legacy bare command arrays are still accepted. |
 
 Macro keys trigger on key-down (no modifiers); `Super+1`…`Super+8` still loads
 presets. A command is one of:
@@ -240,17 +240,28 @@ presets. A command is one of:
 {
   "number_keys": "macro",
   "macros": {
-    "1": [
-      { "type": "set", "param": "rhythm_mute", "value": "off" },
-      { "type": "drum_mute", "piece": "kick", "value": "on" },
-      { "type": "set", "param": "tempo", "value": 88 }
-    ],
-    "2": [
-      { "type": "toggle", "param": "rhythm_enable", "a": 1, "b": 0 }
-    ]
+    "1": {
+      "name": "Verse",
+      "commands": [
+        { "type": "set", "param": "rhythm_mute", "value": "off" },
+        { "type": "drum_mute", "piece": "kick", "value": "on" },
+        { "type": "set", "param": "tempo", "value": 88 }
+      ]
+    },
+    "2": {
+      "name": "Chorus",
+      "commands": [
+        { "type": "toggle", "param": "rhythm_enable", "a": 1, "b": 0 }
+      ]
+    }
   }
 }
 ```
+
+Macro names default to `M1`…`M9`, `M0` (matching the key labels) when `name` is
+missing or empty. Names are limited to 16 characters. When a macro key is
+pressed, the LCD shows `Macro <name> loaded` (or `Macro <name>` / `loaded` on
+two lines for longer names).
 
 | Command `type` | Fields | Notes |
 |----------------|--------|-------|
@@ -264,8 +275,8 @@ Limits: **16 commands per key** and **48 commands per preset**. The firmware
 truncates excess commands; the configurator rejects them. Parameter names and
 value strings match the keymap names in §4.3/§4.4, plus the per-drum parameters
 `drum_kick`, `drum_kick_vel`, … (note / velocity). The firmware writes macro
-values as integers, but `on`/`off`, enum names, and pattern names are accepted
-when editing by hand.
+values as integers, names as default or custom strings, but `on`/`off`, enum
+names, and pattern names are accepted when editing by hand.
 
 > On-device preset Save preserves the preset's macro configuration; Clear
 > resets it to `number_keys: "strum"` with no macros.

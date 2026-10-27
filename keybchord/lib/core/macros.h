@@ -44,12 +44,17 @@ struct MacroCommand {
 constexpr int MACRO_KEY_COUNT = 10;
 constexpr int MAX_MACRO_COMMANDS_PER_KEY = 16;
 constexpr int MAX_MACRO_COMMANDS_PER_PRESET = 48;
+constexpr int MAX_MACRO_NAME_LEN = 16;
 
 struct MacroConfig {
     NumberKeyMode numberKeys = NumberKeyMode::Strum;
+    std::string names[MACRO_KEY_COUNT];
     std::vector<MacroCommand> keys[MACRO_KEY_COUNT];
 
     static MacroConfig defaults();
+
+    // Stored name, or the built-in default ("M1".."M9","M0") when empty.
+    std::string nameFor(uint8_t index) const;
     bool operator==(const MacroConfig& other) const;
     bool operator!=(const MacroConfig& other) const { return !(*this == other); }
 

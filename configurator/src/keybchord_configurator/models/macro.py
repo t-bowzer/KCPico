@@ -22,6 +22,7 @@ NUMBER_KEY_LABELS: tuple[str, ...] = (
 
 MAX_MACRO_COMMANDS_PER_KEY = 16
 MAX_MACRO_COMMANDS_PER_PRESET = 48
+MAX_MACRO_NAME_LEN = 16
 
 MACRO_COMMAND_TYPES: tuple[str, ...] = (
     "set", "toggle", "cycle", "inc", "dec", "drum_mute",
@@ -91,14 +92,27 @@ class MacroCommand:
         return self.param or ""
 
 
+def default_macro_name(label: str) -> str:
+    return f"M{label}"
+
+
 @dataclass
 class MacroConfig:
     number_keys: NumberKeyMode = NumberKeyMode.STRUM
+    names: dict[str, str] = field(
+        default_factory=lambda: {
+            label: default_macro_name(label) for label in NUMBER_KEY_LABELS
+        }
+    )
     keys: dict[str, list[MacroCommand]] = field(default_factory=dict)
 
     @classmethod
     def defaults(cls) -> "MacroConfig":
         return cls()
+
+    def name_for(self, label: str) -> str:
+        name = self.names.get(label, "")
+        return name if name else default_macro_name(label)
 
     @classmethod
     def from_dict(cls, data: Any) -> "MacroConfig":
@@ -111,10 +125,19 @@ class MacroConfig:
             return cfg
         for label in NUMBER_KEY_LABELS:
             raw = macros.get(label)
-            if not isinstance(raw, list):
+            if isinstance(raw, list):
+                raw_commands = raw
+            elif isinstance(raw, dict):
+                raw_commands = raw.get("commands")
+                name = raw.get("name")
+                if isinstance(name, str) and name.strip():
+                    cfg.names[label] = name.strip()[:MAX_MACRO_NAME_LEN]
+            else:
+                continue
+            if not isinstance(raw_commands, list):
                 continue
             commands: list[MacroCommand] = []
-            for item in raw:
+            for item in raw_commands:
                 cmd = MacroCommand.from_dict(item)
                 if cmd.type == "drum_mute" and not cmd.piece:
                     continue
@@ -126,11 +149,16 @@ class MacroConfig:
         return cfg
 
     def to_dict(self) -> dict:
-        macros: dict[str, list[dict]] = {}
+        macros: dict[str, dict] = {}
         for label in NUMBER_KEY_LABELS:
-            commands = self.keys.get(label)
-            if commands:
-                macros[label] = [cmd.to_dict() for cmd in commands]
+            commands = self.keys.get(label, [])
+            name = self.name_for(label)
+            if not commands and name == default_macro_name(label):
+                continue
+            macros[label] = {
+                "name": name,
+                "commands": [cmd.to_dict() for cmd in commands],
+            }
         return {
             "number_keys": NUMBER_KEY_MODE_JSON[self.number_keys],
             "macros": macros,

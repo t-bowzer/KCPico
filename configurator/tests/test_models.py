@@ -128,6 +128,7 @@ def test_preset_macros_default_and_roundtrip():
     assert data["macros"] == {}
 
     slot.macros.number_keys = NumberKeyMode.MACRO
+    slot.macros.names["1"] = "Verse"
     slot.macros.keys["1"] = [
         MacroCommand(type="set", param="rhythm_mute", value="off"),
         MacroCommand(type="drum_mute", piece="kick", value="on"),
@@ -138,6 +139,8 @@ def test_preset_macros_default_and_roundtrip():
 
     loaded = PresetSlot.from_dict(slot.to_dict())
     assert loaded.macros.number_keys == NumberKeyMode.MACRO
+    assert loaded.macros.name_for("1") == "Verse"
+    assert loaded.macros.name_for("0") == "M0"
     assert len(loaded.macros.keys["1"]) == 2
     assert loaded.macros.keys["1"][0].param == "rhythm_mute"
     assert loaded.macros.keys["1"][1].piece == "kick"
@@ -150,3 +153,18 @@ def test_old_preset_without_macros_loads_defaults():
     slot = PresetSlot.from_dict({"name": "Old", "chord": {"velocity": 80}})
     assert slot.macros.number_keys == NumberKeyMode.STRUM
     assert slot.macros.keys == {}
+
+
+def test_legacy_macro_array_gets_default_name():
+    from keybchord_configurator.models.macro import MacroConfig
+    from keybchord_configurator.models.enums import NumberKeyMode
+
+    cfg = MacroConfig.from_dict({
+        "number_keys": "macro",
+        "macros": {
+            "1": [{"type": "set", "param": "tempo", "value": 88}],
+        },
+    })
+    assert cfg.number_keys == NumberKeyMode.MACRO
+    assert cfg.name_for("1") == "M1"
+    assert len(cfg.keys["1"]) == 1

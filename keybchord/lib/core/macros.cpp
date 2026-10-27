@@ -78,9 +78,17 @@ MacroConfig MacroConfig::defaults() {
 bool MacroConfig::operator==(const MacroConfig& other) const {
     if (numberKeys != other.numberKeys) return false;
     for (int i = 0; i < MACRO_KEY_COUNT; i++) {
+        if (names[i] != other.names[i]) return false;
         if (keys[i] != other.keys[i]) return false;
     }
     return true;
+}
+
+std::string MacroConfig::nameFor(uint8_t index) const {
+    if (index >= MACRO_KEY_COUNT) return "";
+    if (!names[index].empty()) return names[index];
+    const char* label = macroKeyLabel(index);
+    return label ? (std::string("M") + label) : "";
 }
 
 const std::vector<MacroCommand>& MacroConfig::commandsFor(uint8_t index) const {

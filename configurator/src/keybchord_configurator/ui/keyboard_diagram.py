@@ -555,9 +555,11 @@ class KeyboardDiagram(QWidget):
             commands = (self._macro_config.keys.get(spec.name, [])
                         if self._macro_config is not None else [])
             where = f" for {self._macro_preset_label}" if self._macro_preset_label else ""
+            name = (self._macro_config.name_for(spec.name)
+                    if self._macro_config is not None else spec.name)
             lines = [
                 f"{spec.label} ({spec.name})",
-                f"Per-preset macro{where} ({len(commands)} commands)",
+                f"Per-preset macro{where}: {name} ({len(commands)} commands)",
             ]
             if commands:
                 for command in commands:

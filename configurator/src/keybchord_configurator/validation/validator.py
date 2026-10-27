@@ -92,6 +92,7 @@ from ..models.macro import (
     DRUM_PIECE_KEYS,
     MAX_MACRO_COMMANDS_PER_KEY,
     MAX_MACRO_COMMANDS_PER_PRESET,
+    MAX_MACRO_NAME_LEN,
     MACRO_COMMAND_TYPES,
     NUMBER_KEY_LABELS,
 )
@@ -580,13 +581,30 @@ def _validate_macros(result: ValidationResult, where: str, slot: dict,
         return
 
     total = 0
-    for label, commands in macros.items():
+    for label, entry in macros.items():
         key_where = f"{where}.macros[{label}]"
         if label not in NUMBER_KEY_LABELS:
             result.add_error(f"{key_where}: unknown number key (use 1..9,0)")
-        if not isinstance(commands, list):
-            result.add_error(f"{key_where}: must be an array")
+
+        if isinstance(entry, list):
+            commands = entry
+        elif isinstance(entry, dict):
+            name = entry.get("name")
+            if name is not None:
+                if not _is_str(name):
+                    result.add_error(f"{key_where}: 'name' must be a string")
+                elif len(name) > MAX_MACRO_NAME_LEN:
+                    result.add_error(
+                        f"{key_where}: 'name' exceeds {MAX_MACRO_NAME_LEN} "
+                        f"characters")
+            commands = entry.get("commands", [])
+            if not isinstance(commands, list):
+                result.add_error(f"{key_where}.commands: must be an array")
+                continue
+        else:
+            result.add_error(f"{key_where}: must be an array or macro object")
             continue
+
         if len(commands) > MAX_MACRO_COMMANDS_PER_KEY:
             result.add_error(
                 f"{key_where}: {len(commands)} commands exceeds the "

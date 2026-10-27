@@ -10,9 +10,10 @@ device's mass-storage drive.
 
 - **Presets** — browse and edit all 10 banks × 8 slots (chord / strum / bass /
   rhythm / drum sections).
-- **Macros** — per-preset top-row number-key mode (strum or macro) and an ordered
-  macro-command editor (set/toggle/cycle/inc/dec and per-drum mute), with the
-  firmware's per-key and per-preset limits enforced.
+- **Macros** — per-preset top-row number-key mode (strum or macro), optional
+  macro names (default `M1`…`M9`, `M0`), and an ordered macro-command editor
+  (set/toggle/cycle/inc/dec and per-drum mute), with the firmware's per-key and
+  per-preset limits enforced.
 - **Rhythm editor** — step-grid editor for drum patterns (tracks × 16th-note
   steps) with velocity editing.
 - **Bass editor** — step-grid editor for bass patterns (chord-degree + sustain).

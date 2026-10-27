@@ -207,8 +207,27 @@ void parseMacroConfig(JsonObject obj, MacroConfig& cfg) {
     for (int i = 0; i < MACRO_KEY_COUNT; i++) {
         const char* label = macroKeyLabel(i);
         if (!label || !macros.containsKey(label)) continue;
-        if (!macros[label].is<JsonArray>()) continue;
-        for (JsonVariant cv : macros[label].as<JsonArray>()) {
+
+        auto entry = macros[label];
+        JsonArray commands;
+        if (entry.is<JsonArray>()) {
+            commands = entry.as<JsonArray>();
+        } else if (entry.is<JsonObject>()) {
+            auto macroObj = entry.as<JsonObject>();
+            if (macroObj["name"].is<const char*>()) {
+                std::string name = macroObj["name"].as<std::string>();
+                if (name.size() > MAX_MACRO_NAME_LEN) {
+                    name.resize(MAX_MACRO_NAME_LEN);
+                }
+                cfg.names[i] = name;
+            }
+            if (macroObj["commands"].is<JsonArray>()) {
+                commands = macroObj["commands"].as<JsonArray>();
+            }
+        }
+
+        if (commands.isNull()) continue;
+        for (JsonVariant cv : commands) {
             if (static_cast<int>(cfg.keys[i].size()) >= MAX_MACRO_COMMANDS_PER_KEY ||
                 total >= MAX_MACRO_COMMANDS_PER_PRESET) {
                 break;
@@ -271,9 +290,11 @@ void writeMacroConfig(JsonObject obj, const MacroConfig& cfg) {
     int total = 0;
     for (int i = 0; i < MACRO_KEY_COUNT; i++) {
         const char* label = macroKeyLabel(i);
-        if (!label || cfg.keys[i].empty()) continue;
+        if (!label || (cfg.keys[i].empty() && cfg.names[i].empty())) continue;
 
-        auto arr = macros[label].to<JsonArray>();
+        auto macroObj = macros[label].to<JsonObject>();
+        macroObj["name"] = cfg.names[i].empty() ? cfg.nameFor(i) : cfg.names[i];
+        auto arr = macroObj["commands"].to<JsonArray>();
         int perKey = 0;
         for (const auto& cmd : cfg.keys[i]) {
             if (perKey >= MAX_MACRO_COMMANDS_PER_KEY ||

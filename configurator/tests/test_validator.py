@@ -230,3 +230,33 @@ def test_macros_reject_unknown_number_key():
     )
     result = validate_preset_bank([data] * 8)
     assert any("unknown number key" in e for e in result.errors)
+
+
+def test_macro_object_with_name_is_valid():
+    data = _macro_slot(
+        number_keys="macro",
+        macros={
+            "1": {
+                "name": "Verse",
+                "commands": [
+                    {"type": "set", "param": "tempo", "value": 88},
+                ],
+            },
+        },
+    )
+    result = validate_preset_bank([data] * 8)
+    assert result.ok(), result.errors
+
+
+def test_macro_name_too_long_errors():
+    data = _macro_slot(
+        number_keys="macro",
+        macros={
+            "1": {
+                "name": "x" * 17,
+                "commands": [{"type": "set", "param": "tempo", "value": 88}],
+            },
+        },
+    )
+    result = validate_preset_bank([data] * 8)
+    assert any("'name' exceeds" in e for e in result.errors)

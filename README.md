@@ -16,8 +16,8 @@ out a DIN-5 connector — no computer required.
   and chord roll.
 - **Strum plate** — top-row number keys + numpad, with follow-chord / scale /
   piano note pools. Per preset, the top row can instead become **macro keys**.
-- **Macros** — each preset can map the top-row keys `1`–`0` to an ordered bundle
-  of parameter changes (set/toggle/cycle/inc/dec and per-drum mute).
+- **Macros** — each preset can map the top-row keys `1`–`0` to named, ordered
+  bundles of parameter changes (set/toggle/cycle/inc/dec and per-drum mute).
 - **Chord patterns** — 9 built-in polyphonic patterns (Block, Alberti, Pulse,
   …) played in lockstep with the rhythm, all editable as JSON (`/chordpatterns/`).
 - **Rhythm engine** — 12 built-in drum patterns (Rock, Waltz, Swing, Bossa Nova,

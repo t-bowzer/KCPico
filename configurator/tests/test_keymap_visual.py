@@ -208,6 +208,7 @@ def test_macro_display_helpers():
 
     cfg = MacroConfig()
     cfg.number_keys = NumberKeyMode.MACRO
+    cfg.names["1"] = "Verse"
     cfg.keys["1"] = [
         MacroCommand(type="set", param="tempo", value=88),
         MacroCommand(type="drum_mute", piece="kick", value="on"),
@@ -216,10 +217,10 @@ def test_macro_display_helpers():
     assert is_macro_key("1", cfg)
     assert not is_macro_key("Kp1", cfg)
     assert not is_macro_key("1", MacroConfig())
-    assert macro_key_cell_text(cfg, "1") == "2 cmds"
+    assert macro_key_cell_text(cfg, "1") == "Verse"
     assert macro_key_cell_text(cfg, "2") == "Macro"
     assert "Tempo" in macro_command_label(cfg.keys["1"][0]).short
     assert "mute" in macro_command_label(cfg.keys["1"][1]).short.lower()
-    assert "2 commands" in macro_key_summary(cfg, "1")
+    assert "Verse (2 commands)" in macro_key_summary(cfg, "1")
     assert "Per-preset macro" in describe_key(
         KEY_BY_NAME["1"], macro_config=cfg, preset_label="B1:P1")

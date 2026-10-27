@@ -207,9 +207,13 @@ void EditEngine::triggerMacro(uint8_t keyIndex, uint64_t now_us) {
     if (patternChanged && patternChanged_) patternChanged_();
     if (edited && anyEdit_) anyEdit_();
 
-    display_.showValue(std::string("Macro ") + label,
-                       std::to_string(commands.size()) + " settings",
-                       false, now_us);
+    std::string name = state_.pendingMacros.nameFor(keyIndex);
+    std::string loaded = "Macro " + name + " loaded";
+    if (loaded.size() <= 16) {
+        display_.showValue(loaded, "", false, now_us);
+    } else {
+        display_.showValue("Macro " + name, "loaded", false, now_us);
+    }
 }
 
 void EditEngine::toggleDrumMute(int slot, uint64_t now_us) {

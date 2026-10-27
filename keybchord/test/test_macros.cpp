@@ -25,12 +25,32 @@ MacroCommand command(MacroOp op, ParamId param, int16_t a = 0, int16_t b = 0) {
 } // namespace
 
 
+class MacroRecordingLcd : public LcdAdapter {
+public:
+    struct Frame {
+        std::string l1;
+        std::string l2;
+    };
+
+    bool begin() override { return true; }
+    void write(const std::string& l1, const std::string& l2) override {
+        frames.push_back({l1, l2});
+    }
+    void clear() override {}
+
+    std::vector<Frame> frames;
+};
+
+
 TEST(Macros, DefaultsAreStrumAndEmpty) {
     MacroConfig cfg = MacroConfig::defaults();
     EXPECT_EQ(cfg.numberKeys, NumberKeyMode::Strum);
     for (int i = 0; i < MACRO_KEY_COUNT; i++) {
         EXPECT_TRUE(cfg.keys[i].empty());
     }
+    EXPECT_EQ(cfg.nameFor(0), "M1");
+    EXPECT_EQ(cfg.nameFor(8), "M9");
+    EXPECT_EQ(cfg.nameFor(9), "M0");
 }
 
 TEST(Macros, KeyLabelsAndDrumPieces) {
@@ -50,6 +70,7 @@ TEST(Macros, PresetRoundTrip) {
 
     PresetSlot p = PresetSlot::defaults();
     p.macros.numberKeys = NumberKeyMode::Macro;
+    p.macros.names[0] = "Verse";
     p.macros.keys[0] = {
         command(MacroOp::Set, ParamId::RhythmMute, 0),
         command(MacroOp::Toggle, ParamId::RhythmEnable, 1, 0),
@@ -68,6 +89,8 @@ TEST(Macros, PresetRoundTrip) {
     PresetSlot loaded = loadPreset(storage, 0, 2);
 
     EXPECT_EQ(loaded.macros.numberKeys, NumberKeyMode::Macro);
+    EXPECT_EQ(loaded.macros.nameFor(0), "Verse");
+    EXPECT_EQ(loaded.macros.nameFor(9), "M0");
     ASSERT_EQ(loaded.macros.keys[0].size(), 5u);
     EXPECT_EQ(loaded.macros.keys[0][0].op, MacroOp::Set);
     EXPECT_EQ(loaded.macros.keys[0][0].param, ParamId::RhythmMute);
@@ -95,6 +118,17 @@ TEST(Macros, OldPresetLoadsAsStrumWithNoMacros) {
     for (int i = 0; i < MACRO_KEY_COUNT; i++) {
         EXPECT_TRUE(p.macros.keys[i].empty());
     }
+}
+
+TEST(Macros, LegacyArrayMacroGetsDefaultName) {
+    StorageStub storage;
+    storage.writeFile("/presets/bank1.json",
+        "[{\"number_keys\":\"macro\",\"macros\":{\"1\":["
+        "{\"type\":\"set\",\"param\":\"tempo\",\"value\":88}]}}]");
+
+    PresetSlot p = loadPreset(storage, 0, 0);
+    EXPECT_EQ(p.macros.nameFor(0), "M1");
+    ASSERT_EQ(p.macros.keys[0].size(), 1u);
 }
 
 TEST(Macros, LoadEnforcesPerKeyAndTotalCaps) {
@@ -153,6 +187,7 @@ protected:
         state_.loadDefaults();
         display_ = new DisplayManager(state_, lcd_);
         edit_ = new EditEngine(state_, *display_);
+        lcd_.frames.clear();
         modeChanged_ = 0;
         arpChanged_ = 0;
         patternChanged_ = 0;
@@ -167,7 +202,7 @@ protected:
     }
 
     StateManager state_;
-    NullLcdAdapter lcd_;
+    MacroRecordingLcd lcd_;
     DisplayManager* display_ = nullptr;
     EditEngine* edit_ = nullptr;
     int modeChanged_ = 0;
@@ -224,6 +259,36 @@ TEST_F(MacroTriggerTest, AppliesCycleIncAndDec) {
     EXPECT_EQ(state_.pendingRhythm.tempo, 101);
     EXPECT_EQ(patternChanged_, 0);
     EXPECT_EQ(arpChanged_, 0);
+}
+
+TEST_F(MacroTriggerTest, ShowsNamedMacroLoaded) {
+    state_.pendingMacros.names[0] = "Verse";
+    MacroCommand cmd;
+    cmd.op = MacroOp::Set;
+    cmd.param = ParamId::RhythmTempo;
+    cmd.valueA = 88;
+    state_.pendingMacros.keys[0].push_back(cmd);
+
+    edit_->triggerMacro(0, 0);
+    display_->update(0);
+
+    ASSERT_FALSE(lcd_.frames.empty());
+    EXPECT_EQ(lcd_.frames.back().l1.rfind("Macro Verse", 0), 0u);
+    EXPECT_EQ(lcd_.frames.back().l2.rfind("loaded", 0), 0u);
+}
+
+TEST_F(MacroTriggerTest, ShowsDefaultMacroNameLoaded) {
+    MacroCommand cmd;
+    cmd.op = MacroOp::Set;
+    cmd.param = ParamId::RhythmTempo;
+    cmd.valueA = 90;
+    state_.pendingMacros.keys[1].push_back(cmd);
+
+    edit_->triggerMacro(1, 0);
+    display_->update(0);
+
+    ASSERT_FALSE(lcd_.frames.empty());
+    EXPECT_EQ(lcd_.frames.back().l1.rfind("Macro M2 loaded", 0), 0u);
 }
 
 TEST_F(MacroTriggerTest, FiresCallbacksAfterApplyingAllCommands) {

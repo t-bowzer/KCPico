@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLineEdit,
     QListWidget,
     QPushButton,
     QTableWidget,
@@ -28,6 +29,7 @@ from ..models.macro import (
     MACRO_COMMAND_TYPES,
     MAX_MACRO_COMMANDS_PER_KEY,
     MAX_MACRO_COMMANDS_PER_PRESET,
+    MAX_MACRO_NAME_LEN,
     NUMBER_KEY_LABELS,
     MacroCommand,
     MacroConfig,
@@ -236,11 +238,20 @@ class MacroEditor(QWidget):
 
         body = QHBoxLayout()
         self.key_list = QListWidget()
-        self.key_list.setFixedWidth(120)
+        self.key_list.setFixedWidth(170)
         self.key_list.currentRowChanged.connect(self._on_key_changed)
         body.addWidget(self.key_list)
 
         right = QVBoxLayout()
+        name_row = QHBoxLayout()
+        name_row.addWidget(QLabel("Macro name:"))
+        self.name_edit = QLineEdit()
+        self.name_edit.setMaxLength(MAX_MACRO_NAME_LEN)
+        self.name_edit.textEdited.connect(self._on_name_changed)
+        self.name_edit.editingFinished.connect(self._normalize_name)
+        name_row.addWidget(self.name_edit, 1)
+        right.addLayout(name_row)
+
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(["Command", "Parameter", "Value", "Drum piece"])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
@@ -324,6 +335,29 @@ class MacroEditor(QWidget):
                 return
         self._edit_command()
 
+    def _on_name_changed(self, text: str) -> None:
+        if self._loading or self._config is None:
+            return
+        label = self._current_label()
+        if label is None:
+            return
+        self._config.names[label] = text.strip()[:MAX_MACRO_NAME_LEN]
+        row = self.key_list.currentRow()
+        if row >= 0:
+            count = len(self._config.keys.get(label, []))
+            name = self._config.name_for(label)
+            self.key_list.item(row).setText(f"{label}  {name} ({count})")
+        self.changed.emit()
+
+    def _normalize_name(self) -> None:
+        if self._loading or self._config is None:
+            return
+        label = self._current_label()
+        if label is None:
+            return
+        if not self._config.names.get(label):
+            self.name_edit.setText(self._config.name_for(label))
+
     def _current_label(self) -> Optional[str]:
         row = self.key_list.currentRow()
         if row < 0 or row >= len(NUMBER_KEY_LABELS):
@@ -355,12 +389,22 @@ class MacroEditor(QWidget):
         self.key_list.clear()
         for label in NUMBER_KEY_LABELS:
             count = len(self._config.keys.get(label, [])) if self._config else 0
-            self.key_list.addItem(f"{label}  ({count})")
+            name = self._config.name_for(label) if self._config else f"M{label}"
+            self.key_list.addItem(f"{label}  {name} ({count})")
         self.key_list.blockSignals(False)
         if 0 <= current < len(NUMBER_KEY_LABELS):
             self.key_list.setCurrentRow(current)
 
     def _refresh_table(self) -> None:
+        label = self._current_label()
+        self.name_edit.blockSignals(True)
+        self.name_edit.setText(
+            self._config.name_for(label)
+            if self._config is not None and label is not None else "")
+        self.name_edit.setEnabled(
+            self._config is not None and label is not None)
+        self.name_edit.blockSignals(False)
+
         commands = self._current_commands()
         self.table.setRowCount(len(commands))
         for row, cmd in enumerate(commands):

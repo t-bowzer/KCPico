@@ -23,6 +23,7 @@ from ..models.macro import (
     NUMBER_KEY_LABELS,
     MacroCommand,
     MacroConfig,
+    default_macro_name,
 )
 from ..models.preset import DRUM_PIECES
 
@@ -605,10 +606,11 @@ def macro_command_label(
 def macro_key_cell_text(macro_config: Optional[MacroConfig], label: str) -> str:
     if macro_config is None:
         return "Macro"
+    name = macro_config.name_for(label)
     count = len(macro_config.keys.get(label, []))
-    if count == 0:
+    if count == 0 and name == default_macro_name(label):
         return "Macro"
-    return f"{count} cmd" if count == 1 else f"{count} cmds"
+    return name
 
 
 def macro_key_summary(
@@ -631,7 +633,7 @@ def macro_key_summary(
             bass_names=bass_names,
             chord_pattern_names=chord_pattern_names,
         ).short
-    return f"{len(commands)} commands"
+    return f"{macro_config.name_for(label)} ({len(commands)} commands)"
 
 
 def combo_label(modifier: Optional[str], key: str) -> str:

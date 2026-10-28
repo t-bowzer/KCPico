@@ -8,8 +8,9 @@
 // and rhythms. The keyboard host remains on the separate PIO-USB port.
 //
 // Concurrency: while the host has the drive mounted the firmware must not write
-// to FatFS; on eject (Start-Stop load_eject) the FatFS cache is remounted so the
-// firmware sees the host's edits.
+// to FatFS; on eject (Start-Stop load_eject) the drive is withdrawn and a reboot
+// request is raised. The main loop performs the reboot so the firmware reloads
+// the host's edits from a clean state.
 class MscFatFs {
 public:
     // Registers the MSC interface and the read/write callbacks. Call after the
@@ -21,10 +22,14 @@ public:
     void setDriveEnabled(bool on);
     bool driveEnabled() const { return enabled_; }
 
+    // Returns true once after the host ejects the drive, then clears the flag.
+    bool takeEjectRequest();
+
 private:
     static MscFatFs* instance_;
 
     bool enabled_ = false;
+    volatile bool ejectRequested_ = false;
 
     static int32_t readCb(uint32_t lba, void* buffer, uint32_t bufsize);
     static int32_t writeCb(uint32_t lba, uint8_t* buffer, uint32_t bufsize);

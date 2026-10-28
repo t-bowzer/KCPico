@@ -38,7 +38,7 @@ bool keymapIsReserved(uint8_t hid_usage);
 char keymapCharForUsage(uint8_t hid_usage, uint8_t modifiers = 0);
 
 // A resolved key command. "Reserved" commands (ChordKey/Backtick/StrumKey/
-// ClearEdit/Panic) are hardcoded; everything else is data-driven from the
+// ClearEdit/Panic/FirmwareInfo) are hardcoded; everything else is data-driven from the
 // loaded keymap config (including the held extensions Ext9/Ext11/Ext13, which
 // map to the "ext" keymap action).
 enum class KeyCmd : uint8_t {
@@ -49,6 +49,7 @@ enum class KeyCmd : uint8_t {
     StrumKey,       // number-row / keypad strum key (layout applied in engine)
     ClearEdit,      // Esc (exits the edit menu / cancels)
     Panic,          // Super+Esc -> all-sound/notes-off all channels (FR-C11)
+    FirmwareInfo,   // Ctrl+Esc -> firmware version + git hash (debug)
     // Configurable:
     Ext9,           // held add9 modifier (default: Left arrow, FR-C7)
     Ext11,          // held add11 modifier (default: Down arrow, FR-C7)

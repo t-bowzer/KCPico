@@ -156,6 +156,28 @@ TEST_F(DisplayManagerTest, ShowValueRevertsToIdle) {
     EXPECT_EQ(lcd_.frames()[0].l1, pad("--" + sp(8) + "B1:P1"));
 }
 
+TEST_F(DisplayManagerTest, ShowInfoPersistsUntilCancelled) {
+    DisplayManager dm(state_, lcd_);
+    dm.showInfo("KC FW ver. 0.2.0", "de5562b");
+    dm.update(0);
+
+    ASSERT_EQ(lcd_.frames().size(), 1u);
+    EXPECT_EQ(lcd_.frames()[0].l1, pad("KC FW ver. 0.2.0"));
+    EXPECT_EQ(lcd_.frames()[0].l2, pad("de5562b"));
+
+    // No timeout: the info screen stays put.
+    lcd_.reset();
+    dm.update(60000000);
+    EXPECT_TRUE(lcd_.frames().empty());
+    EXPECT_TRUE(dm.infoVisible());
+
+    dm.cancel();
+    dm.update(0);
+    ASSERT_EQ(lcd_.frames().size(), 1u);
+    EXPECT_FALSE(dm.infoVisible());
+    EXPECT_EQ(lcd_.frames()[0].l1, pad("--" + sp(8) + "B1:P1"));
+}
+
 TEST_F(DisplayManagerTest, ShowPromptAndAutoCancel) {
     DisplayManager dm(state_, lcd_);
     dm.update(0);

@@ -18,6 +18,7 @@
 #include "perf.h"
 #include "debug_log.h"
 #include "msc_fatfs.h"
+#include "version.h"
 
 #ifdef KEYBCHORD_TEST_HOOK
 #include "test_hook.h"
@@ -93,6 +94,11 @@ static PerfStats g_latencyStats;      // Core 0 loop-processing time
 static PerfStats g_keyLatencyStats;   // HID report receipt -> MIDI dispatch
 static uint64_t  g_lastPerfLogUs = 0;
 static constexpr uint64_t kPerfLogIntervalUs = 5000000ULL;  // 5 s
+
+// Grace period after the host ejects the MSC drive. This lets the SCSI command
+// complete and the host finish its removal UI before the firmware reboots.
+static uint64_t g_ejectRebootAtUs = 0;
+static constexpr uint64_t kEjectRebootDelayUs = 1000000ULL;  // 1 s
 
 // Sets every target LED on/off; returns true if all SET_REPORTs were queued.
 static bool applyLedState(bool on) {
@@ -214,6 +220,20 @@ static void enterBootloader() {
     busy_wait_ms(50);
     reset_usb_boot(1u << LED_BUILTIN, 0);
     while (true) {}  // reset_usb_boot() is noreturn
+#endif
+}
+
+// Warm-reboot after an MSC eject so setup() reloads config/presets from the
+// files the host just wrote. Core 1 must be stopped first: loop1() feeds the
+// watchdog, which would otherwise keep the chip from resetting.
+static void rebootForReload() {
+#if defined(ARDUINO_ARCH_RP2040)
+    logInfo("MSC: rebooting to reload configuration");
+    multicore_reset_core1();
+    tud_disconnect();
+    busy_wait_ms(20);
+    rp2040.reboot();
+    while (true) {}  // rp2040.reboot() does not return
 #endif
 }
 
@@ -356,6 +376,23 @@ void loop() {
 
     uint64_t now_us = nowUs();
 
+    // MSC eject: the host has finished writing/removing the drive. Reboot after
+    // a short grace period so setup() reloads the edited files. Keep this before
+    // the keymap-error return so ejecting can recover a bad keymap too.
+    if (g_msc) {
+        if (g_msc->takeEjectRequest()) {
+            g_ejectRebootAtUs = now_us + kEjectRebootDelayUs;
+            logInfo("MSC: eject detected; reloading configuration");
+            if (g_display) {
+                g_display->showValue("USB ejected", "Rebooting...", false, now_us);
+                g_display->update(now_us);
+            }
+        }
+        if (g_ejectRebootAtUs != 0 && now_us >= g_ejectRebootAtUs) {
+            rebootForReload();
+        }
+    }
+
 #ifdef KEYBCHORD_TEST_HOOK
     if (g_testHook) g_testHook->poll(now_us);
 #endif
@@ -391,7 +428,25 @@ void loop() {
         logKeyEvent(ev.hid_usage, ev.pressed, ev.modifiers);
 
         if (ev.pressed) {
+            // Any new key dismisses the persistent firmware-info screen. The
+            // key itself is still processed normally below.
+            if (g_display && g_display->infoVisible()) {
+                g_display->cancel();
+            }
             KeyCmd t = g_keymap.resolve(ev.hid_usage, ev.modifiers).cmd;
+            // Ctrl+Esc: hard-coded debug screen (firmware version + git hash).
+            if (t == KeyCmd::FirmwareInfo) {
+                if (g_display) {
+                    std::string hash = keybchord::kGitHash;
+                    if (hash.size() > 8) hash.resize(8);
+                    g_display->showInfo(
+                        std::string("KC FW ver. ") + keybchord::kFirmwareVersion,
+                        hash);
+                    g_display->update(now_us);
+                }
+                logInfo("Firmware info shown");
+                continue;
+            }
             // Super+Esc: full panic, works from any state (prompt, cursor, menu).
             if (t == KeyCmd::Panic) {
                 handlePanic();

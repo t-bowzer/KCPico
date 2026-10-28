@@ -17,11 +17,12 @@ The filesystem is presented as a USB Mass Storage drive named **"KeybChord"**:
 1. Power the unit **off**.
 2. Hold **`Right Ctrl`** and power it **on** (keep holding until the drive appears).
 3. On your PC the **"KeybChord"** drive mounts. Edit/add files there.
-4. Eject the drive and power-cycle **without** holding `Ctrl`.
+4. Eject the drive. KeybChord detects the eject, reboots automatically, and
+   reloads the edited files. You do **not** need to power-cycle it.
 
 > The keyboard stays on the separate CH559 host coprocessor; the drive is on the
 > native USB port. While the drive is mounted the firmware must not write to the
-> filesystem, so preset Save/Clear is suppressed until you eject and reboot.
+> filesystem, so preset Save/Clear is suppressed until you eject (which reboots).
 
 ### Updating the firmware (enclosed build)
 

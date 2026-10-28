@@ -20,7 +20,8 @@ struct KeymapLoadResult;
 // built-in defaults when the file is missing). Only non-reserved keys (and
 // Super/Ctrl/Alt combos on non-reserved keys) may be bound; chord/strum keys,
 // backtick, Esc, the arrow keys, Enter/Backspace and the Super+1..8 preset-load
-// + Super+Esc panic combos are reserved and hardcoded in the resolver.
+// + Super+Esc panic and Ctrl+Esc firmware-info combos are reserved and
+// hardcoded in the resolver.
 class KeymapConfig {
 public:
     std::vector<KeyBinding> bindings;

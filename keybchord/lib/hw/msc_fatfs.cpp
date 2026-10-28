@@ -60,6 +60,12 @@ void MscFatFs::setDriveEnabled(bool on) {
     }
 }
 
+bool MscFatFs::takeEjectRequest() {
+    if (!ejectRequested_) return false;
+    ejectRequested_ = false;
+    return true;
+}
+
 int32_t MscFatFs::readCb(uint32_t lba, void* buffer, uint32_t bufsize) {
     uint16_t sectorSize = 512;
     fatfs::disk_ioctl(0, GET_SECTOR_SIZE, &sectorSize);
@@ -87,14 +93,15 @@ void MscFatFs::flushCb() {
 
 bool MscFatFs::startStopCb(uint8_t power_condition, bool start, bool load_eject) {
     (void)power_condition;
-    // load_eject && !start == the host ejected the drive. Remount FatFS so the
-    // firmware's cached FAT reflects any files the host wrote, and withdraw the
-    // drive (unit not-ready) so the host does not immediately re-mount it.
+    // load_eject && !start == the host ejected the drive. Raise a reboot request
+    // for the main loop (this runs in USB interrupt context) and withdraw the
+    // drive so the host does not immediately re-mount it.
     if (load_eject && !start) {
-        FatFS.end();
-        FatFS.begin();
-        if (instance_) instance_->setDriveEnabled(false);
-        logInfo("MSC: drive ejected, FatFS remounted");
+        if (instance_) {
+            instance_->ejectRequested_ = true;
+            instance_->setDriveEnabled(false);
+        }
+        logInfo("MSC: drive ejected; reboot requested");
     }
     return true;
 }

@@ -182,6 +182,13 @@ KeyAction KeymapResolver::resolve(uint8_t hid_usage, uint8_t modifiers) const {
         a.cmd = KeyCmd::Panic;
         return a;
     }
+    // Ctrl+Esc (either Ctrl) is a permanent debug shortcut, independent of the
+    // configurable keymap.
+    constexpr uint8_t CTRL_ANY_MASK = 0x11;  // LCtrl | RCtrl
+    if ((modifiers & CTRL_ANY_MASK) && hid_usage == HID_USAGE_ESC) {
+        a.cmd = KeyCmd::FirmwareInfo;
+        return a;
+    }
     if (super && isNumberRowStrum(hid_usage)) {
         int idx = static_cast<int>(hid_usage - NUMBER_ROW_STRUM_LO);  // 0..9
         if (idx < NUM_SLOTS) {

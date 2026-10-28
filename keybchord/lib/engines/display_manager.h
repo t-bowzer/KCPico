@@ -40,11 +40,16 @@ public:
     // errors, e.g. an invalid keymap.json).
     void showError(const std::string& line1, const std::string& line2);
 
+    // Persistent informational screen (firmware version/debug). Stays until
+    // cancel() is called, e.g. when the next key is pressed.
+    void showInfo(const std::string& line1, const std::string& line2);
+    bool infoVisible() const { return screen_ == Screen::Info; }
+
     // Return to idle (exiting a menu or cancelling a transient).
     void cancel();
 
 private:
-    enum class Screen : uint8_t { Idle, Menu, Edit, Prompt, NameEdit, Error };
+    enum class Screen : uint8_t { Idle, Menu, Edit, Prompt, NameEdit, Error, Info };
 
     StateManager& state_;
     LcdAdapter&   lcd_;
@@ -61,6 +66,8 @@ private:
     std::string nameEditText_;
     std::string errorLine1_;
     std::string errorLine2_;
+    std::string infoLine1_;
+    std::string infoLine2_;
 
     std::string lastLine1_;
     std::string lastLine2_;

@@ -77,8 +77,11 @@ On first boot the firmware self-provisions its config, presets, and rhythms.
 - `F1`–`F8` are quick settings; `F9`–`F12` open the Chord/Strum/Rhythm/Bass
   menus. `Home`/`End` browse presets, `Insert`→`Enter` saves, `Space` is tap
   tempo, `Super`+`Esc` is panic.
+- `Ctrl`+`Esc` shows the firmware version and current git commit (any key
+  dismisses the debug screen).
 - To edit config/presets/rhythms, power off, hold **Ctrl**, power on — the
-  "KeybChord" drive mounts on your PC.
+  "KeybChord" drive mounts on your PC. Ejecting the drive reboots KeybChord
+  automatically and reloads the edited files.
 
 ## Customization
 

@@ -76,6 +76,13 @@ void DisplayManager::showError(const std::string& line1, const std::string& line
     errorLine2_  = line2;
 }
 
+void DisplayManager::showInfo(const std::string& line1, const std::string& line2) {
+    screen_       = Screen::Info;
+    revertToMenu_ = false;
+    infoLine1_    = line1;
+    infoLine2_    = line2;
+}
+
 void DisplayManager::cancel() {
     screen_       = Screen::Idle;
     revertToMenu_ = false;
@@ -136,6 +143,10 @@ void DisplayManager::render(std::string& l1, std::string& l2, uint64_t now_us) c
         case Screen::Error:
             l1 = padTrunc(errorLine1_, kCols);
             l2 = padTrunc(errorLine2_, kCols);
+            break;
+        case Screen::Info:
+            l1 = padTrunc(infoLine1_, kCols);
+            l2 = padTrunc(infoLine2_, kCols);
             break;
         case Screen::Idle:
         default:

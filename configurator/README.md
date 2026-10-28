@@ -31,6 +31,7 @@ device's mass-storage drive.
   from one.
 - **Save to device or folder** — write directly to a mounted **"KeybChord"**
   drive, or any user-chosen directory, and optionally eject the drive after.
+  Ejecting reboots the KeybChord automatically so it reloads the new files.
 - **Startup device detection** — when a KeybChord volume is already mounted,
   the configurator offers to open it when it starts.
 

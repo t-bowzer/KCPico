@@ -193,6 +193,13 @@ TEST(Keymap, SuperEscIsPanic) {
     EXPECT_EQ(resolve(0x29, 0x80).cmd, KeyCmd::Panic);  // RGui
 }
 
+TEST(Keymap, CtrlEscShowsFirmwareInfo) {
+    EXPECT_EQ(resolve(0x29, CTRL).cmd, KeyCmd::FirmwareInfo);
+    EXPECT_EQ(resolve(0x29, 0x10).cmd, KeyCmd::FirmwareInfo);  // RCtrl
+    EXPECT_EQ(resolve(0x29, CTRL | SUPER).cmd, KeyCmd::Panic);
+    EXPECT_EQ(resolve(0x29, 0).cmd, KeyCmd::ClearEdit);
+}
+
 TEST(Keymap, SuperChordKeyIsInert) {
     EXPECT_EQ(resolve(0x14, SUPER).cmd, KeyCmd::None);  // Q
     EXPECT_EQ(resolve(0x1E, 0).cmd, KeyCmd::StrumKey);  // 1 without Super

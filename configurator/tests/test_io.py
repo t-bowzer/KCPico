@@ -16,6 +16,28 @@ def test_volume_name_match_is_case_insensitive():
     assert not device._matches_volume("")
 
 
+def test_eject_linux_powers_off_after_unmount(monkeypatch):
+    from keybchord_configurator.io import device
+    monkeypatch.setattr(device, "_IS_WINDOWS", False)
+    monkeypatch.setattr(device, "_IS_MAC", False)
+    monkeypatch.setattr(os.path, "exists", lambda _path: True)
+    monkeypatch.setattr(device, "_linux_block_device",
+                        lambda _path: "/dev/sdx")
+    calls = []
+
+    def fake_run(command):
+        calls.append(command)
+        return True, "ok"
+
+    monkeypatch.setattr(device, "_run_eject", fake_run)
+    ok, _message = device.eject("/media/user/KeybChord")
+    assert ok
+    assert calls == [
+        ["udisksctl", "unmount", "-b", "/dev/sdx"],
+        ["udisksctl", "power-off", "-b", "/dev/sdx"],
+    ]
+
+
 def test_device_display_path_windows_drive(monkeypatch):
     from keybchord_configurator.io import device
     monkeypatch.setattr(device, "_IS_WINDOWS", True)

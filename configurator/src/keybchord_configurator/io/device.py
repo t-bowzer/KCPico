@@ -120,12 +120,16 @@ def eject(path: str) -> tuple[bool, str]:
     if _IS_MAC:
         return _run_eject(["diskutil", "eject", path])
 
-    # Linux: prefer udisksctl, fall back to umount.
+    # Linux: prefer udisksctl, fall back to umount. A plain unmount does not send
+    # a SCSI eject, so ask udisks to power the device off afterwards; that is
+    # what raises the firmware's Start-Stop eject event and triggers its reboot.
     device = _linux_block_device(path)
     if device:
         ok, msg = _run_eject(["udisksctl", "unmount", "-b", device])
         if ok:
-            return True, msg
+            powered, power_msg = _run_eject(
+                ["udisksctl", "power-off", "-b", device])
+            return True, power_msg if powered else msg
     return _run_eject(["umount", path])
 
 

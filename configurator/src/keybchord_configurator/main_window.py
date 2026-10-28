@@ -337,7 +337,9 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Eject failed", str(exc))
             return
         if ok:
-            QMessageBox.information(self, "Ejected", message)
+            QMessageBox.information(
+                self, "Ejected",
+                f"{message}\n\nKeybChord will reboot to apply changes.")
         else:
             QMessageBox.warning(self, "Eject failed", message)
 

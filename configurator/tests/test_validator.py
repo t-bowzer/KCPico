@@ -301,3 +301,26 @@ def test_macro_name_too_long_errors():
     )
     result = validate_preset_bank([data] * 8)
     assert any("'name' exceeds" in e for e in result.errors)
+
+
+def test_media_keys_are_bindable():
+    from keybchord_configurator.models.keymap import CONSUMER_KEYS
+    for key in CONSUMER_KEYS:
+        data = {"bindings": [{"keys": [key], "action": {"type": "tap_tempo"}}]}
+        result = validate_keymap(data)
+        assert not any("unknown key" in e for e in result.errors), key
+
+
+def test_volume_keys_are_reserved():
+    for key in ("Mute", "VolumeUp", "VolumeDown"):
+        data = {"bindings": [{"keys": [key], "action": {"type": "tap_tempo"}}]}
+        result = validate_keymap(data)
+        assert any("reserved" in e for e in result.errors), key
+
+
+def test_media_keys_cannot_use_modifiers():
+    data = {"bindings": [
+        {"keys": ["Ctrl", "PlayPause"], "action": {"type": "tap_tempo"}},
+    ]}
+    result = validate_keymap(data)
+    assert any("media keys cannot use modifiers" in e for e in result.errors)

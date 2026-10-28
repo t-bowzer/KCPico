@@ -78,6 +78,7 @@ private:
     void commitName();
     void cancelNameEdit();
     bool handleNameEdit(const KeyEvent& ev);
+    bool isEnter(const KeyEvent& ev) const;
     std::string nameEditText() const;
     void peekCursorName();
 

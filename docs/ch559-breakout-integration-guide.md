@@ -137,7 +137,9 @@ Key changes from the upstream `atc1441/CH559sdccUSBHost` fork:
    `SER1_*`. Baud is `CH559_UART_BAUD` in `config.h`.
 2. **HID boot protocol** — during enumeration the firmware issues
    `SET_PROTOCOL = boot` so keyboards report the standard 8-byte boot format (no
-   report ID). See `setHidBootProtocol()` in `USBHost.c`.
+   report ID). See `setHidBootProtocol()` in `USBHost.c`. Consumer Control
+   interfaces (media/volume keys) are instead tagged `0x0C` in `DEVICE_POLL` so
+   the RP2040 can parse them from the forwarded HID report descriptor.
 3. **LED SET_REPORT relay** — the RP2040 sends `0xED` + 1 LED byte over UART1;
    `processUart()` (in `uart.c`) calls `setHidKeyboardLed()`, which issues a
    `SET_REPORT(output)` through `hostCtrlTransfer()` with the 1-byte LED report.

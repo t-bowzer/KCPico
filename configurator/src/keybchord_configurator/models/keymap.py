@@ -15,6 +15,18 @@ from .enums import EditMenu, EDIT_MENU_BY_JSON, EDIT_MENU_JSON
 # --- Key / modifier name tables (keymap_config.cpp) ------------------------
 MODIFIERS: tuple[str, ...] = ("Ctrl", "Alt", "Super")
 
+# Consumer/media keys bindable in keymap.json (firmware key table order).
+CONSUMER_KEYS: tuple[str, ...] = (
+    "PlayPause", "Stop", "PrevTrack", "NextTrack", "Rewind",
+    "FastForward", "Eject", "MediaSelect", "Mail", "Calculator",
+    "BrowserSearch", "BrowserHome", "BrowserBack", "BrowserForward",
+    "BrowserStop", "BrowserRefresh", "BrowserFavorites",
+)
+
+# Fixed consumer keys: volume controls and Mute (acts like Enter).
+VOLUME_KEYS: tuple[str, ...] = ("VolumeUp", "VolumeDown")
+FIXED_KEYS: tuple[str, ...] = VOLUME_KEYS + ("Mute",)
+
 # Bindable (non-reserved) keys, in the firmware's table order.
 BINDABLE_KEYS: tuple[str, ...] = (
     "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
@@ -22,12 +34,13 @@ BINDABLE_KEYS: tuple[str, ...] = (
     "Insert", "Home", "PgUp", "Delete", "End", "PgDn",
     "Space", "=", "-", "KpPlus", "KpMinus", "KpEnter",
     "Left", "Down", "Right", "Up",
-)
+) + CONSUMER_KEYS
 
 # Keys the firmware's name table knows but that are reserved (number-row strum
-# keys). They resolve to "key is reserved" rather than "unknown key".
+# keys and the fixed volume controls). They resolve to "key is reserved" rather
+# than "unknown key".
 RESERVED_NAMED_KEYS: frozenset[str] = frozenset(
-    {"1", "2", "3", "4", "5", "6", "7", "8"}
+    {"1", "2", "3", "4", "5", "6", "7", "8", *FIXED_KEYS}
 )
 
 # --- Parameter names (keymap_config.cpp kParamNames) -----------------------

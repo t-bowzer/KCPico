@@ -18,11 +18,13 @@ public:
     // Revert expired screens and render the current frame.
     void update(uint64_t now_us);
 
-    // Show a menu: title on line 1, selected parameter name on line 2.
-    void showMenu(const std::string& title, const std::string& paramName);
+    // Show a menu: title on line 1, highlighted parameter name on line 2.
+    // `selected` adds the "> " marker for the parameter being value-edited.
+    void showMenu(const std::string& title, const std::string& paramName,
+                  bool selected = false);
 
-    // Update the selected-parameter line while staying in the menu.
-    void selectParam(const std::string& paramName);
+    // Update the highlighted-parameter line while staying in the menu.
+    void selectParam(const std::string& paramName, bool selected = false);
 
     // Transient value screen (line1 = full name, line2 = value). If inMenu,
     // reverts to the menu screen after display_revert_ms; otherwise to idle.
@@ -60,6 +62,7 @@ private:
 
     std::string menuTitle_;
     std::string menuParamName_;
+    bool        menuParamSelected_ = false;
     std::string editFullName_;
     std::string editValue_;
     std::string promptText_;

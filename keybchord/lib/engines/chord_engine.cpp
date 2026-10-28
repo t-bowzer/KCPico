@@ -23,7 +23,7 @@ ChordEngine::ChordEngine(StateManager& state, MidiRouter& router)
     : state_(state), router_(router), keymap_(&state.keymap) {}
 
 void ChordEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
-    KeyAction a = keymap_.resolve(ev.hid_usage, ev.modifiers);
+    KeyAction a = keymap_.resolve(ev.hid_usage, ev.modifiers, ev.usage_page);
 
     switch (a.cmd) {
         case KeyCmd::ChordKey:

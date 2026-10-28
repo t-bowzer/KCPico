@@ -1,7 +1,10 @@
 #pragma once
 
+#include <array>
+
 #include "base.h"
 #include "ch559_protocol.h"
+#include "hid_consumer.h"
 #include "hid_report.h"
 
 
@@ -20,8 +23,11 @@ public:
     bool controllerReady() const override { return controllerReady_; }
 
 private:
+    static constexpr size_t kMaxHidDevices = 8;
+
     ch559::FrameParser      parser_;
     hid_report::BootReportParser report_;
+    std::array<hid_consumer::ReportParser, kMaxHidDevices> consumerParsers_;
     std::vector<KeyEvent>   eventQueue_;
 
     bool    connected_ = false;

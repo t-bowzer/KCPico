@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "hid_usage.h"
+
 // Debug log + MIDI monitor (NFR-8).
 //
 // Two independent gates:
@@ -33,7 +35,8 @@ inline void logInit() {
 #endif
 }
 
-inline void logKeyEvent(uint8_t usage, bool pressed, uint8_t mods) {
+inline void logKeyEvent(uint16_t usage, bool pressed, uint8_t mods,
+                        uint8_t page = hid_usage::PAGE_KEYBOARD) {
 #if KB_LOG_ON
     if (!g_debugLogEnabled) return;
     unsigned long t = millis();
@@ -41,7 +44,9 @@ inline void logKeyEvent(uint8_t usage, bool pressed, uint8_t mods) {
     Serial.print(t);
     Serial.print("] KEY ");
     Serial.print(pressed ? "DN " : "UP ");
-    Serial.print("usage=0x");
+    Serial.print("page=0x");
+    Serial.print(page, HEX);
+    Serial.print(" usage=0x");
     Serial.print(usage, HEX);
     Serial.print(" mods=0x");
     Serial.println(mods, HEX);

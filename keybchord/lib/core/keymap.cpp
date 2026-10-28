@@ -124,34 +124,50 @@ bool KeymapResolver::isSuper(uint8_t modifiers) {
     return (modifiers & SUPER) != 0;
 }
 
-bool keymapIsReserved(uint8_t hid_usage) {
-    if (KeymapResolver::isChordKey(hid_usage)) return true;
-    if (isNumberRowStrum(hid_usage) || isKeypadStrum(hid_usage)) return true;
-    switch (hid_usage) {
+bool keymapIsReserved(uint16_t usage_code, uint8_t usage_page) {
+    if (usage_page == hid_usage::PAGE_CONSUMER) {
+        return usage_code == hid_usage::CONSUMER_MUTE ||
+               usage_code == hid_usage::CONSUMER_VOLUME_UP ||
+               usage_code == hid_usage::CONSUMER_VOLUME_DOWN;
+    }
+    if (usage_page != hid_usage::PAGE_KEYBOARD) return false;
+    if (usage_code > 0xFF) return false;
+
+    uint8_t usage = static_cast<uint8_t>(usage_code);
+    if (KeymapResolver::isChordKey(usage)) return true;
+    if (isNumberRowStrum(usage) || isKeypadStrum(usage)) return true;
+    switch (usage) {
         case HID_USAGE_BACKTICK:
         case HID_USAGE_ESC:
         case HID_USAGE_ENTER:
         case HID_USAGE_BACKSPACE:
+        case hid_usage::KEYBOARD_MUTE:
+        case hid_usage::KEYBOARD_VOLUME_UP:
+        case hid_usage::KEYBOARD_VOLUME_DOWN:
             return true;
         default:
             return false;
     }
 }
 
-char keymapCharForUsage(uint8_t hid_usage, uint8_t modifiers) {
+char keymapCharForUsage(uint16_t usage_code, uint8_t modifiers,
+                        uint8_t usage_page) {
+    if (usage_page != hid_usage::PAGE_KEYBOARD || usage_code > 0xFF) return '\0';
+
     constexpr uint8_t SHIFT_MASK = 0x22;  // LShift 0x02 | RShift 0x20
     bool shift = (modifiers & SHIFT_MASK) != 0;
+    uint8_t usage8 = static_cast<uint8_t>(usage_code);
 
-    switch (hid_usage) {
+    switch (usage8) {
         // Letters a..z (0x04..0x1D) -> lowercase / uppercase with Shift.
         case 0x04 ... 0x1D:
-            return static_cast<char>((shift ? 'A' : 'a') + (hid_usage - 0x04));
+            return static_cast<char>((shift ? 'A' : 'a') + (usage8 - 0x04));
         // Number row 1..9,0 (0x1E..0x27) -> digits / ! @ # $ % ^ & * ( ).
         case 0x1E ... 0x27: {
             static const char kNumShift[10] = {
                 '!', '@', '#', '$', '%', '^', '&', '*', '(', ')',
             };
-            int idx = hid_usage - 0x1E;  // 0..9
+            int idx = usage8 - 0x1E;  // 0..9
             char digit = (idx == 9) ? '0' : static_cast<char>('1' + idx);
             return shift ? kNumShift[idx] : digit;
         }
@@ -172,25 +188,66 @@ char keymapCharForUsage(uint8_t hid_usage, uint8_t modifiers) {
     }
 }
 
-KeyAction KeymapResolver::resolve(uint8_t hid_usage, uint8_t modifiers) const {
+KeyAction KeymapResolver::resolve(uint16_t usage_code, uint8_t modifiers,
+                                 uint8_t usage_page) const {
     KeyAction a;
+
+    // Consumer/media keys have no modifier byte. Volume Up/Down are permanent
+    // hard-coded controls and cannot be overridden by keymap.json.
+    if (usage_page == hid_usage::PAGE_CONSUMER) {
+        if (usage_code == hid_usage::CONSUMER_MUTE) {
+            a.cmd = KeyCmd::Enter;
+            return a;
+        }
+        if (usage_code == hid_usage::CONSUMER_VOLUME_UP) {
+            a.cmd = KeyCmd::VolumeUp;
+            return a;
+        }
+        if (usage_code == hid_usage::CONSUMER_VOLUME_DOWN) {
+            a.cmd = KeyCmd::VolumeDown;
+            return a;
+        }
+        if (keymap_) {
+            const KeyAction* found = keymap_->find(0, usage_page, usage_code);
+            if (found) return *found;
+        }
+        return a;
+    }
+    if (usage_page != hid_usage::PAGE_KEYBOARD) return a;
+
+    // Some keyboards expose mute/volume keys on the Keyboard/Keypad page; treat
+    // them as the same permanent controls.
+    if (usage_code == hid_usage::KEYBOARD_MUTE) {
+        a.cmd = KeyCmd::Enter;
+        return a;
+    }
+    if (usage_code == hid_usage::KEYBOARD_VOLUME_UP) {
+        a.cmd = KeyCmd::VolumeUp;
+        return a;
+    }
+    if (usage_code == hid_usage::KEYBOARD_VOLUME_DOWN) {
+        a.cmd = KeyCmd::VolumeDown;
+        return a;
+    }
+
+    uint8_t usage = static_cast<uint8_t>(usage_code);
     uint8_t combo = keymapComboMask(modifiers);
     bool super = (combo & KMOD_SUPER) != 0;
 
     // Hardcoded safety combos on reserved keys (always win).
-    if (super && hid_usage == HID_USAGE_ESC) {
+    if (super && usage == HID_USAGE_ESC) {
         a.cmd = KeyCmd::Panic;
         return a;
     }
     // Ctrl+Esc (either Ctrl) is a permanent debug shortcut, independent of the
     // configurable keymap.
     constexpr uint8_t CTRL_ANY_MASK = 0x11;  // LCtrl | RCtrl
-    if ((modifiers & CTRL_ANY_MASK) && hid_usage == HID_USAGE_ESC) {
+    if ((modifiers & CTRL_ANY_MASK) && usage == HID_USAGE_ESC) {
         a.cmd = KeyCmd::FirmwareInfo;
         return a;
     }
-    if (super && isNumberRowStrum(hid_usage)) {
-        int idx = static_cast<int>(hid_usage - NUMBER_ROW_STRUM_LO);  // 0..9
+    if (super && isNumberRowStrum(usage)) {
+        int idx = static_cast<int>(usage - NUMBER_ROW_STRUM_LO);  // 0..9
         if (idx < NUM_SLOTS) {
             a.cmd  = KeyCmd::PresetLoad;
             a.slot = static_cast<uint8_t>(idx);
@@ -205,13 +262,13 @@ KeyAction KeymapResolver::resolve(uint8_t hid_usage, uint8_t modifiers) const {
     // and leave the chord engine latched. Super is the preset/panic modifier
     // where play keys stay inert (and the Super+Esc/Num combos above win).
     GridCell cell;
-    if (lookupChordKey(hid_usage, cell)) {
+    if (lookupChordKey(usage, cell)) {
         if (super) return a;                 // Super+chord -> None
         a.cmd  = KeyCmd::ChordKey;
         a.cell = cell;
         return a;
     }
-    if (hid_usage == HID_USAGE_BACKTICK) {
+    if (usage == HID_USAGE_BACKTICK) {
         if (super) return a;
         a.cmd = KeyCmd::Backtick;
         return a;
@@ -221,17 +278,17 @@ KeyAction KeymapResolver::resolve(uint8_t hid_usage, uint8_t modifiers) const {
     // held (they are held modifiers — releasing one mid-combo must still
     // resolve, or the extension would latch). Super still suppresses them.
     // Defaults are add9/add11/add13.
-    if (hid_usage == HID_USAGE_LEFT || hid_usage == HID_USAGE_DOWN ||
-        hid_usage == HID_USAGE_RIGHT) {
+    if (usage == HID_USAGE_LEFT || usage == HID_USAGE_DOWN ||
+        usage == HID_USAGE_RIGHT) {
         if (super) return a;
         if (keymap_) {
-            const KeyAction* found = keymap_->find(0, hid_usage);
+            const KeyAction* found = keymap_->find(0, hid_usage::PAGE_KEYBOARD, usage);
             if (found) return *found;
         }
         return a;
     }
-    if (hid_usage == HID_USAGE_ESC)   { if (!super) a.cmd = KeyCmd::ClearEdit; return a; }
-    if (isNumberRowStrum(hid_usage) || isKeypadStrum(hid_usage)) {
+    if (usage == HID_USAGE_ESC)   { if (!super) a.cmd = KeyCmd::ClearEdit; return a; }
+    if (isNumberRowStrum(usage) || isKeypadStrum(usage)) {
         if (super) return a;
         a.cmd = KeyCmd::StrumKey;
         return a;
@@ -239,7 +296,7 @@ KeyAction KeymapResolver::resolve(uint8_t hid_usage, uint8_t modifiers) const {
 
     // Configurable: lookup the (combo, usage) in the keymap table.
     if (keymap_) {
-        const KeyAction* found = keymap_->find(combo, hid_usage);
+        const KeyAction* found = keymap_->find(combo, hid_usage::PAGE_KEYBOARD, usage);
         if (found) return *found;
     }
 

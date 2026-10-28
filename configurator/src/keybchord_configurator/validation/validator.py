@@ -81,6 +81,7 @@ from ..models.keymap import (
     ACTION_TYPES,
     BINDABLE_KEYS,
     BOOL_PARAMS,
+    CONSUMER_KEYS,
     KEYMAP_PARAM_NAMES,
     MODIFIERS,
     PARAM_VALUE_TABLE,
@@ -244,6 +245,9 @@ def validate_keymap(data: Any, *, rhythm_names: Optional[list[str]] = None,
             continue
         if key in RESERVED_NAMED_KEYS:
             result.add_error(f"{where}: key is reserved")
+            continue
+        if mods is not None and key in CONSUMER_KEYS:
+            result.add_error(f"{where}: media keys cannot use modifiers")
             continue
 
         pair = (mods, key)

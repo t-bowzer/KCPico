@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "hid_usage.h"
 #include "params.h"
 
 
@@ -29,13 +30,15 @@ uint8_t keymapComboMask(uint8_t hid_modifiers);
 
 // True if the HID usage is a reserved key that may not be rebound in the
 // keymap config (chord-grid, strum, backtick, Esc, Enter/Backspace).
-bool keymapIsReserved(uint8_t hid_usage);
+bool keymapIsReserved(uint16_t hid_usage,
+                      uint8_t usage_page = hid_usage::PAGE_KEYBOARD);
 
 // Character produced by a keyboard key for preset name text-entry, or '\0' if
 // the usage is not a printable text-entry key. `modifiers` is the raw HID
 // modifier byte; holding Shift (left 0x02 / right 0x20) yields the shifted
 // character (uppercase letters, number-row symbols). Tab and Space map to ' '.
-char keymapCharForUsage(uint8_t hid_usage, uint8_t modifiers = 0);
+char keymapCharForUsage(uint16_t hid_usage, uint8_t modifiers = 0,
+                        uint8_t usage_page = hid_usage::PAGE_KEYBOARD);
 
 // A resolved key command. "Reserved" commands (ChordKey/Backtick/StrumKey/
 // ClearEdit/Panic/FirmwareInfo) are hardcoded; everything else is data-driven from the
@@ -50,6 +53,7 @@ enum class KeyCmd : uint8_t {
     ClearEdit,      // Esc (exits the edit menu / cancels)
     Panic,          // Super+Esc -> all-sound/notes-off all channels (FR-C11)
     FirmwareInfo,   // Ctrl+Esc -> firmware version + git hash (debug)
+    Enter,          // fixed Mute key -> same as pressing Enter
     // Configurable:
     Ext9,           // held add9 modifier (default: Left arrow, FR-C7)
     Ext11,          // held add11 modifier (default: Down arrow, FR-C7)
@@ -69,6 +73,8 @@ enum class KeyCmd : uint8_t {
     PresetSave,     // save prompt (FR-P6)
     PresetClear,    // clear prompt (FR-P7)
     TapTempo,       // tap tempo (sets rhythm tempo)
+    VolumeUp,       // hard-coded Consumer Volume Increment (tempo / menu value)
+    VolumeDown,     // hard-coded Consumer Volume Decrement (tempo / menu value)
     COUNT
 };
 
@@ -91,8 +97,10 @@ public:
     // non-reserved key (no configurable bindings).
     explicit KeymapResolver(const KeymapConfig* keymap = nullptr);
 
-    // Maps a raw HID usage (plus modifier byte) to a semantic action.
-    KeyAction resolve(uint8_t hid_usage, uint8_t modifiers) const;
+    // Maps a raw HID usage (plus modifier byte and usage page) to a semantic
+    // action. Keyboard-page usages default when `usage_page` is omitted.
+    KeyAction resolve(uint16_t hid_usage, uint8_t modifiers,
+                      uint8_t usage_page = hid_usage::PAGE_KEYBOARD) const;
 
     // True if the usage is one of the 36 chord-grid keys (incl. Tab/Caps/Shift/[ /').
     static bool isChordKey(uint8_t hid_usage);

@@ -12,8 +12,9 @@ KeymapResolver& defaultResolver() {
     return r;
 }
 
-KeyAction resolve(uint8_t usage, uint8_t mods = 0) {
-    return defaultResolver().resolve(usage, mods);
+KeyAction resolve(uint16_t usage, uint8_t mods = 0,
+                  uint8_t page = hid_usage::PAGE_KEYBOARD) {
+    return defaultResolver().resolve(usage, mods, page);
 }
 
 void expectGridCell(uint8_t usage, ChordQuality quality, int column) {
@@ -311,6 +312,9 @@ TEST(Keymap, ReservedFlag) {
     EXPECT_TRUE(keymapIsReserved(0x35));   // backtick
     EXPECT_TRUE(keymapIsReserved(0x29));   // Esc
     EXPECT_TRUE(keymapIsReserved(0x28));   // Enter
+    EXPECT_TRUE(keymapIsReserved(hid_usage::KEYBOARD_MUTE));
+    EXPECT_TRUE(keymapIsReserved(hid_usage::CONSUMER_MUTE,
+                                 hid_usage::PAGE_CONSUMER));
     EXPECT_FALSE(keymapIsReserved(0x50));  // Left (now bindable)
     EXPECT_FALSE(keymapIsReserved(0x51));  // Down (now bindable)
     EXPECT_FALSE(keymapIsReserved(0x4F));  // Right (now bindable)
@@ -371,4 +375,85 @@ TEST(Keymap, CharForUsageShifted) {
     EXPECT_EQ(keymapCharForUsage(0x04, 0x01), 'a');
     EXPECT_EQ(keymapCharForUsage(0x04, 0x04), 'a');
     EXPECT_EQ(keymapCharForUsage(0x04, 0x08), 'a');
+}
+
+TEST(Keymap, MuteActsLikeEnter) {
+    EXPECT_EQ(resolve(hid_usage::CONSUMER_MUTE, 0,
+                      hid_usage::PAGE_CONSUMER).cmd,
+              KeyCmd::Enter);
+    EXPECT_EQ(resolve(hid_usage::KEYBOARD_MUTE).cmd, KeyCmd::Enter);
+}
+
+TEST(Keymap, ConsumerVolumeKeysAreHardcoded) {
+    EXPECT_EQ(resolve(hid_usage::CONSUMER_VOLUME_UP, 0,
+                      hid_usage::PAGE_CONSUMER).cmd,
+              KeyCmd::VolumeUp);
+    EXPECT_EQ(resolve(hid_usage::CONSUMER_VOLUME_DOWN, 0,
+                      hid_usage::PAGE_CONSUMER).cmd,
+              KeyCmd::VolumeDown);
+    EXPECT_EQ(resolve(hid_usage::KEYBOARD_VOLUME_UP).cmd, KeyCmd::VolumeUp);
+    EXPECT_EQ(resolve(hid_usage::KEYBOARD_VOLUME_DOWN).cmd, KeyCmd::VolumeDown);
+}
+
+TEST(Keymap, ConsumerVolumeCannotBeOverridden) {
+    KeymapConfig cfg = KeymapConfig::defaults();
+    KeyBinding kb;
+    kb.usagePage = hid_usage::PAGE_CONSUMER;
+    kb.usage = hid_usage::CONSUMER_VOLUME_UP;
+    kb.action.cmd = KeyCmd::TapTempo;
+    cfg.bindings.push_back(kb);
+    KeymapResolver resolver(&cfg);
+
+    EXPECT_EQ(resolver.resolve(hid_usage::CONSUMER_VOLUME_UP, 0,
+                               hid_usage::PAGE_CONSUMER).cmd,
+              KeyCmd::VolumeUp);
+}
+
+TEST(Keymap, ConsumerMuteCannotBeOverridden) {
+    KeymapConfig cfg = KeymapConfig::defaults();
+    KeyBinding kb;
+    kb.usagePage = hid_usage::PAGE_CONSUMER;
+    kb.usage = hid_usage::CONSUMER_MUTE;
+    kb.action.cmd = KeyCmd::TapTempo;
+    cfg.bindings.push_back(kb);
+    KeymapResolver resolver(&cfg);
+
+    EXPECT_EQ(resolver.resolve(hid_usage::CONSUMER_MUTE, 0,
+                               hid_usage::PAGE_CONSUMER).cmd,
+              KeyCmd::Enter);
+}
+
+TEST(Keymap, ConsumerKeysResolveThroughKeymap) {
+    KeymapConfig cfg = KeymapConfig::defaults();
+    KeyBinding kb;
+    kb.usagePage = hid_usage::PAGE_CONSUMER;
+    kb.usage = hid_usage::CONSUMER_PLAY_PAUSE;
+    kb.action.cmd = KeyCmd::CycleParam;
+    kb.action.param = ParamId::ChordMode;
+    cfg.bindings.push_back(kb);
+    KeymapResolver resolver(&cfg);
+
+    KeyAction a = resolver.resolve(hid_usage::CONSUMER_PLAY_PAUSE, 0,
+                                   hid_usage::PAGE_CONSUMER);
+    EXPECT_EQ(a.cmd, KeyCmd::CycleParam);
+    EXPECT_EQ(a.param, ParamId::ChordMode);
+}
+
+TEST(Keymap, ConsumerKeysDoNotResolveAsKeyboard) {
+    KeymapConfig cfg = KeymapConfig::defaults();
+    KeyBinding kb;
+    kb.usagePage = hid_usage::PAGE_CONSUMER;
+    kb.usage = hid_usage::CONSUMER_PLAY_PAUSE;
+    kb.action.cmd = KeyCmd::TapTempo;
+    cfg.bindings.push_back(kb);
+    KeymapResolver resolver(&cfg);
+
+    EXPECT_EQ(resolver.resolve(hid_usage::CONSUMER_PLAY_PAUSE, 0).cmd,
+              KeyCmd::None);
+}
+
+TEST(Keymap, ConsumerKeysProduceNoText) {
+    EXPECT_EQ(keymapCharForUsage(hid_usage::CONSUMER_PLAY_PAUSE, 0,
+                                 hid_usage::PAGE_CONSUMER),
+              '\0');
 }

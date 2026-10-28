@@ -9,6 +9,7 @@ from keybchord_configurator.models.keymap import (
     default_keymap,
 )
 from keybchord_configurator.ui.keymap_visual import (
+    ALL_KEYS,
     ANSI_104_KEYS,
     CHORD_GRID,
     CHORD_ROOTS,
@@ -35,15 +36,23 @@ def test_layout_is_full_size_ansi_104():
     assert len(names) == len(set(names))
     positions = [(spec.x, spec.y) for spec in ANSI_104_KEYS]
     assert len(positions) == len(set(positions))
-    assert max(spec.x + spec.w for spec in ANSI_104_KEYS) == LAYOUT_WIDTH
-    assert max(spec.y + spec.h for spec in ANSI_104_KEYS) == LAYOUT_HEIGHT
+    assert max(spec.x + spec.w for spec in ALL_KEYS) == LAYOUT_WIDTH
+    assert max(spec.y + spec.h for spec in ALL_KEYS) == LAYOUT_HEIGHT
 
 
 def test_every_bindable_key_has_one_physical_key():
     for key in BINDABLE_KEYS:
-        matches = [spec for spec in ANSI_104_KEYS if spec.name == key]
+        matches = [spec for spec in ALL_KEYS if spec.name == key]
         assert len(matches) == 1, key
         assert matches[0].kind == "bindable"
+
+
+def test_media_keys_and_fixed_volume_are_on_diagram():
+    for key in ("PlayPause", "BrowserHome", "Calculator"):
+        assert KEY_BY_NAME[key].kind == "bindable"
+    for key in ("Mute", "VolumeUp", "VolumeDown"):
+        assert KEY_BY_NAME[key].kind == "reserved"
+        assert "Fixed" in KEY_BY_NAME[key].fixed
 
 
 def test_chord_grid_is_complete():

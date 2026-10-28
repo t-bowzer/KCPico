@@ -14,12 +14,15 @@ struct RhythmPattern;
 
 
 // Owns the parameter-edit menus (Chord/Strum/Rhythm/Bass/Drum) and all
-// parameter mutation. F-keys select a parameter inside a menu; Up/Down navigate
-// parameters; Left/Right (and the inc/dec shortcuts) change the value; Esc
-// returns to the main menu. In the main menu, the configurable keymap actions
-// (cycle/set/inc/dec/toggle/drum-mute) edit their parameter directly.
-// Chord-grid, backtick, held-extension arrows, and strum keys are not consumed
-// and fall through to the engines.
+// parameter mutation. In a menu, arrows and volume +/- scroll the parameter
+// highlight; Enter/Mute select the highlighted parameter. While selected, the
+// same keys edit its value live; Enter/Mute keeps the value and deselects, while
+// Backspace/Esc restores the value captured on selection and deselects. A
+// selected parameter never times out; browsing menus still use menu_timeout_ms.
+// In the main menu, the configurable keymap actions (cycle/set/inc/dec/toggle/
+// drum-mute) edit their parameter directly. Chord-grid, backtick,
+// held-extension arrows, and strum keys are not consumed and fall through to the
+// engines.
 class EditEngine {
 public:
     EditEngine(StateManager& state, DisplayManager& display);
@@ -73,13 +76,20 @@ private:
     void sendOrScheduleMidi(const std::vector<uint8_t>& bytes,
                             uint64_t dueUs);
 
-    uint8_t  repeatUsage_ = 0;
+    uint16_t repeatUsage_ = 0;
+    uint8_t  repeatPage_ = hid_usage::PAGE_KEYBOARD;
     int      repeatDelta_ = 0;
     ParamId  repeatParam_ = ParamId::COUNT;
     bool     repeatInMenu_ = false;
     uint64_t repeatDeadlineUs_ = 0;
 
     uint64_t menuDeadlineUs_ = 0;
+
+    // Two-phase menu selection. The original value is captured on selection so
+    // Backspace/Esc can cancel live edits (Enter/Mute keeps them).
+    bool     paramSelected_ = false;
+    ParamId  selectedParam_ = ParamId::COUNT;
+    int      selectedOriginalValue_ = 0;
 
     // Tap-tempo state (Space key): average the intervals of the most recent taps
     // (up to 8) to set the rhythm tempo.
@@ -95,13 +105,18 @@ private:
 
     ParamId currentParam() const;
     void enterOrSwitch(EditMenu menu, uint64_t now_us);
-    void exitMenu();
-    void selectParam(int fIndex);
+    void exitMenu(uint64_t now_us);
     void navigateParam(int delta);
+    void selectCurrentParam(uint64_t now_us);
+    void leaveSelectedParam(bool commit, uint64_t now_us,
+                            bool refreshDisplay);
+    void restoreParamValue(ParamId id, int value, uint64_t now_us);
     void applyParamStep(ParamId id, int delta, bool inMenu, uint64_t now_us);
-    void applyParamAction(const KeyAction& a, uint8_t usage, bool inMenu, uint64_t now_us);
+    void applyParamAction(const KeyAction& a, uint16_t usage, uint8_t usagePage,
+                          bool inMenu, uint64_t now_us);
     void toggleDrumMute(int slot, uint64_t now_us);
-    void armRepeat(uint8_t usage, int delta, ParamId id, bool inMenu, uint64_t now_us);
+    void armRepeat(uint16_t usage, uint8_t usagePage, int delta, ParamId id,
+                   bool inMenu, uint64_t now_us);
     void clearRepeat();
     void handleTapTempo(uint64_t now_us);
 };

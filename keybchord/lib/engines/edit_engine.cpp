@@ -6,6 +6,8 @@
 
 namespace {
 
+constexpr uint8_t HID_USAGE_ENTER     = 0x28;
+constexpr uint8_t HID_USAGE_BACKSPACE = 0x2A;
 constexpr uint8_t HID_USAGE_LEFT  = 0x50;
 constexpr uint8_t HID_USAGE_RIGHT = 0x4F;
 constexpr uint8_t HID_USAGE_UP    = 0x52;
@@ -14,11 +16,6 @@ constexpr uint8_t HID_USAGE_DOWN  = 0x51;
 // Key-hold auto-repeat timing (large-range parameters only).
 constexpr uint64_t REPEAT_INITIAL_US = 500000;   // 500 ms before first repeat
 constexpr uint64_t REPEAT_INTERVAL_US = 80000;   // 80 ms between repeats
-
-int functionKeyIndex(uint8_t usage) {
-    if (usage >= 0x3A && usage <= 0x45) return static_cast<int>(usage - 0x3A);
-    return -1;
-}
 
 // True for drum *note* parameters (auditioned on change); velocities are not.
 bool isDrumNoteParam(ParamId id) {
@@ -115,8 +112,11 @@ ParamId EditEngine::currentParam() const {
 }
 
 void EditEngine::enterOrSwitch(EditMenu menu, uint64_t now_us) {
+    // Changing/closing a menu discards an uncommitted selected-parameter edit.
+    if (paramSelected_) leaveSelectedParam(false, now_us, false);
+
     if (state_.editMenu == menu) {
-        exitMenu();
+        exitMenu(now_us);
         return;
     }
     state_.editMenu = menu;
@@ -124,29 +124,72 @@ void EditEngine::enterOrSwitch(EditMenu menu, uint64_t now_us) {
     if (state_.editParam >= menuParamCount(menu)) state_.editParam = 0;
     menuDeadlineUs_ = now_us +
         static_cast<uint64_t>(state_.config.menu_timeout_ms) * 1000ULL;
-    display_.showMenu(menuTitle(menu), paramShortName(currentParam()));
+    display_.showMenu(menuTitle(menu), paramShortName(currentParam()), false);
 }
 
-void EditEngine::exitMenu() {
+void EditEngine::exitMenu(uint64_t now_us) {
+    if (paramSelected_) leaveSelectedParam(false, now_us, false);
     state_.editMenu = EditMenu::None;
     state_.editParam = 0;
     clearRepeat();
     display_.cancel();
 }
 
-void EditEngine::selectParam(int fIndex) {
-    if (state_.editMenu == EditMenu::None) return;
-    if (fIndex < 0 || fIndex >= menuParamCount(state_.editMenu)) return;
-    state_.editParam = fIndex;
-    display_.selectParam(paramShortName(currentParam()));
-}
-
 void EditEngine::navigateParam(int delta) {
-    if (state_.editMenu == EditMenu::None) return;
+    if (state_.editMenu == EditMenu::None || paramSelected_) return;
     int count = menuParamCount(state_.editMenu);
     if (count <= 0) return;
     state_.editParam = (state_.editParam + delta + count) % count;
-    display_.selectParam(paramShortName(currentParam()));
+    display_.selectParam(paramShortName(currentParam()), false);
+}
+
+void EditEngine::selectCurrentParam(uint64_t now_us) {
+    ParamId id = currentParam();
+    if (id == ParamId::COUNT) return;
+
+    paramSelected_ = true;
+    selectedParam_ = id;
+    selectedOriginalValue_ = paramValueInt(state_, id);
+    clearRepeat();
+
+    display_.selectParam(paramShortName(id), true);
+    display_.showValue(paramFullName(id), paramValueString(state_, id),
+                       true, now_us);
+}
+
+void EditEngine::restoreParamValue(ParamId id, int value, uint64_t now_us) {
+    if (id == ParamId::COUNT) return;
+    paramSet(state_, id, value);
+
+    if (id == ParamId::ChordMode && modeChanged_) modeChanged_();
+    if (id == ParamId::ChordArpMode && arpModeChanged_) arpModeChanged_();
+    if (id == ParamId::RhythmPattern && patternChanged_) patternChanged_();
+    if (isDrumNoteParam(id) && drumAudition_) {
+        drumAudition_(drumNoteValue(state_, id));
+    }
+    if (anyEdit_) anyEdit_();
+
+    menuDeadlineUs_ = now_us +
+        static_cast<uint64_t>(state_.config.menu_timeout_ms) * 1000ULL;
+}
+
+void EditEngine::leaveSelectedParam(bool commit, uint64_t now_us,
+                                    bool refreshDisplay) {
+    if (!paramSelected_) return;
+
+    if (!commit) restoreParamValue(selectedParam_, selectedOriginalValue_,
+                                   now_us);
+
+    paramSelected_ = false;
+    selectedParam_ = ParamId::COUNT;
+    selectedOriginalValue_ = 0;
+    clearRepeat();
+    menuDeadlineUs_ = now_us +
+        static_cast<uint64_t>(state_.config.menu_timeout_ms) * 1000ULL;
+
+    if (refreshDisplay) {
+        display_.selectParam(paramShortName(currentParam()), false);
+    }
 }
 
 void EditEngine::applyParamStep(ParamId id, int delta, bool inMenu, uint64_t now_us) {
@@ -162,7 +205,8 @@ void EditEngine::applyParamStep(ParamId id, int delta, bool inMenu, uint64_t now
     display_.showValue(paramFullName(id), paramValueString(state_, id), inMenu, now_us);
 }
 
-void EditEngine::applyParamAction(const KeyAction& a, uint8_t usage, bool inMenu, uint64_t now_us) {
+void EditEngine::applyParamAction(const KeyAction& a, uint16_t usage, uint8_t usagePage,
+                                  bool inMenu, uint64_t now_us) {
     ParamId id = a.param;
     if (id == ParamId::COUNT) return;
 
@@ -183,7 +227,7 @@ void EditEngine::applyParamAction(const KeyAction& a, uint8_t usage, bool inMenu
 
     if (a.cmd == KeyCmd::IncParam || a.cmd == KeyCmd::DecParam) {
         int dir = (a.cmd == KeyCmd::IncParam) ? +1 : -1;
-        armRepeat(usage, dir, id, inMenu, now_us);
+        armRepeat(usage, usagePage, dir, id, inMenu, now_us);
     }
 }
 
@@ -279,10 +323,12 @@ void EditEngine::toggleDrumMute(int slot, uint64_t now_us) {
     display_.showValue(name + " Mute", nowMuted ? "On" : "Off", false, now_us);
 }
 
-void EditEngine::armRepeat(uint8_t usage, int delta, ParamId id, bool inMenu, uint64_t now_us) {
+void EditEngine::armRepeat(uint16_t usage, uint8_t usagePage, int delta, ParamId id,
+                           bool inMenu, uint64_t now_us) {
     if (delta == 0) return;
     if (!isAutoRepeatable(id)) return;
     repeatUsage_ = usage;
+    repeatPage_ = usagePage;
     repeatDelta_ = delta;
     repeatParam_ = id;
     repeatInMenu_ = inMenu;
@@ -311,8 +357,9 @@ void EditEngine::update(uint64_t now_us) {
         menuDeadlineUs_ = now_us +
             static_cast<uint64_t>(state_.config.menu_timeout_ms) * 1000ULL;
     }
-    if (state_.editMenu != EditMenu::None && now_us >= menuDeadlineUs_) {
-        exitMenu();
+    if (state_.editMenu != EditMenu::None && !paramSelected_ &&
+        now_us >= menuDeadlineUs_) {
+        exitMenu(now_us);
     }
 }
 
@@ -354,14 +401,23 @@ void EditEngine::handleTapTempo(uint64_t now_us) {
 
 bool EditEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
     if (!ev.pressed) {
-        if (ev.hid_usage == repeatUsage_ && repeatDelta_ != 0) clearRepeat();
+        if (ev.hid_usage == repeatUsage_ && ev.usage_page == repeatPage_ &&
+            repeatDelta_ != 0) {
+            clearRepeat();
+        }
         return false;
     }
 
-    KeyAction a = keymap_.resolve(ev.hid_usage, ev.modifiers);
+    KeyAction a = keymap_.resolve(ev.hid_usage, ev.modifiers, ev.usage_page);
     bool inMenu = state_.editMenu != EditMenu::None;
 
-    if (inMenu) {
+    bool enterKey = a.cmd == KeyCmd::Enter ||
+        (ev.usage_page == hid_usage::PAGE_KEYBOARD &&
+         ev.hid_usage == HID_USAGE_ENTER);
+    bool backspaceKey = ev.usage_page == hid_usage::PAGE_KEYBOARD &&
+                        ev.hid_usage == HID_USAGE_BACKSPACE;
+
+    if (inMenu && !paramSelected_) {
         menuDeadlineUs_ = now_us +
             static_cast<uint64_t>(state_.config.menu_timeout_ms) * 1000ULL;
     }
@@ -371,40 +427,123 @@ bool EditEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
             enterOrSwitch(a.menu, now_us);
             return true;
         case KeyCmd::ClearEdit:   // Esc
-            if (inMenu) exitMenu();
+            if (inMenu) {
+                if (paramSelected_) {
+                    leaveSelectedParam(false, now_us, true);  // cancel edit
+                } else {
+                    exitMenu(now_us);
+                }
+            }
             return true;
+        case KeyCmd::VolumeUp:
+        case KeyCmd::VolumeDown: {
+            int dir = (a.cmd == KeyCmd::VolumeUp) ? +1 : -1;
+            if (inMenu) {
+                if (paramSelected_) {
+                    applyParamStep(selectedParam_, dir, true, now_us);
+                    armRepeat(ev.hid_usage, ev.usage_page, dir, selectedParam_,
+                              true, now_us);
+                } else {
+                    navigateParam(dir);
+                }
+            } else {
+                applyParamStep(ParamId::RhythmTempo, dir, false, now_us);
+                armRepeat(ev.hid_usage, ev.usage_page, dir,
+                          ParamId::RhythmTempo, false, now_us);
+            }
+            return true;
+        }
         default:
             break;
     }
 
     if (inMenu) {
-        uint8_t combo = keymapComboMask(ev.modifiers);
-        int f = functionKeyIndex(ev.hid_usage);
-        if (f >= 0 && combo == 0) {
-            // F8 inside the Rhythm menu opens the Drum sub-menu.
-            if (state_.editMenu == EditMenu::Rhythm && f == 7) {
-                enterOrSwitch(EditMenu::Drum, now_us);
+        if (backspaceKey) {
+            if (paramSelected_) {
+                leaveSelectedParam(false, now_us, true);   // cancel edit
+            } else {
+                exitMenu(now_us);
+            }
+            return true;
+        }
+
+        // Function keys no longer select parameters inside menus. Menu-open
+        // actions (F9-F12/Super+F11) were handled above; all other F-key
+        // shortcuts are inert here.
+        if (ev.usage_page == hid_usage::PAGE_KEYBOARD &&
+            ev.hid_usage >= 0x3A && ev.hid_usage <= 0x45) {
+            return true;
+        }
+
+        if (paramSelected_) {
+            if (enterKey) {
+                leaveSelectedParam(true, now_us, true);    // keep edit
                 return true;
             }
-            selectParam(f);
+
+            int dir = 0;
+            if (ev.hid_usage == HID_USAGE_UP ||
+                ev.hid_usage == HID_USAGE_LEFT) {
+                dir = -1;
+            } else if (ev.hid_usage == HID_USAGE_DOWN ||
+                       ev.hid_usage == HID_USAGE_RIGHT) {
+                dir = +1;
+            }
+            if (dir != 0) {
+                applyParamStep(selectedParam_, dir, true, now_us);
+                armRepeat(ev.hid_usage, ev.usage_page, dir, selectedParam_,
+                          true, now_us);
+                return true;
+            }
+            if (a.cmd == KeyCmd::IncParam || a.cmd == KeyCmd::DecParam) {
+                int step = (a.cmd == KeyCmd::IncParam) ? +1 : -1;
+                applyParamStep(selectedParam_, step, true, now_us);
+                armRepeat(ev.hid_usage, ev.usage_page, step, selectedParam_,
+                          true, now_us);
+                return true;
+            }
+
+            // Keep chord/strum keys live and preserve configured keymap actions.
+            switch (a.cmd) {
+                case KeyCmd::ChordKey:
+                case KeyCmd::Backtick:
+                case KeyCmd::StrumKey:
+                    return false;
+                case KeyCmd::CycleParam:
+                case KeyCmd::SetParam:
+                case KeyCmd::ToggleParam:
+                case KeyCmd::DrumMute:
+                    applyParamAction(a, ev.hid_usage, ev.usage_page, true,
+                                     now_us);
+                    return true;
+                default:
+                    return true;   // Enter/Mute/no-op while selected
+            }
+        }
+
+        // Browsing: all navigation keys scroll the parameter highlight.
+        if (enterKey) {
+            selectCurrentParam(now_us);
             return true;
         }
-        // Arrow keys: Up/Down navigate parameters, Left/Right change the value.
-        if (ev.hid_usage == HID_USAGE_UP)   { navigateParam(-1); return true; }
-        if (ev.hid_usage == HID_USAGE_DOWN) { navigateParam(+1); return true; }
-        if (ev.hid_usage == HID_USAGE_LEFT || ev.hid_usage == HID_USAGE_RIGHT) {
-            int dir = (ev.hid_usage == HID_USAGE_RIGHT) ? +1 : -1;
-            applyParamStep(currentParam(), dir, true, now_us);
-            armRepeat(ev.hid_usage, dir, currentParam(), true, now_us);
+        if (ev.hid_usage == HID_USAGE_UP ||
+            ev.hid_usage == HID_USAGE_LEFT) {
+            navigateParam(-1);
             return true;
         }
-        // Inc/dec shortcuts also step the currently-selected parameter.
+        if (ev.hid_usage == HID_USAGE_DOWN ||
+            ev.hid_usage == HID_USAGE_RIGHT) {
+            navigateParam(+1);
+            return true;
+        }
         if (a.cmd == KeyCmd::IncParam || a.cmd == KeyCmd::DecParam) {
             int dir = (a.cmd == KeyCmd::IncParam) ? +1 : -1;
             applyParamStep(currentParam(), dir, true, now_us);
-            armRepeat(ev.hid_usage, dir, currentParam(), true, now_us);
+            armRepeat(ev.hid_usage, ev.usage_page, dir, currentParam(), true,
+                      now_us);
             return true;
         }
+
         // Keep chord/strum keys live so edits give immediate audible feedback.
         switch (a.cmd) {
             case KeyCmd::ChordKey:
@@ -415,10 +554,10 @@ bool EditEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
             case KeyCmd::SetParam:
             case KeyCmd::ToggleParam:
             case KeyCmd::DrumMute:
-                applyParamAction(a, ev.hid_usage, true, now_us);
+                applyParamAction(a, ev.hid_usage, ev.usage_page, true, now_us);
                 return true;
             default:
-                return true;   // everything else is still consumed while in a menu
+                return true;   // everything else is still consumed in a menu
         }
     }
 
@@ -442,7 +581,7 @@ bool EditEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
         case KeyCmd::IncParam:
         case KeyCmd::DecParam:
         case KeyCmd::ToggleParam:
-            applyParamAction(a, ev.hid_usage, false, now_us);
+            applyParamAction(a, ev.hid_usage, ev.usage_page, false, now_us);
             return true;
         default:
             return true;

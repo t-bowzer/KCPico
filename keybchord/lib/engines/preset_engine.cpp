@@ -192,10 +192,19 @@ void PresetEngine::cancelNameEdit() {
     display_.cancel();
 }
 
+bool PresetEngine::isEnter(const KeyEvent& ev) const {
+    if (ev.usage_page == hid_usage::PAGE_KEYBOARD &&
+        ev.hid_usage == HID_USAGE_ENTER) {
+        return true;
+    }
+    return keymap_.resolve(ev.hid_usage, ev.modifiers, ev.usage_page).cmd ==
+           KeyCmd::Enter;
+}
+
 bool PresetEngine::handleNameEdit(const KeyEvent& ev) {
     if (!ev.pressed) return true;
 
-    if (ev.hid_usage == HID_USAGE_ENTER) { commitName(); return true; }
+    if (isEnter(ev)) { commitName(); return true; }
     if (ev.hid_usage == HID_USAGE_ESC)   { cancelNameEdit(); return true; }
     if (ev.hid_usage == HID_USAGE_BACKSPACE) {
         if (!nameBuffer_.empty()) {
@@ -241,11 +250,11 @@ bool PresetEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
 
     if (!ev.pressed) return false;
 
-    KeyAction a = keymap_.resolve(ev.hid_usage, ev.modifiers);
+    KeyAction a = keymap_.resolve(ev.hid_usage, ev.modifiers, ev.usage_page);
 
     // --- Save/clear prompt active ---
     if (op_ != PendingOp::None) {
-        if (ev.hid_usage == HID_USAGE_ENTER) { confirmPrompt(now_us); return true; }
+        if (isEnter(ev)) { confirmPrompt(now_us); return true; }
         if (ev.hid_usage == HID_USAGE_BACKSPACE || ev.hid_usage == HID_USAGE_ESC) {
             cancelPrompt();
             return true;
@@ -279,7 +288,7 @@ bool PresetEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
             default:
                 break;
         }
-        if (ev.hid_usage == HID_USAGE_ENTER) { loadCursor(now_us); return true; }
+        if (isEnter(ev)) { loadCursor(now_us); return true; }
         if (ev.hid_usage == HID_USAGE_ESC)   { exitCursor(); return true; }
         switch (a.cmd) {
             case KeyCmd::ChordKey:

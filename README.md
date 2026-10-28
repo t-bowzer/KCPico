@@ -90,6 +90,13 @@ On first boot the firmware self-provisions its config, presets, and rhythms.
   tempo, `Super`+`Esc` is panic.
 - `Ctrl`+`Esc` shows the firmware version and current git commit (any key
   dismisses the debug screen).
+- The keyboard's **Volume +/−** keys are fixed controls: on the main screen they
+  change tempo; inside an edit menu they scroll parameters, then edit the
+  selected value after `Enter`/`Mute`. **Mute** is also fixed and behaves like
+  `Enter` (select/commit). Other media keys can be bound in `keymap.json`.
+- In an edit menu, arrows/volume scroll; `Enter`/`Mute` selects a parameter.
+  `Enter`/`Mute` again keeps the edited value, while `Backspace`/`Esc` restores
+  the value from selection and returns to scrolling.
 - To edit config/presets/rhythms, power off, hold **Ctrl**, power on — the
   "KeybChord" drive mounts on your PC. Ejecting the drive reboots KeybChord
   automatically and reloads the edited files.

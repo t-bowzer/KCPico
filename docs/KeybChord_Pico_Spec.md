@@ -195,7 +195,7 @@ The system is a set of cooperating modules coordinated by a central state manage
 - **FR-R4** When rhythm is enabled, the Chord Engine's Arpeggio mode follows rhythm step timing, and the walking bass (4.7) follows rhythm beat timing.
 - **FR-R5** Tempo adjust via `Page Up` / `Page Down`; swing (and other rhythm parameters) adjust in the Rhythm Edit menu (`F11`, see 5.6).
 - **FR-R6** Rhythm patterns are defined as step sequences in JSON on LittleFS (Section 7.2).
-- **FR-R9** Per-drum-piece **note code** and **velocity** are editable (Drum sub-menu of the Rhythm Edit menu, 5.6): every percussion instrument used by the shipped rhythms — kick, snare, hi-hat, open-hat, rimshot, clap, crash, ride, bongo, conga-lo, conga-hi, clave, and shaker — can be remapped to a different GM percussion note and given a fixed velocity (or "Auto" to follow the pattern's authored step velocity, or "Off" to mute the piece). Cycling a code auditions the selected sound once. Velocity parameters auto-repeat while the step key is held.
+- **FR-R9** Per-drum-piece **note code** and **velocity** are editable (Drum Edit menu, opened by `Super+F11`; 5.6): every percussion instrument used by the shipped rhythms — kick, snare, hi-hat, open-hat, rimshot, clap, crash, ride, bongo, conga-lo, conga-hi, clave, and shaker — can be remapped to a different GM percussion note and given a fixed velocity (or "Auto" to follow the pattern's authored step velocity, or "Off" to mute the piece). Cycling a code auditions the selected sound once. Velocity parameters auto-repeat while the step key is held.
 - **FR-R7** MIDI clock transmission (24 PPQN) can be toggled on/off in the Rhythm Edit menu (Clock Out, see 5.6); when on, clock is sent to the DIN output.
 - **FR-R8** **Keyboard-LED BPM indicator:** the keyboard's **Scroll Lock** LED can flash in time with the Rhythm Engine clock as a visual tempo indicator. Default behavior: a short quarter-note flash on every beat, with a longer accented flash on beat 1 of the bar. The LED is driven by sending a **HID Output Report (SET_REPORT)** to the hosted keyboard. It blinks only while the Rhythm Engine is enabled (follows the active clock), and is disabled if `led.bpm_indicator` is off. Scroll Lock is used because it is not mapped to any chord/strum/function key; Caps Lock and Num Lock LEDs are left untouched to avoid confusion (Caps is a chord root; numpad state is irrelevant per FR-S6). This is best-effort visual feedback and must degrade gracefully if the LED is unavailable (missing keyboard, keyboard that rejects the output report, USB write failure) without affecting timing or MIDI output.
 
@@ -226,7 +226,7 @@ The system is a set of cooperating modules coordinated by a central state manage
   q=120  Rk  >Held
   ```
   (Line 1: active chord + optional `*` dirty marker + bank/preset. Line 2: tempo, rhythm short-code, play mode — final layout **[DRAFT — REVIEW]**.)
-- **FR-D2** Parameters are edited through four **edit menus** (see 5.4–5.6, 5.9). Inside a menu the LCD shows the menu title on line 1 and the selected parameter name on line 2; `F1`..`F11` select a parameter and `+` / `-` (or `Page Up`/`Page Down`) change its value, showing the full parameter name and value as a transient screen that reverts to the menu after `display.revert_timeout_ms`. Single-key edits from the main menu show the same transient and revert to idle.
+- **FR-D2** Parameters are edited through four **edit menus** (see 5.4–5.6, 5.9). Inside a menu the LCD shows the menu title on line 1 and the highlighted parameter on line 2. `Up`/`Down`/`Left`/`Right` and volume +/− scroll the parameter highlight; `Enter`/`Mute` select it. While selected, the same keys change the value live (shown as a transient full name/value screen) and the parameter remains selected indefinitely; `Enter`/`Mute` commits and deselects, while `Backspace`/`Esc` restores the value captured on selection and deselects. An unselected (browsing) menu auto-exits after `display.menu_timeout_ms`.
 - **FR-D3** Save/clear/confirm prompts are shown on the LCD, including the auto-cancel behavior (FR-P10).
 
 ### 4.7 Bass Function (Walking Bass)
@@ -270,14 +270,23 @@ The three main letter rows plus their bounding modifiers are fully consumed by t
 | Limited strum path `0 . 2 3 5 6 8 9 / *` | Strum (Limited layout, when enabled) |
 
 ### 5.3 Function Modifier Convention
-Because `Shift` (both keys) is a chord root, **Shift is never used as a function modifier**. Parameter editing uses **no modifier-key combos**: instead, four dedicated keys on the top row open a parameter-edit menu (see 5.4–5.6, 5.9), where F-keys select a parameter and `+` / `-` change its value.
+Because `Shift` (both keys) is a chord root, **Shift is never used as a function modifier**. Parameter editing uses **no modifier-key combos**: four dedicated keys on the top row open a parameter-edit menu (see 5.4–5.6, 5.9), where arrows/volume scroll parameters and `Enter`/`Mute` select one for editing.
+
+Consumer/media keys (`Mute`, `PlayPause`, `Stop`, transport keys, browser keys,
+`Calculator`, `Mail`, etc.) are configurable in `keymap.json` when the keyboard
+exposes a Consumer Control collection (separate interface or QMK-style shared
+keyboard/consumer report). The keyboard's **Mute** key is hard-coded to behave
+exactly like `Enter` (select/commit in menus, confirm prompts). The **Volume +/−**
+keys are hard-coded: on the main screen they step tempo; inside an edit menu they
+scroll parameters while browsing and change the selected value once selected
+(with repeat).
 
 - **`F9`** — opens the **Chord Edit** menu (toggle).
 - **`F10`** — opens the **Strum Edit** menu (toggle).
 - **`F11`** — opens the **Rhythm Edit** menu (toggle).
 - **`F12`** — opens the **Bass Edit** menu (toggle).
 - **`Super`** (`Windows` key) — global/system modifier, used for preset navigation/save/clear (5.7) and panic (5.8). The target keyboard has no `Fn` key, so the `Windows`/`Super` key is used. (Stored in config as `global_fn: "super"`.)
-- **`Esc`** — returns to the main menu from any edit menu (and cancels prompts).
+- **`Esc` / `Backspace`** — while a parameter is selected, cancel its edits, restore the original value, and return to scrolling; when browsing, exit the edit menu. `Esc` also cancels prompts.
 - **`Esc`** (held at **power-on only**) — reboot into the USB bootloader (`RPI-RP2` drive) so the Pico can be reflashed over USB without opening the enclosure.
 - **`Ctrl`** — held at **power-on only**, to also present the USB Mass Storage drive (M9); it has no runtime function. Ejecting the drive from the host reboots the firmware automatically so it reloads the edited files.
 
@@ -299,22 +308,22 @@ Main-menu single-key shortcuts (no menu):
 | `Pause` | Third inversion |
 | `+` / `-` (number row `=` / `-`) | Chord octave up / down |
 
-**Chord Edit menu** — opened by `F9`. F-keys select a parameter; `+` / `-` change its value:
+**Chord Edit menu** — opened by `F9`. Scroll with arrows/volume, select with `Enter`/`Mute`, then edit the selected value:
 
-| F-key | Parameter | Range / cycle |
+| Order | Parameter | Range / cycle |
 |-------|-----------|----------------|
-| `F1` | Octave | −3..+3 (step 1) |
-| `F2` | Mode | Held / Press / Arp / Arp-Hold / Silent / Pattern / Pattern-Hold |
-| `F3` | Voicing | Root / Smart |
-| `F4` | Duration | 50..4000 ms (step 50) |
-| `F5` | Velocity | 1..127 |
-| `F6` | Pan | 0..127 |
-| `F7` | Roll | −2000..+2000 ms (step 10; positive = up, negative = down) |
-| `F8` | Min Notes | 2..6 (default 3) |
-| `F9` | Min Interval | 0..12 semitones (0 = off) |
-| `F10` | Inversion | Root / 1st / 2nd / 3rd |
-| `F11` | Arp Mode | Up / Down / Up-Down / Alternating / Random |
-| `F12` | Pattern | Built-in + user chord patterns (6.10) |
+| 1 | Octave | −3..+3 (step 1) |
+| 2 | Mode | Held / Press / Arp / Arp-Hold / Silent / Pattern / Pattern-Hold |
+| 3 | Voicing | Root / Smart |
+| 4 | Duration | 50..4000 ms (step 50) |
+| 5 | Velocity | 1..127 |
+| 6 | Pan | 0..127 |
+| 7 | Roll | −2000..+2000 ms (step 10; positive = up, negative = down) |
+| 8 | Min Notes | 2..6 (default 3) |
+| 9 | Min Interval | 0..12 semitones (0 = off) |
+| 10 | Inversion | Root / 1st / 2nd / 3rd |
+| 11 | Arp Mode | Up / Down / Up-Down / Alternating / Random |
+| 12 | Pattern | Built-in + user chord patterns (6.10) |
 
 ### 5.5 Function Keys — Strum Controls & the Strum Edit Menu
 
@@ -324,17 +333,17 @@ Main-menu single-key shortcut:
 |-----|--------|
 | `Keypad +` / `Keypad -` | Strum octave up / down (the numpad math keys are free because they are excluded from the strum plate, FR-S2) |
 
-**Strum Edit menu** — opened by `F10`. F-keys select a parameter; `+` / `-` change its value:
+**Strum Edit menu** — opened by `F10`. Scroll with arrows/volume, select with `Enter`/`Mute`, then edit the selected value:
 
-| F-key | Parameter | Range / cycle |
+| Order | Parameter | Range / cycle |
 |-------|-----------|----------------|
-| `F1` | Octave | −3..+3 (step 1) |
-| `F2` | Duration | 50..4000 ms (step 50) |
-| `F3` | Velocity | 1..127 |
-| `F4` | Layout | Full / Limited |
-| `F5` | Mode | Follow-Chord / Scale / Piano (FR-S7) |
-| `F6` | Root | C..B (cycle, pitch class; used by Scale/Piano) |
-| `F7` | Scale | Ionian/Dorian/Phrygian/Lydian/Mixolydian/Aeolian/Locrian/Harmonic-Minor/Melodic-Minor/Major-Pentatonic/Minor-Pentatonic/Blues (Scale mode only) |
+| 1 | Octave | −3..+3 (step 1) |
+| 2 | Duration | 50..4000 ms (step 50) |
+| 3 | Velocity | 1..127 |
+| 4 | Layout | Full / Limited |
+| 5 | Mode | Follow-Chord / Scale / Piano (FR-S7) |
+| 6 | Root | C..B (cycle, pitch class; used by Scale/Piano) |
+| 7 | Scale | Ionian/Dorian/Phrygian/Lydian/Mixolydian/Aeolian/Locrian/Harmonic-Minor/Melodic-Minor/Major-Pentatonic/Minor-Pentatonic/Blues (Scale mode only) |
 
 ### 5.6 Rhythm Controls & the Rhythm Edit Menu
 
@@ -349,51 +358,55 @@ Main-menu single-key shortcuts (no menu):
 | `F8` | Mute/unmute percussion |
 | `Page Up` / `Page Down` | Tempo up / down |
 
-**Rhythm Edit menu** — opened by `F11`. F-keys select a parameter; `+` / `-` change its value:
+**Rhythm Edit menu** — opened by `F11`. Scroll with arrows/volume, select with `Enter`/`Mute`, then edit the selected value:
 
-| F-key | Parameter | Range / cycle |
+| Order | Parameter | Range / cycle |
 |-------|-----------|----------------|
-| `F1` | Tempo | 40..260 BPM (step 1) |
-| `F2` | Swing | −75..+75 (step 5) |
-| `F3` | Pattern | cycle the 12 rhythms |
-| `F4` | Mute | On / Off |
-| `F5` | Enable | On / Off |
-| `F6` | Clock Out | On / Off (MIDI clock transmit, FR-R7) |
-| `F7` | Beat LED | On / Off (BPM indicator, FR-R8) |
-| `F8` | Drums | Opens the **Drum Edit** sub-menu (FR-R9) |
+| 1 | Tempo | 40..260 BPM (step 1) |
+| 2 | Swing | −75..+75 (step 5) |
+| 3 | Pattern | cycle the 12 rhythms |
+| 4 | Mute | On / Off |
+| 5 | Enable | On / Off |
+| 6 | Clock Out | On / Off (MIDI clock transmit, FR-R7) |
+| 7 | Beat LED | On / Off (BPM indicator, FR-R8) |
 
-**Drum Edit sub-menu** (opened by `F8` from the Rhythm Edit menu). F-keys select a
-piece; `+` / `-` change its code/velocity (cycling a code auditions it once).
-Beyond the eight F-keys, `Left`/`Right`/`Up`/`Down` step through the remaining
-pieces (see 5.6):
+**Drum Edit menu** — opened by `Super+F11` (the keymap's Drum menu action).
+Scroll with arrows/volume, select with `Enter`/`Mute`, then edit the selected
+piece's code/velocity live (cycling a code auditions it once; `Backspace`/`Esc`
+cancels the edit):
 
-| F-key | Parameter | Range / cycle |
+| Order | Parameter | Range / cycle |
 |-------|-----------|----------------|
-| `F1` | Kick note | 0..127 (default 36) |
-| `F2` | Kick velocity | Auto / 1..127 (Auto = follow pattern) |
-| `F3` | Snare note | 0..127 (default 38) |
-| `F4` | Snare velocity | Auto / 1..127 |
-| `F5` | Hi-Hat note | 0..127 (default 42) |
-| `F6` | Hi-Hat velocity | Auto / 1..127 |
-| `F7` | Open-Hat note | 0..127 (default 46) |
-| `F8` | Open-Hat velocity | Auto / 1..127 |
-| (arrows) | Rimshot note/vel | 0..127 (default 37) |
-| (arrows) | Clap note/vel | 0..127 (default 39) |
-| (arrows) | Crash note/vel | 0..127 (default 49) |
-| (arrows) | Ride note/vel | 0..127 (default 51) |
-| (arrows) | Bongo note/vel | 0..127 (default 61) |
-| (arrows) | Conga-Lo note/vel | 0..127 (default 62) |
-| (arrows) | Conga-Hi note/vel | 0..127 (default 63) |
-| (arrows) | Clave note/vel | 0..127 (default 75) |
-| (arrows) | Shaker note/vel | 0..127 (default 82) |
+| 1 | Kick note | 0..127 (default 36) |
+| 2 | Kick velocity | Auto / 1..127 (Auto = follow pattern) |
+| 3 | Snare note | 0..127 (default 38) |
+| 4 | Snare velocity | Auto / 1..127 |
+| 5 | Hi-Hat note | 0..127 (default 42) |
+| 6 | Hi-Hat velocity | Auto / 1..127 |
+| 7 | Open-Hat note | 0..127 (default 46) |
+| 8 | Open-Hat velocity | Auto / 1..127 |
+| 9–10 | Rimshot note/vel | 0..127 (default 37) |
+| 11–12 | Clap note/vel | 0..127 (default 39) |
+| 13–14 | Crash note/vel | 0..127 (default 49) |
+| 15–16 | Ride note/vel | 0..127 (default 51) |
+| 17–18 | Bongo note/vel | 0..127 (default 61) |
+| 19–20 | Conga-Lo note/vel | 0..127 (default 62) |
+| 21–22 | Conga-Hi note/vel | 0..127 (default 63) |
+| 23–24 | Clave note/vel | 0..127 (default 75) |
+| 25–26 | Shaker note/vel | 0..127 (default 82) |
 
-**Inside any edit menu,** `Left`/`Right` arrows step between parameters (wrapping)
-and `Up`/`Down` arrows change the selected value, in addition to `+`/`-`/`Page
-Up`/`Page Down`. Large-range parameters (tempo, velocity, pan, durations, swing)
-auto-repeat while the step key is held (≈500 ms delay, then ≈80 ms interval);
-small-range parameters (octave, enums, toggles) step once per press. A menu
-auto-exits to the idle screen after `display.menu_timeout_ms` of idleness
-(default 10 s).
+**Inside any edit menu:** while browsing, `Up`/`Down`/`Left`/`Right` and volume
++/− scroll the parameter highlight (wrapping); `Enter`/`Mute` selects it. While a
+parameter is selected, those same keys change its value. Large-range parameters
+(tempo, velocity, pan, durations, swing) auto-repeat while a value key is held
+(≈500 ms delay, then ≈80 ms interval); small-range parameters (octave, enums,
+toggles) step once per press. `Enter`/`Mute` commits the value and deselects;
+`Backspace`/`Esc` restores the value captured on selection and deselects. A
+selected parameter never times out; an unselected menu auto-exits after
+`display.menu_timeout_ms` (default 10 s).
+
+`F1`–`F12` are inert inside edit menus (they retain their main-menu shortcuts
+outside menus; `F9`–`F12`/`Super+F11` still open/switch menus).
 
 ### 5.7 Preset & Navigation
 | Key | Action |
@@ -432,16 +445,16 @@ Main-menu single-key shortcut:
 |-----|--------|
 | `F3` | Toggle the walking bass on/off (FR-B1) |
 
-**Bass Edit menu** — opened by `F12`. F-keys select a parameter; `+` / `-` change its value:
+**Bass Edit menu** — opened by `F12`. Scroll with arrows/volume, select with `Enter`/`Mute`, then edit the selected value:
 
-| F-key | Parameter | Range / cycle |
+| Order | Parameter | Range / cycle |
 |-------|-----------|----------------|
-| `F1` | Enable | On / Off |
-| `F2` | Octave | −3..+3 (step 1; default −1) |
-| `F3` | Duration | 50..4000 ms (step 50; default 150) |
-| `F4` | Velocity | 1..127 (default 90) |
-| `F5` | Channel | 1..16 (default 3) |
-| `F6` | Pattern | Walking / Whole / Half / Quarter / Half-Alt / Quarter-Alt / 3/4-Alt / Hold (default Walking, FR-B5) |
+| 1 | Enable | On / Off |
+| 2 | Octave | −3..+3 (step 1; default −1) |
+| 3 | Duration | 50..4000 ms (step 50; default 150) |
+| 4 | Velocity | 1..127 (default 90) |
+| 5 | Channel | 1..16 (default 3) |
+| 6 | Pattern | Walking / Whole / Half / Quarter / Half-Alt / Quarter-Alt / 3/4-Alt / Hold (default Walking, FR-B5) |
 
 ---
 
@@ -648,9 +661,9 @@ Each rhythm is a step sequence stored as a JSON file on LittleFS (one file per p
 ### 7.3 Timing, Tempo & Swing (integer / fixed-point)
 All timing math runs on Core 1 using integer microseconds; the RP2040 has no FPU (Section 1.4), so **no floats are used in the scheduler**.
 - **Tempo:** BPM, adjustable via Page Up/Down (FR-R5). Range e.g. 40–260 BPM. Step interval is computed with integer division, e.g. `step_us = 60000000 / (bpm * steps_per_beat)`.
-- **Swing:** stored as a **signed integer percentage −75..+75** (0 = straight; positive = laid-back, negative = rushed), adjustable in the Rhythm Edit menu (`F11` → `F2`) in steps of 5. The off-beat delay is applied as fixed-point integer math, e.g. `delay_us = (base_step_us * swing) / 100`, applied to the off-beat 8th-note step only. (Semantically equivalent to the original 0.0–0.75 float, expressed as a signed −0.75..+0.75.)
+- **Swing:** stored as a **signed integer percentage −75..+75** (0 = straight; positive = laid-back, negative = rushed), adjustable in the Rhythm Edit menu (Swing parameter) in steps of 5. The off-beat delay is applied as fixed-point integer math, e.g. `delay_us = (base_step_us * swing) / 100`, applied to the off-beat 8th-note step only. (Semantically equivalent to the original 0.0–0.75 float, expressed as a signed −0.75..+0.75.)
 - **Sync:** The Rhythm Engine clock drives the Chord Engine Arpeggio mode (FR-R4) and the walking bass's beat (FR-B4).
-- **MIDI clock:** A single **master clock** (24 PPQN) runs continuously in the background from boot — its tick counter and phase never reset, regardless of whether the rhythm or Clock Out is enabled. Clock Out (`F6`, or `F11` → `F6`) only gates whether the `0xF8` byte is emitted. The beat LED and the rhythm scheduler both **slave to this master clock**: the LED flashes on every 24th tick, and the rhythm downbeat aligns to a 24-tick beat boundary with each 16th-note step = exactly 6 ticks. This keeps LED, drums, and clock mutually phase-locked (nothing preempts or resets the clock). Only the `0xF8` byte is streamed; no Start/Stop/Continue.
+- **MIDI clock:** A single **master clock** (24 PPQN) runs continuously in the background from boot — its tick counter and phase never reset, regardless of whether the rhythm or Clock Out is enabled. Clock Out (`F6`, or Clock Out in the Rhythm Edit menu) only gates whether the `0xF8` byte is emitted. The beat LED and the rhythm scheduler both **slave to this master clock**: the LED flashes on every 24th tick, and the rhythm downbeat aligns to a 24-tick beat boundary with each 16th-note step = exactly 6 ticks. This keeps LED, drums, and clock mutually phase-locked (nothing preempts or resets the clock). Only the `0xF8` byte is streamed; no Start/Stop/Continue.
 - **Mute (FR-R2):** suppresses drum note-ons while the clock/sync continues.
 - **LED BPM indicator (FR-R8):** the beat LED flashes with a **consistent short pulse** (`led.flash_ms`, default 40 ms) on every beat of the master clock, independent of rhythm/clock-out state. The target LED is configurable (`led.led` = `num_lock` default, `caps_lock`, `scroll_lock`, or `all`); Core 0 owns the LED on/off state and retries the HID report until it is queued, so a dropped report cannot leave the LED stuck on.
 
@@ -850,7 +863,7 @@ The pure-logic core must be testable on a desktop without the Pico hardware. Str
 - **Rhythm stepping:** pattern → scheduled events; integer tempo/swing math (7.2/7.3), including the fixed-point swing formula.
 - **Held-mode latching:** parameter snapshot vs pending state (FR-C9/VR-5).
 - **Config:** validation, default generation, and out-of-range fallback (NFR-9), using an in-memory/std::filesystem stub for the storage adapter.
-- **Keymap:** HID usage + modifier byte → action mapping; Shift/Caps/Tab resolve as chord roots; keypad usages Num-Lock-independent; `+`/`-` context-sensitivity.
+- **Keymap:** HID usage page + usage + modifier byte → action mapping; Shift/Caps/Tab resolve as chord roots; keypad usages Num-Lock-independent; `+`/`-` context-sensitivity; Consumer/media keys bindable with fixed Volume +/− controls.
 
 ### 11.2 On-device verification
 - **MIDI monitor/log mode:** a build/runtime flag that logs every outgoing MIDI message (channel, note/CC, velocity, timestamp) over USB-CDC/UART for verifying output without external gear.
@@ -902,7 +915,7 @@ These milestones align with the Build Sequence (Section 1.6); stop for user feed
 - **AC-20** Dirty marker (`*`) appears when active state differs from the stored preset and clears on save/load (FR-P11).
 - **AC-21** Uninitialized/cleared preset slots load factory defaults with per-function channels 1/2/3/10 (FR-P9/FR-P12).
 - **AC-22** Corrupt or missing config/presets on LittleFS are regenerated or fall back to defaults without crashing (NFR-9).
-- **AC-23** When `bpm_indicator` is on, the configured LED (default Num Lock) flashes once per beat of the master clock, independent of rhythm/clock-out state; `F4` (or Beat LED, `F11` → `F7`) enables/disables it; LED unavailability does not affect timing or MIDI (FR-R8).
+- **AC-23** When `bpm_indicator` is on, the configured LED (default Num Lock) flashes once per beat of the master clock, independent of rhythm/clock-out state; `F4` (or Beat LED in the Rhythm Edit menu) enables/disables it; LED unavailability does not affect timing or MIDI (FR-R8).
 - **AC-24** Chord roll staggers note-ons by `chord_roll_ms` (positive ascending, negative descending) in Held/Press modes; note-offs release together.
 - **AC-25** `min_notes` pads a chord with octave notes to at least the configured count (e.g. C major min 4 → `C E G C`).
 - **AC-26** `min_interval` enforces the minimum semitone spacing between adjacent voicing notes in the tightest ascending configuration.

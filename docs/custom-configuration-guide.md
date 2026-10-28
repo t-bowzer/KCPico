@@ -78,7 +78,7 @@ A single object. Any omitted key uses its default.
 | `display.revert_timeout_ms` | int | 250–5000 | `1500` | How long a parameter value stays on the LCD before reverting. |
 | `display.prompt_timeout_ms` | int | 1000–30000 | `5000` | Save/Clear prompt auto-cancel. |
 | `display.cursor_timeout_ms` | int | 500–30000 | `5000` | Preset-cursor auto-reset. |
-| `display.menu_timeout_ms` | int | 500–30000 | `10000` | Edit-menu idle auto-exit. |
+| `display.menu_timeout_ms` | int | 500–30000 | `10000` | Edit-menu idle auto-exit while scrolling; a selected parameter never times out. |
 | `led.bpm_indicator` | bool | — | `true` | Flash a keyboard LED on each beat. |
 | `led.led` | enum | — | `num_lock` | Which LED(s): `num_lock`, `caps_lock`, `scroll_lock`, or `all`. |
 | `led.flash_ms` | int | 5–500 | `40` | Beat-flash duration (ms). |
@@ -321,17 +321,42 @@ key-combo to an action.
 
 **Bindable keys:** `F1`–`F12`, `PrtSc`, `ScLk`, `Pause`, `Insert`, `Home`,
 `PgUp`, `Delete`, `End`, `PgDn`, `Space`, `=`, `-`, `KpPlus`, `KpMinus`,
-`KpEnter`, `Left`, `Down`, `Right`, `Up`.
+`KpEnter`, `Left`, `Down`, `Right`, `Up`, plus these Consumer/media keys:
+`PlayPause`, `Stop`, `PrevTrack`, `NextTrack`, `Rewind`,
+`FastForward`, `Eject`, `MediaSelect`, `Mail`, `Calculator`, `BrowserSearch`,
+`BrowserHome`, `BrowserBack`, `BrowserForward`, `BrowserStop`,
+`BrowserRefresh`, `BrowserFavorites`.
+
+Media keys are bindable **without** `Ctrl`/`Alt`/`Super`; a modifier combo on a
+media key is rejected. They require a keyboard that exposes a USB Consumer
+Control collection (either a separate interface or the shared QMK keyboard/
+consumer report; the CH559 forwards it to the RP2040).
 
 **Reserved keys (cannot be rebound):** the chord grid (`Tab`, `Q`…`[`, `Caps`,
 `A`…`'`, `LShift`…`/`, `RShift`), strum keys (number row `1`…`0` and the keypad
-`0 . 1…9 NumLock / *`), `` ` `` (backtick), `Esc`, `Enter`, and `Backspace`.
-`Super`+`Esc` (panic) and `Super`+`1`…`8` (preset load) are also hard-coded.
+`0 . 1…9 NumLock / *`), `` ` `` (backtick), `Esc`, `Enter`, `Backspace`, and the
+fixed keys `Mute`, `VolumeUp`, and `VolumeDown`. `Super`+`Esc` (panic) and
+`Super`+`1`…`8` (preset load) are also hard-coded.
+
+> **Mute is fixed** to behave exactly like pressing `Enter` (select/commit a
+> parameter in a menu, confirm a save/clear prompt, load a preset from cursor
+> mode, or commit a preset name). **Volume keys are always fixed:** on the main
+> screen `VolumeUp`/`VolumeDown` step the tempo up/down; inside an edit menu they
+> scroll parameters while browsing and change the selected value once a parameter
+> is selected. Holding either volume key repeats value edits.
 
 > The arrow keys (`Left`/`Down`/`Right`/`Up`) are bindable; by default `Left`,
 > `Down`, and `Right` are bound to the held add9/add11/add13 extensions. Inside
-> an edit menu the arrows still navigate the menu regardless of any keymap
-> binding.
+> an edit menu the arrows scroll parameter highlights while browsing and change
+> the selected value once selected, regardless of any keymap binding.
+
+> **Edit-menu flow:** arrows or volume scroll the parameters; `Enter`/`Mute`
+> selects the highlighted parameter. While selected, the same keys edit its
+> value. `Enter`/`Mute` keeps the value and deselects; `Backspace`/`Esc` restores
+> the value from when it was selected and deselects. A selected parameter stays
+> selected indefinitely; only an unselected menu auto-exits after
+> `display.menu_timeout_ms`. `F1`–`F12` are inert inside menus (menu-open keys
+> such as `F9`–`F12` still work).
 
 ### 4.2 Action types
 
@@ -663,6 +688,12 @@ To make `Ctrl`+`Pause` select the `arp_hold` play mode, add:
 
 ```json
 { "keys": ["Ctrl", "Pause"], "action": { "type": "set", "param": "chord_mode", "value": "arp_hold" } }
+```
+
+To use the keyboard's media Play/Pause key to toggle the rhythm, add:
+
+```json
+{ "keys": ["PlayPause"], "action": { "type": "toggle", "param": "rhythm_enable", "a": 1, "b": 0 } }
 ```
 
 ### 7.3 A custom rhythm

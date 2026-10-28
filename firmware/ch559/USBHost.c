@@ -521,7 +521,12 @@ unsigned char getInterfaceDescriptor(unsigned char index)
 #define REPORT_USAGE_PAGE_KEYBOARD 	0x07
 #define REPORT_USAGE_PAGE_LEDS		0x08
 #define REPORT_USAGE_PAGE_BUTTON	0x09
+#define REPORT_USAGE_PAGE_CONSUMER	0x0C
 #define REPORT_USAGE_PAGE_VENDOR	0xff00
+
+// Reported in the DEVICE_POLL `type` field for Consumer Control interfaces so
+// the RP2040 can route media/volume keys to its consumer report parser.
+#define REPORT_USAGE_CONSUMER		0x0C
 
 #define MAX_HID_DEVICES 8
 struct 
@@ -604,6 +609,7 @@ void parseHIDDeviceReport(unsigned char __xdata *report, unsigned short length, 
 	unsigned short i = 0;
 	unsigned char level = 0;
 	unsigned char isUsageSet = 0;
+	unsigned long usagePage = 0;
 	while(i < length)
 	{
 		unsigned char j;
@@ -619,6 +625,7 @@ void parseHIDDeviceReport(unsigned char __xdata *report, unsigned short length, 
 		{
 			case REPORT_USAGE_PAGE:	//todo clean up defines (case)
 			{
+				usagePage = data;
 				unsigned long vd = data < REPORT_USAGE_PAGE_VENDOR ? data : REPORT_USAGE_PAGE_VENDOR;
 				DEBUG_OUT("Usage page ");
 				switch(vd)
@@ -628,6 +635,9 @@ void parseHIDDeviceReport(unsigned char __xdata *report, unsigned short length, 
 					break;
 					case REPORT_USAGE_PAGE_KEYBOARD:
 						DEBUG_OUT("Keyboard/Keypad");
+					break;
+					case REPORT_USAGE_PAGE_CONSUMER:
+						DEBUG_OUT("Consumer");
 					break;
 					case REPORT_USAGE_PAGE_BUTTON:
 						DEBUG_OUT("Button");
@@ -646,7 +656,12 @@ void parseHIDDeviceReport(unsigned char __xdata *report, unsigned short length, 
 			break;
 			case REPORT_USAGE:
 				if (!isUsageSet){
-					HIDdevice[CurrentDevive].type = data;
+					// Keyboard/Keypad interfaces keep their traditional 0x06
+					// type. Consumer Control interfaces are tagged with the
+					// Consumer page so the RP2040 can parse their reports.
+					HIDdevice[CurrentDevive].type =
+						(usagePage == REPORT_USAGE_PAGE_CONSUMER)
+							? REPORT_USAGE_CONSUMER : data;
 					isUsageSet = 1;
 				}
 				DEBUG_OUT("Usage ");

@@ -45,8 +45,9 @@ protected:
         delete display_;
     }
 
-    KeyEvent key(uint8_t usage, bool pressed, uint8_t mods = 0) {
-        return {usage, pressed, mods};
+    KeyEvent key(uint16_t usage, bool pressed, uint8_t mods = 0,
+                 uint8_t page = hid_usage::PAGE_KEYBOARD) {
+        return {usage, pressed, mods, 0, page};
     }
 
     // Full Core 0 routing: preset -> edit. (Chord/strum engines are not wired
@@ -440,4 +441,69 @@ TEST_F(PresetEngineTest, OnDeviceSavePreservesMacrosAndMode) {
     EXPECT_EQ(reloaded.macros.numberKeys, NumberKeyMode::Macro);
     ASSERT_EQ(reloaded.macros.keys[3].size(), 1u);
     EXPECT_EQ(reloaded.macros.keys[3][0].param, ParamId::RhythmMute);
+}
+
+
+TEST_F(PresetEngineTest, MuteLoadsCursorLikeEnter) {
+    PresetSlot p = PresetSlot::defaults();
+    p.name = "Target";
+    p.chord.velocity = 88;
+    savePreset(storage_, 1, 2, p);   // B2:P3
+
+    state_.cursorActive = true;
+    state_.cursorBank   = 1;
+    state_.cursorSlot   = 2;
+
+    route(key(hid_usage::CONSUMER_MUTE, true, 0,
+              hid_usage::PAGE_CONSUMER));
+    EXPECT_FALSE(state_.cursorActive);
+    EXPECT_EQ(state_.currentBank, 1);
+    EXPECT_EQ(state_.currentSlot, 2);
+    EXPECT_EQ(state_.pendingChord.velocity, 88);
+}
+
+TEST_F(PresetEngineTest, MuteConfirmsSavePromptLikeEnter) {
+    setDistinctive();
+    route(key(INSERT, true));   // save prompt
+    route(key(hid_usage::CONSUMER_MUTE, true, 0,
+              hid_usage::PAGE_CONSUMER));
+
+    PresetSlot saved = loadPreset(storage_, 0, 0);
+    EXPECT_EQ(saved.chord.velocity, 111);
+    EXPECT_FALSE(state_.dirty);
+}
+
+TEST_F(PresetEngineTest, MuteCommitsNameEditLikeEnter) {
+    route(key(INSERT, true));
+    route(key(ENTER, true));   // save -> name edit
+    route(key(0x04, true));    // 'a'
+    route(key(hid_usage::CONSUMER_MUTE, true, 0,
+              hid_usage::PAGE_CONSUMER));
+
+    EXPECT_FALSE(engine_->nameEditing());
+    EXPECT_EQ(loadPreset(storage_, 0, 0).name, "a");
+}
+
+TEST_F(PresetEngineTest, ConsumerVolumeAndMuteRouteThroughMainAndMenu) {
+    // Main screen: volume changes tempo.
+    route(key(hid_usage::CONSUMER_VOLUME_UP, true, 0,
+              hid_usage::PAGE_CONSUMER));
+    EXPECT_EQ(state_.pendingRhythm.tempo, 121);
+    route(key(hid_usage::CONSUMER_VOLUME_DOWN, true, 0,
+              hid_usage::PAGE_CONSUMER));
+    EXPECT_EQ(state_.pendingRhythm.tempo, 120);
+
+    // Menu browsing: volume scrolls; Mute selects.
+    route(key(0x44, true));   // F11 -> Rhythm (Tempo)
+    route(key(hid_usage::CONSUMER_VOLUME_DOWN, true, 0,
+              hid_usage::PAGE_CONSUMER));
+    EXPECT_EQ(state_.editParam, 6);   // wrapped to Beat LED
+    route(key(hid_usage::CONSUMER_VOLUME_UP, true, 0,
+              hid_usage::PAGE_CONSUMER));
+    EXPECT_EQ(state_.editParam, 0);   // back to Tempo
+    route(key(hid_usage::CONSUMER_MUTE, true, 0,
+              hid_usage::PAGE_CONSUMER));
+    route(key(hid_usage::CONSUMER_VOLUME_UP, true, 0,
+              hid_usage::PAGE_CONSUMER));
+    EXPECT_EQ(state_.pendingRhythm.tempo, 121);
 }

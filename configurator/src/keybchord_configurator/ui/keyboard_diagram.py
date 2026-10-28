@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from .keymap_visual import (
-    ANSI_104_KEYS,
+    ALL_KEYS,
     CHORD_QUALITY_COLORS,
     CHORD_QUALITY_LABELS,
     HARDCODED_COMBOS,
@@ -226,7 +226,7 @@ class KeyboardDiagram(QWidget):
 
         self._draw_legend(painter, legend_rect)
 
-        for spec in ANSI_104_KEYS:
+        for spec in ALL_KEYS:
             self._draw_key(painter, spec)
 
     def _draw_legend(self, painter: QPainter, rect: QRectF) -> None:
@@ -595,7 +595,7 @@ class KeyboardDiagram(QWidget):
             return None
         x = (position.x() - self._origin.x()) / self._unit
         y = (position.y() - self._origin.y()) / self._unit
-        for spec in reversed(ANSI_104_KEYS):
+        for spec in reversed(ALL_KEYS):
             if spec.x <= x <= spec.x + spec.w and spec.y <= y <= spec.y + spec.h:
                 return spec
         return None

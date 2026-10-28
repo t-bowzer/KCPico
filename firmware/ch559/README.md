@@ -58,6 +58,8 @@ Implemented (tracked against the bring-up plan):
       firmware issues a SET_REPORT(output) on the enumerated keyboard.
 - [x] Set the HID **boot protocol** during enumeration for the standard 8-byte
       report format.
+- [x] Tag **Consumer Control** interfaces as type `0x0C` in `DEVICE_POLL` so the
+      RP2040 can decode media/volume keys from their report descriptor.
 - [x] Detect a keyboard that is already attached at power-up/reset by polling
       the root-hub attach levels, rather than waiting for a `UIF_DETECT` edge.
 

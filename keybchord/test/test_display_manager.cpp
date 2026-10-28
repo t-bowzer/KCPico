@@ -118,6 +118,28 @@ TEST_F(DisplayManagerTest, SelectParamUpdatesBottomLine) {
     EXPECT_EQ(lcd_.frames()[0].l2, pad("Duration"));
 }
 
+TEST_F(DisplayManagerTest, SelectedParamIsMarked) {
+    DisplayManager dm(state_, lcd_);
+    dm.showMenu("Strum Edit", "Octave", true);
+    dm.update(0);
+
+    ASSERT_EQ(lcd_.frames().size(), 1u);
+    EXPECT_EQ(lcd_.frames()[0].l1, pad("Strum Edit"));
+    EXPECT_EQ(lcd_.frames()[0].l2, pad("> Octave"));
+
+    lcd_.reset();
+    dm.selectParam("Duration", true);
+    dm.update(0);
+    ASSERT_EQ(lcd_.frames().size(), 1u);
+    EXPECT_EQ(lcd_.frames()[0].l2, pad("> Duration"));
+
+    lcd_.reset();
+    dm.selectParam("Duration", false);
+    dm.update(0);
+    ASSERT_EQ(lcd_.frames().size(), 1u);
+    EXPECT_EQ(lcd_.frames()[0].l2, pad("Duration"));
+}
+
 TEST_F(DisplayManagerTest, ShowValueRevertsToMenu) {
     DisplayManager dm(state_, lcd_);
     dm.showMenu("Strum Edit", "Octave");

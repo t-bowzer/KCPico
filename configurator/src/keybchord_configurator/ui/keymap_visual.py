@@ -105,7 +105,7 @@ STRUM_FULL: frozenset[str] = frozenset(_NUMBER_ROW_STRUM) | frozenset(
 STRUM_LIMITED: frozenset[str] = frozenset(_NUMPAD_STRUM_LIMITED)
 
 RESERVED_KEYS: frozenset[str] = frozenset(
-    {"Esc", "Backtick", "Enter", "Backspace"}
+    {"Esc", "Backtick", "Enter", "Backspace", "Mute", "VolumeUp", "VolumeDown"}
 )
 
 HARDCODED_COMBOS: dict[tuple[Optional[str], str], str] = {
@@ -118,6 +118,9 @@ RESERVED_DESCRIPTIONS: dict[str, str] = {
     "Backtick": "Leftmost chord-column modifier",
     "Enter": "Reserved",
     "Backspace": "Reserved",
+    "Mute": "Fixed: same as Enter",
+    "VolumeUp": "Fixed: tempo + (main) / value + (menu)",
+    "VolumeDown": "Fixed: tempo - (main) / value - (menu)",
 }
 
 
@@ -254,6 +257,29 @@ _NUMPAD = (
     _k("KpDot", ".", 20.5, 5.25),
 )
 
+_MEDIA_ROW = (
+    _k("VolumeDown", "Vol-", 0.0, 6.5),
+    _k("VolumeUp", "Vol+", 1.0, 6.5),
+    _k("Mute", "Mute", 2.0, 6.5),
+    _k("PlayPause", "Play", 3.0, 6.5),
+    _k("Stop", "Stop", 4.0, 6.5),
+    _k("PrevTrack", "Prev", 5.0, 6.5),
+    _k("NextTrack", "Next", 6.0, 6.5),
+    _k("Rewind", "Rew", 7.0, 6.5),
+    _k("FastForward", "FF", 8.0, 6.5),
+    _k("Eject", "Eject", 9.0, 6.5),
+    _k("MediaSelect", "Media", 10.0, 6.5),
+    _k("Mail", "Mail", 11.0, 6.5),
+    _k("Calculator", "Calc", 12.0, 6.5),
+    _k("BrowserSearch", "B.Search", 13.0, 6.5),
+    _k("BrowserHome", "Home", 14.0, 6.5),
+    _k("BrowserBack", "Back", 15.0, 6.5),
+    _k("BrowserForward", "Fwd", 16.0, 6.5),
+    _k("BrowserStop", "B.Stop", 17.0, 6.5),
+    _k("BrowserRefresh", "Refresh", 18.0, 6.5),
+    _k("BrowserFavorites", "Fav", 19.0, 6.5),
+)
+
 _KEY_GEOMETRY = (
     _FUNCTION_ROW + _NUMBER_ROW + _TAB_ROW + _CAPS_ROW + _SHIFT_ROW
     + _BOTTOM_ROW + _NAV_CLUSTER + _NUMPAD
@@ -274,9 +300,9 @@ def _kind_for(name: str) -> str:
     return "other"
 
 
-def _build_keys() -> tuple[KeySpec, ...]:
+def _build_keys(geometry=_KEY_GEOMETRY) -> tuple[KeySpec, ...]:
     specs: list[KeySpec] = []
-    for name, label, x, y, w, h in _KEY_GEOMETRY:
+    for name, label, x, y, w, h in geometry:
         chord_root = ""
         quality: Optional[ChordQuality] = None
         if name in CHORD_GRID:
@@ -301,13 +327,15 @@ def _build_keys() -> tuple[KeySpec, ...]:
 
 
 ANSI_104_KEYS: tuple[KeySpec, ...] = _build_keys()
-KEY_BY_NAME: dict[str, KeySpec] = {spec.name: spec for spec in ANSI_104_KEYS}
+MEDIA_KEYS: tuple[KeySpec, ...] = _build_keys(_MEDIA_ROW)
+ALL_KEYS: tuple[KeySpec, ...] = ANSI_104_KEYS + MEDIA_KEYS
+KEY_BY_NAME: dict[str, KeySpec] = {spec.name: spec for spec in ALL_KEYS}
 KEY_DISPLAY_LABELS: dict[str, str] = {
-    spec.name: spec.label for spec in ANSI_104_KEYS
+    spec.name: spec.label for spec in ALL_KEYS
 }
 
-LAYOUT_WIDTH: float = max(spec.x + spec.w for spec in ANSI_104_KEYS)
-LAYOUT_HEIGHT: float = max(spec.y + spec.h for spec in ANSI_104_KEYS)
+LAYOUT_WIDTH: float = max(spec.x + spec.w for spec in ALL_KEYS)
+LAYOUT_HEIGHT: float = max(spec.y + spec.h for spec in ALL_KEYS)
 
 
 PARAM_LABELS: dict[str, str] = {

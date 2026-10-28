@@ -170,7 +170,7 @@ Each message is a byte stream delimited by `0xFE` … `0x0A`:
 | 0 | `0xFE` start |
 | 1–2 | payload length, 16-bit little-endian |
 | 3 | message type (below) |
-| 4 | `type` (HID usage for `DEVICE_POLL`, e.g. `0x06`=keyboard) |
+| 4 | `type` (for `DEVICE_POLL`: `0x06`=keyboard, `0x0C`=Consumer/media) |
 | 5 | `device` |
 | 6 | `endpoint` |
 | 7–10 | 4 bytes — zeros, or VID/PID for `DEVICE_POLL` |
@@ -282,7 +282,8 @@ MIDI monitor on the device's USB-MIDI input.
 |---|---|---|
 | 3 | Plug a keyboard → `CONNECTED` (`0x01`) + `DEVICE_INFO` (`0x06`) frames | |
 | 4 | Press keys → `DEVICE_POLL` (`0x04`, HID usage `0x06`) frames appear | |
-| 5 | Unplug → `DISCONNECTED` (`0x02`) | |
+| 5 | Press media/volume keys → `DEVICE_POLL` frames with HID usage `0x0C` (Consumer) appear | |
+| 5a | Unplug → `DISCONNECTED` (`0x02`) | |
 
 ### 7.3 RP2040 end-to-end
 
@@ -295,7 +296,10 @@ MIDI monitor on the device's USB-MIDI input.
 | 10 | **Beat LED** on the keyboard flashes | |
 | 11 | **Hot-plug:** unplug/replug the keyboard mid-session recovers without reset | |
 | 12 | **Problem keyboards:** a hub-connected keyboard and a long-descriptor/NKRO keyboard that failed on PIO-USB now enumerate and type | |
-| 13 | Native GoogleTest suite green (`pio test -e native`) | |
+| 13 | **Volume keys:** `Volume +`/`−` change tempo on the main screen and the selected value in an edit menu (with repeat while held) | |
+| 14 | **Mute:** behaves like `Enter` (confirms a save/clear prompt, loads a cursor-selected preset, commits name editing) | |
+| 15 | A media key bound in `keymap.json` (e.g. `PlayPause`) triggers its action, including on QMK keyboards that share the Consumer report with the keyboard endpoint (e.g. Keychron V6) | |
+| 16 | Native GoogleTest suite green (`pio test -e native`) | |
 
 ---
 

@@ -24,8 +24,11 @@ constexpr uint8_t MSG_DEVICE_INFO   = 0x06;
 constexpr uint8_t MSG_HID_INFO      = 0x07;
 constexpr uint8_t MSG_STARTUP       = 0x08;
 
-// HID usage value carried in the `type` field of a DEVICE_POLL for keyboards.
+// HID usage value carried in the `type` field of a DEVICE_POLL. The CH559
+// reports keyboard interfaces as 0x06 and Consumer Control interfaces as 0x0C
+// (the Consumer usage page), so the RP2040 can pick the right report parser.
 constexpr uint8_t HID_USAGE_KEYBOARD = 0x06;
+constexpr uint8_t HID_USAGE_CONSUMER = 0x0C;
 
 constexpr uint8_t FRAME_START = 0xFE;
 constexpr uint8_t FRAME_END   = 0x0A;

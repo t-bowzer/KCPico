@@ -23,8 +23,9 @@ device's mass-storage drive.
 - **Keymap editor** — map non-reserved keys and combos to parameters, with live
   validation and coverage checking, plus a live ANSI 104-key overlay of the
   keymap (fixed chord/strum maps, modifier layers, click-to-select / double-click
-  to edit, and PNG/SVG export). A synced preset selector shows the top row as
-  strum or per-preset macros, with the macro editor embedded in the same tab.
+  to edit, and PNG/SVG export). A media-key strip shows configurable Consumer
+  keys plus the fixed Volume +/− controls. A synced preset selector shows the top
+  row as strum or per-preset macros, with the macro editor embedded in the same tab.
 - **JSON validator** — validate every file against the same rules the firmware
   enforces (bounds, enums, reserved keys, required keymap coverage).
 - **Backup / restore** — save the whole configuration to a `.zip`, or restore

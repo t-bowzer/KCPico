@@ -44,26 +44,52 @@ constexpr uint8_t HID_USAGE_UP        = 0x52;
 // --- Key name table (configurable keys only; modifiers handled separately) ---
 struct KeyName {
     const char* name;
-    uint8_t     usage;
+    uint8_t     page;
+    uint16_t    usage;
 };
+
+constexpr uint8_t KB = hid_usage::PAGE_KEYBOARD;
+constexpr uint8_t CONS = hid_usage::PAGE_CONSUMER;
 
 const KeyName kKeyNames[] = {
-    {"F1", 0x3A}, {"F2", 0x3B}, {"F3", 0x3C}, {"F4", 0x3D},
-    {"F5", 0x3E}, {"F6", 0x3F}, {"F7", 0x40}, {"F8", 0x41},
-    {"F9", 0x42}, {"F10", 0x43}, {"F11", 0x44}, {"F12", 0x45},
-    {"PrtSc", 0x46}, {"ScLk", 0x47}, {"Pause", 0x48},
-    {"Insert", 0x49}, {"Home", 0x4A}, {"PgUp", 0x4B},
-    {"Delete", 0x4C}, {"End", 0x4D}, {"PgDn", 0x4E},
-    {"Space", 0x2C}, {"=", 0x2E}, {"-", 0x2D},
-    {"KpPlus", 0x57}, {"KpMinus", 0x56}, {"KpEnter", 0x58},
-    {"Left", 0x50}, {"Down", 0x51}, {"Right", 0x4F}, {"Up", 0x52},
-    {"1", 0x1E}, {"2", 0x1F}, {"3", 0x20}, {"4", 0x21},
-    {"5", 0x22}, {"6", 0x23}, {"7", 0x24}, {"8", 0x25},
+    {"F1", KB, 0x3A}, {"F2", KB, 0x3B}, {"F3", KB, 0x3C}, {"F4", KB, 0x3D},
+    {"F5", KB, 0x3E}, {"F6", KB, 0x3F}, {"F7", KB, 0x40}, {"F8", KB, 0x41},
+    {"F9", KB, 0x42}, {"F10", KB, 0x43}, {"F11", KB, 0x44}, {"F12", KB, 0x45},
+    {"PrtSc", KB, 0x46}, {"ScLk", KB, 0x47}, {"Pause", KB, 0x48},
+    {"Insert", KB, 0x49}, {"Home", KB, 0x4A}, {"PgUp", KB, 0x4B},
+    {"Delete", KB, 0x4C}, {"End", KB, 0x4D}, {"PgDn", KB, 0x4E},
+    {"Space", KB, 0x2C}, {"=", KB, 0x2E}, {"-", KB, 0x2D},
+    {"KpPlus", KB, 0x57}, {"KpMinus", KB, 0x56}, {"KpEnter", KB, 0x58},
+    {"Left", KB, 0x50}, {"Down", KB, 0x51}, {"Right", KB, 0x4F}, {"Up", KB, 0x52},
+    {"1", KB, 0x1E}, {"2", KB, 0x1F}, {"3", KB, 0x20}, {"4", KB, 0x21},
+    {"5", KB, 0x22}, {"6", KB, 0x23}, {"7", KB, 0x24}, {"8", KB, 0x25},
+    // Consumer/media keys. VolumeUp/VolumeDown are named so the loader can
+    // report them as reserved, but they are hard-coded and cannot be bound.
+    {"VolumeUp", CONS, hid_usage::CONSUMER_VOLUME_UP},
+    {"VolumeDown", CONS, hid_usage::CONSUMER_VOLUME_DOWN},
+    {"Mute", CONS, hid_usage::CONSUMER_MUTE},
+    {"PlayPause", CONS, hid_usage::CONSUMER_PLAY_PAUSE},
+    {"Stop", CONS, hid_usage::CONSUMER_STOP},
+    {"PrevTrack", CONS, hid_usage::CONSUMER_PREV_TRACK},
+    {"NextTrack", CONS, hid_usage::CONSUMER_NEXT_TRACK},
+    {"Rewind", CONS, hid_usage::CONSUMER_REWIND},
+    {"FastForward", CONS, hid_usage::CONSUMER_FAST_FORWARD},
+    {"Eject", CONS, hid_usage::CONSUMER_EJECT},
+    {"MediaSelect", CONS, hid_usage::CONSUMER_MEDIA_SELECT},
+    {"Mail", CONS, hid_usage::CONSUMER_MAIL},
+    {"Calculator", CONS, hid_usage::CONSUMER_CALCULATOR},
+    {"BrowserSearch", CONS, hid_usage::CONSUMER_BROWSER_SEARCH},
+    {"BrowserHome", CONS, hid_usage::CONSUMER_BROWSER_HOME},
+    {"BrowserBack", CONS, hid_usage::CONSUMER_BROWSER_BACK},
+    {"BrowserForward", CONS, hid_usage::CONSUMER_BROWSER_FORWARD},
+    {"BrowserStop", CONS, hid_usage::CONSUMER_BROWSER_STOP},
+    {"BrowserRefresh", CONS, hid_usage::CONSUMER_BROWSER_REFRESH},
+    {"BrowserFavorites", CONS, hid_usage::CONSUMER_BROWSER_FAVORITES},
 };
 
-bool lookupKeyName(const std::string& name, uint8_t& usage) {
+bool lookupKeyName(const std::string& name, uint8_t& page, uint16_t& usage) {
     for (const auto& k : kKeyNames) {
-        if (name == k.name) { usage = k.usage; return true; }
+        if (name == k.name) { page = k.page; usage = k.usage; return true; }
     }
     return false;
 }
@@ -279,9 +305,13 @@ bool keymapParseParamValue(ParamId id, const std::string& value, int& out) {
 }
 
 
-const KeyAction* KeymapConfig::find(uint8_t modifierMask, uint8_t usage) const {
+const KeyAction* KeymapConfig::find(uint8_t modifierMask, uint8_t usagePage,
+                                    uint16_t usage) const {
     for (const auto& b : bindings) {
-        if (b.modifierMask == modifierMask && b.usage == usage) return &b.action;
+        if (b.modifierMask == modifierMask && b.usagePage == usagePage &&
+            b.usage == usage) {
+            return &b.action;
+        }
     }
     return nullptr;
 }
@@ -290,9 +320,10 @@ KeymapConfig KeymapConfig::defaults() {
     KeymapConfig cfg;
     std::vector<KeyBinding>& b = cfg.bindings;
 
-    auto bind = [&](uint8_t mods, uint8_t usage, KeyAction a) {
+    auto bind = [&](uint8_t mods, uint16_t usage, KeyAction a) {
         KeyBinding kb;
         kb.modifierMask = mods;
+        kb.usagePage = hid_usage::PAGE_KEYBOARD;
         kb.usage = usage;
         kb.action = a;
         b.push_back(kb);
@@ -443,19 +474,24 @@ KeymapLoadResult KeymapConfig::load(StorageAdapter& storage) {
         }
 
         uint8_t mods = 0;
-        uint8_t usage = 0;
+        uint8_t usagePage = hid_usage::PAGE_KEYBOARD;
+        uint16_t usage = 0;
         bool haveKey = false;
         bool keyErr = false;
         for (JsonVariant kv : obj["keys"].as<JsonArray>()) {
             if (!kv.is<const char*>()) { keyErr = true; break; }
             std::string name = kv.as<std::string>();
             uint8_t m;
+            uint8_t page = hid_usage::PAGE_KEYBOARD;
+            uint16_t keyUsage = 0;
             if (lookupModifier(name, m)) {
                 if (mods != 0) { keyErr = true; break; }  // two modifiers
                 mods = m;
-            } else if (lookupKeyName(name, usage)) {
+            } else if (lookupKeyName(name, page, keyUsage)) {
                 if (haveKey) { keyErr = true; break; }    // two keys
                 haveKey = true;
+                usagePage = page;
+                usage = keyUsage;
             } else {
                 result.errors.push_back(where + ": unknown key '" + name + "'");
                 result.ok = false;
@@ -473,17 +509,27 @@ KeymapLoadResult KeymapConfig::load(StorageAdapter& storage) {
             continue;
         }
 
+        // Consumer/media keys have no modifier byte, so a modifier combo would
+        // never match a real report.
+        if (mods != 0 && usagePage != hid_usage::PAGE_KEYBOARD) {
+            result.errors.push_back(where + ": media keys cannot use modifiers");
+            result.ok = false;
+            continue;
+        }
+
         // Reserved keys cannot be rebound.
-        if (keymapIsReserved(usage)) {
+        if (keymapIsReserved(usage, usagePage)) {
             result.errors.push_back(where + ": key is reserved");
             result.ok = false;
             continue;
         }
 
-        // Duplicate (modifier, usage) check.
+        // Duplicate (modifier, page, usage) check.
         bool dup = false;
         for (const auto& existing : cfg.bindings) {
-            if (existing.modifierMask == mods && existing.usage == usage) {
+            if (existing.modifierMask == mods &&
+                existing.usagePage == usagePage &&
+                existing.usage == usage) {
                 dup = true;
                 break;
             }
@@ -647,6 +693,7 @@ KeymapLoadResult KeymapConfig::load(StorageAdapter& storage) {
 
         KeyBinding kb;
         kb.modifierMask = mods;
+        kb.usagePage = usagePage;
         kb.usage = usage;
         kb.action = a;
         cfg.bindings.push_back(kb);

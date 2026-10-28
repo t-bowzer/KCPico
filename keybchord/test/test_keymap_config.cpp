@@ -16,8 +16,8 @@ bool actionEqual(const KeyAction& a, const KeyAction& b) {
 }
 
 bool bindingEqual(const KeyBinding& a, const KeyBinding& b) {
-    return a.modifierMask == b.modifierMask && a.usage == b.usage &&
-           actionEqual(a.action, b.action);
+    return a.modifierMask == b.modifierMask && a.usagePage == b.usagePage &&
+           a.usage == b.usage && actionEqual(a.action, b.action);
 }
 
 bool configEqual(const KeymapConfig& a, const KeymapConfig& b) {
@@ -297,6 +297,65 @@ TEST_F(KeymapConfigTest, UnknownPatternNameRejected) {
         { "keys": ["Home"], "action": { "type": "preset_prev" } },
         { "keys": ["End"], "action": { "type": "preset_next" } },
         { "keys": ["Insert"], "action": { "type": "preset_save" } }
+      ]
+    })");
+    KeymapLoadResult r = KeymapConfig::load(storage_);
+    EXPECT_FALSE(r.ok);
+}
+
+TEST_F(KeymapConfigTest, ConsumerKeyLoadsAndResolves) {
+    storage_.writeFile("/keymap.json", R"({
+      "bindings": [
+        { "keys": ["PlayPause"], "action": { "type": "cycle", "param": "chord_mode" } },
+        { "keys": ["F9"], "action": { "type": "open_menu", "menu": "chord" } },
+        { "keys": ["F10"], "action": { "type": "open_menu", "menu": "strum" } },
+        { "keys": ["F11"], "action": { "type": "open_menu", "menu": "rhythm" } },
+        { "keys": ["F12"], "action": { "type": "open_menu", "menu": "bass" } },
+        { "keys": ["Super", "F11"], "action": { "type": "open_menu", "menu": "drum" } },
+        { "keys": ["Home"], "action": { "type": "preset_prev" } },
+        { "keys": ["End"], "action": { "type": "preset_next" } },
+        { "keys": ["Insert"], "action": { "type": "preset_save" } }
+      ]
+    })");
+    KeymapLoadResult r = KeymapConfig::load(storage_);
+    EXPECT_TRUE(r.ok) << [&] {
+        std::string s;
+        for (const auto& e : r.errors) s += e + "; ";
+        return s;
+    }();
+
+    KeymapResolver resolver(&r.config);
+    KeyAction a = resolver.resolve(hid_usage::CONSUMER_PLAY_PAUSE, 0,
+                                   hid_usage::PAGE_CONSUMER);
+    EXPECT_EQ(a.cmd, KeyCmd::CycleParam);
+    EXPECT_EQ(a.param, ParamId::ChordMode);
+}
+
+TEST_F(KeymapConfigTest, ConsumerVolumeKeysAreReserved) {
+    storage_.writeFile("/keymap.json", R"({
+      "bindings": [
+        { "keys": ["VolumeUp"], "action": { "type": "tap_tempo" } }
+      ]
+    })");
+    KeymapLoadResult r = KeymapConfig::load(storage_);
+    EXPECT_FALSE(r.ok);
+}
+
+TEST_F(KeymapConfigTest, ConsumerKeyWithModifierRejected) {
+    storage_.writeFile("/keymap.json", R"({
+      "bindings": [
+        { "keys": ["Ctrl", "PlayPause"], "action": { "type": "tap_tempo" } }
+      ]
+    })");
+    KeymapLoadResult r = KeymapConfig::load(storage_);
+    EXPECT_FALSE(r.ok);
+}
+
+
+TEST_F(KeymapConfigTest, ConsumerMuteIsReserved) {
+    storage_.writeFile("/keymap.json", R"({
+      "bindings": [
+        { "keys": ["Mute"], "action": { "type": "tap_tempo" } }
       ]
     })");
     KeymapLoadResult r = KeymapConfig::load(storage_);

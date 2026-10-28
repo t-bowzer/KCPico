@@ -6,11 +6,14 @@
 #include <string>
 #include <vector>
 
+#include "hid_usage.h"
+
 struct KeyEvent {
-    uint8_t hid_usage;
+    uint16_t hid_usage;
     bool pressed;
     uint8_t modifiers;   // HID modifier byte
     uint64_t received_us = 0;  // device timestamp when the report was received
+    uint8_t usage_page = hid_usage::PAGE_KEYBOARD;
 };
 
 struct MidiMessage {

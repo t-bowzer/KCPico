@@ -425,7 +425,7 @@ void loop() {
 
     auto events = g_adapters.input->poll();
     for (const auto& ev : events) {
-        logKeyEvent(ev.hid_usage, ev.pressed, ev.modifiers);
+        logKeyEvent(ev.hid_usage, ev.pressed, ev.modifiers, ev.usage_page);
 
         if (ev.pressed) {
             // Any new key dismisses the persistent firmware-info screen. The
@@ -433,7 +433,7 @@ void loop() {
             if (g_display && g_display->infoVisible()) {
                 g_display->cancel();
             }
-            KeyCmd t = g_keymap.resolve(ev.hid_usage, ev.modifiers).cmd;
+            KeyCmd t = g_keymap.resolve(ev.hid_usage, ev.modifiers, ev.usage_page).cmd;
             // Ctrl+Esc: hard-coded debug screen (firmware version + git hash).
             if (t == KeyCmd::FirmwareInfo) {
                 if (g_display) {

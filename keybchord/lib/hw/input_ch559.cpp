@@ -35,23 +35,60 @@ std::vector<KeyEvent> InputCh559::poll() {
                 connected_ = true;
                 reportReceived_ = false;
                 report_.reset();
+                for (auto& p : consumerParsers_) p.reset();
                 break;
             case ch559::MSG_DISCONNECTED:
                 connected_ = false;
                 reportReceived_ = false;
                 report_.reset();
+                for (auto& p : consumerParsers_) p.reset();
                 break;
-            case ch559::MSG_DEVICE_POLL:
-                // The CH559 firmware forces the boot protocol, so reports carry
-                // no report ID (report_id = 0).
-                if (msg.hid_usage == ch559::HID_USAGE_KEYBOARD) {
-                    connected_ = true;
-                    reportReceived_ = true;
-                    report_.apply(msg.payload.data(),
-                                  static_cast<uint16_t>(msg.payload.size()),
-                                  0, time_us_64(), eventQueue_);
+            case ch559::MSG_HID_INFO:
+                // For HID_INFO the `hid_usage` field carries the CH559's device
+                // index (matching the `device` field of later DEVICE_POLLs).
+                if (msg.hid_usage < consumerParsers_.size()) {
+                    consumerParsers_[msg.hid_usage].setDescriptor(
+                        msg.payload.data(), msg.payload.size());
                 }
                 break;
+            case ch559::MSG_DEVICE_POLL: {
+                uint16_t len = static_cast<uint16_t>(msg.payload.size());
+                bool consumer = false;
+                if (msg.device < consumerParsers_.size()) {
+                    hid_consumer::ReportParser& cp =
+                        consumerParsers_[msg.device];
+                    // QMK-style keyboards share one endpoint between the boot
+                    // keyboard report and Consumer reports (report ID 4). Match
+                    // the Consumer report by its descriptor report ID + length
+                    // before falling back to the boot keyboard parser.
+                    if (cp.matchesReport(msg.payload.data(), len)) {
+                        cp.apply(msg.payload.data(), len, time_us_64(),
+                                 eventQueue_);
+                        consumer = true;
+                    } else if ((msg.hid_usage == ch559::HID_USAGE_KEYBOARD ||
+                                msg.hid_usage == ch559::HID_USAGE_CONSUMER) &&
+                               cp.applyQmkConsumer(msg.payload.data(), len,
+                                                   time_us_64(), eventQueue_)) {
+                        // Descriptor unavailable (e.g. the Pico was reflashed
+                        // without resetting the CH559, so HID_INFO was not
+                        // resent). Decode QMK's standard 3-byte Consumer report.
+                        consumer = true;
+                    }
+                }
+
+                if (!consumer && msg.hid_usage == ch559::HID_USAGE_KEYBOARD) {
+                    connected_ = true;
+                    reportReceived_ = true;
+                    report_.apply(msg.payload.data(), len, 0,
+                                  time_us_64(), eventQueue_);
+                } else if (!consumer &&
+                           msg.hid_usage == ch559::HID_USAGE_CONSUMER &&
+                           msg.device < consumerParsers_.size()) {
+                    consumerParsers_[msg.device].apply(
+                        msg.payload.data(), len, time_us_64(), eventQueue_);
+                }
+                break;
+            }
             default:
                 break;
         }

@@ -604,10 +604,7 @@ bool isAutoRepeatable(ParamId id) {
     }
 }
 
-namespace {
-
-// Current value of a non-drum parameter as an int (enum index, bool 0/1, int).
-int paramIntValue(const StateManager& s, ParamId id) {
+int paramValueInt(const StateManager& s, ParamId id) {
     switch (id) {
         case ParamId::ChordOctave:      return s.pendingChord.octave;
         case ParamId::ChordMode:        return static_cast<int>(s.pendingChord.play_mode);
@@ -671,8 +668,6 @@ int paramIntValue(const StateManager& s, ParamId id) {
         default:                        return 0;
     }
 }
-
-} // namespace
 
 void paramSet(StateManager& state, ParamId id, int value) {
     switch (id) {
@@ -901,6 +896,6 @@ void paramSet(StateManager& state, ParamId id, int value) {
 }
 
 void paramToggle(StateManager& state, ParamId id, int valueA, int valueB) {
-    int cur = paramIntValue(state, id);
+    int cur = paramValueInt(state, id);
     paramSet(state, id, (cur == valueA) ? valueB : valueA);
 }

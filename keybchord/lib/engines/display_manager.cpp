@@ -35,15 +35,18 @@ void DisplayManager::update(uint64_t now_us) {
     emit(l1, l2);
 }
 
-void DisplayManager::showMenu(const std::string& title, const std::string& paramName) {
+void DisplayManager::showMenu(const std::string& title, const std::string& paramName,
+                              bool selected) {
     screen_       = Screen::Menu;
     revertToMenu_ = false;
     menuTitle_    = title;
     menuParamName_ = paramName;
+    menuParamSelected_ = selected;
 }
 
-void DisplayManager::selectParam(const std::string& paramName) {
+void DisplayManager::selectParam(const std::string& paramName, bool selected) {
     menuParamName_ = paramName;
+    menuParamSelected_ = selected;
     if (screen_ != Screen::Menu) screen_ = Screen::Menu;
 }
 
@@ -126,7 +129,8 @@ void DisplayManager::render(std::string& l1, std::string& l2, uint64_t now_us) c
     switch (screen_) {
         case Screen::Menu:
             l1 = padTrunc(menuTitle_, kCols);
-            l2 = padTrunc(menuParamName_, kCols);
+            l2 = padTrunc((menuParamSelected_ ? "> " : "") + menuParamName_,
+                          kCols);
             break;
         case Screen::Edit:
             l1 = padTrunc(editFullName_, kCols);

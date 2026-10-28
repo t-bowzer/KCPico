@@ -21,6 +21,9 @@ const char* paramFullName(ParamId id);
 // On/Off, Full/Limited).
 std::string paramValueString(const StateManager& state, ParamId id);
 
+// Current value of a parameter as an int (enum index, bool 0/1, int, drum 0..128).
+int paramValueInt(const StateManager& state, ParamId id);
+
 // +/- semantics: ints add `delta` and clamp; enums cycle by sign; bools are set
 // on (+1) / off (-1). Menu +/- uses this.
 void paramStep(StateManager& state, ParamId id, int delta);

@@ -91,6 +91,24 @@ void EditEngine::setPatternProvider(std::function<const RhythmPattern*(int)> cb)
     patternProvider_ = std::move(cb);
 }
 
+void EditEngine::setMidiSendCallback(
+        std::function<void(const std::vector<uint8_t>&)> cb) {
+    midiSend_ = std::move(cb);
+}
+
+void EditEngine::sendOrScheduleMidi(const std::vector<uint8_t>& bytes,
+                                    uint64_t dueUs) {
+    if (!midiSend_ || bytes.empty()) return;
+    if (dueUs == 0) {
+        midiSend_(bytes);
+        return;
+    }
+    if (pendingMidi_.size() >= MAX_PENDING_MIDI) {
+        pendingMidi_.erase(pendingMidi_.begin());
+    }
+    pendingMidi_.push_back({dueUs, bytes});
+}
+
 ParamId EditEngine::currentParam() const {
     if (state_.editMenu == EditMenu::None) return ParamId::COUNT;
     return menuParamAt(state_.editMenu, state_.editParam);
@@ -178,8 +196,16 @@ void EditEngine::triggerMacro(uint8_t keyIndex, uint64_t now_us) {
     bool arpChanged = false;
     bool patternChanged = false;
     bool edited = false;
+    uint64_t midiDelayUs = 0;
 
     for (const auto& cmd : commands) {
+        if (cmd.op == MacroOp::Midi) {
+            midiDelayUs += static_cast<uint64_t>(cmd.delayMs) * 1000ULL;
+            sendOrScheduleMidi(cmd.midiBytes,
+                               midiDelayUs == 0 ? 0 : now_us + midiDelayUs);
+            edited = true;
+            continue;
+        }
         if (cmd.param == ParamId::COUNT && cmd.op != MacroOp::DrumMute) continue;
 
         switch (cmd.op) {
@@ -270,6 +296,15 @@ void EditEngine::clearRepeat() {
 }
 
 void EditEngine::update(uint64_t now_us) {
+    for (size_t i = 0; i < pendingMidi_.size();) {
+        if (now_us >= pendingMidi_[i].dueUs) {
+            if (midiSend_) midiSend_(pendingMidi_[i].bytes);
+            pendingMidi_.erase(pendingMidi_.begin() + static_cast<long>(i));
+        } else {
+            i++;
+        }
+    }
+
     if (repeatDelta_ != 0 && now_us >= repeatDeadlineUs_) {
         applyParamStep(repeatParam_, repeatDelta_, repeatInMenu_, now_us);
         repeatDeadlineUs_ = now_us + REPEAT_INTERVAL_US;

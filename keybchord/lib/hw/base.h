@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -45,6 +46,11 @@ public:
     virtual ~MidiOutAdapter() = default;
     virtual bool begin() = 0;
     virtual void send(const MidiMessage& msg) = 0;
+
+    // Send an arbitrary MIDI byte stream (1..N bytes). Used by macro MIDI
+    // commands so SysEx and other variable-length messages can be emitted.
+    virtual void sendBytes(const uint8_t* data, size_t length) = 0;
+
     virtual void flush() = 0;
 };
 

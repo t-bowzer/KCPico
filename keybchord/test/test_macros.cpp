@@ -163,6 +163,65 @@ TEST(Macros, LoadEnforcesPerKeyAndTotalCaps) {
     EXPECT_EQ(MAX_MACRO_COMMANDS_PER_PRESET, total);
 }
 
+TEST(Macros, MidiCommandRoundTrip) {
+    StorageStub storage;
+
+    PresetSlot p = PresetSlot::defaults();
+    MacroCommand midi;
+    midi.op = MacroOp::Midi;
+    midi.midiBytes = {0xF0, 0x41, 0x10, 0x42, 0x12, 0x18, 0x00, 0x00,
+                      0x00, 0x01, 0x02, 0x03, 0x04, 0xF7};
+    midi.delayMs = 250;
+    p.macros.keys[3] = {midi};
+
+    ASSERT_TRUE(savePreset(storage, 0, 4, p));
+    PresetSlot loaded = loadPreset(storage, 0, 4);
+
+    ASSERT_EQ(loaded.macros.keys[3].size(), 1u);
+    EXPECT_EQ(loaded.macros.keys[3][0].op, MacroOp::Midi);
+    EXPECT_EQ(loaded.macros.keys[3][0].midiBytes, midi.midiBytes);
+    EXPECT_EQ(loaded.macros.keys[3][0].delayMs, 250);
+}
+
+TEST(Macros, LoadSkipsMalformedMidiCommands) {
+    StorageStub storage;
+    storage.writeFile("/presets/bank1.json",
+        "[{\"number_keys\":\"macro\",\"macros\":{\"1\":["
+        "{\"type\":\"midi\",\"bytes\":[]},"
+        "{\"type\":\"midi\",\"bytes\":[1,2,300]},"
+        "{\"type\":\"midi\",\"bytes\":[1,2,3],\"delay_ms\":-1},"
+        "{\"type\":\"midi\",\"bytes\":[144,60,100]},"
+        "{\"type\":\"midi\",\"bytes\":[176,7,42],\"delay_ms\":75}"
+        "]}}]");
+
+    PresetSlot p = loadPreset(storage, 0, 0);
+    ASSERT_EQ(p.macros.keys[0].size(), 2u);
+    EXPECT_EQ(p.macros.keys[0][0].midiBytes,
+              (std::vector<uint8_t>{144, 60, 100}));
+    EXPECT_EQ(p.macros.keys[0][1].midiBytes,
+              (std::vector<uint8_t>{176, 7, 42}));
+    EXPECT_EQ(p.macros.keys[0][1].delayMs, 75);
+}
+
+TEST(Macros, LoadKeepsMidiSysExBytes) {
+    StorageStub storage;
+    storage.writeFile("/presets/bank1.json",
+        "[{\"number_keys\":\"macro\",\"macros\":{\"1\":["
+        "{\"type\":\"midi\",\"bytes\":[240,65,16,0,0,0,14,18,2,0,0,42,1,83,247]},"
+        "{\"type\":\"midi\",\"bytes\":[176,0,85]},"
+        "{\"type\":\"midi\",\"bytes\":[176,32,0],\"delay_ms\":25},"
+        "{\"type\":\"midi\",\"bytes\":[192,0],\"delay_ms\":25}"
+        "]}}]");
+
+    PresetSlot p = loadPreset(storage, 0, 0);
+    ASSERT_EQ(p.macros.keys[0].size(), 4u);
+    EXPECT_EQ(p.macros.keys[0][0].midiBytes,
+              (std::vector<uint8_t>{240, 65, 16, 0, 0, 0, 14, 18,
+                                    2, 0, 0, 42, 1, 83, 247}));
+    EXPECT_EQ(p.macros.keys[0][2].delayMs, 25);
+    EXPECT_EQ(p.macros.keys[0][3].delayMs, 25);
+}
+
 TEST(Macros, LoadSkipsMalformedCommands) {
     StorageStub storage;
     storage.writeFile("/presets/bank1.json",
@@ -309,6 +368,39 @@ TEST_F(MacroTriggerTest, FiresCallbacksAfterApplyingAllCommands) {
     EXPECT_EQ(state_.pendingChord.arp_mode, ArpMode::Down);
     EXPECT_EQ(modeChanged_, 1);
     EXPECT_EQ(arpChanged_, 1);
+}
+
+TEST_F(MacroTriggerTest, SendsMidiCommandsWithCumulativeDelay) {
+    std::vector<std::vector<uint8_t>> sent;
+    edit_->setMidiSendCallback(
+        [&sent](const std::vector<uint8_t>& bytes) { sent.push_back(bytes); });
+
+    MacroConfig cfg;
+    MacroCommand first;
+    first.op = MacroOp::Midi;
+    first.midiBytes = {176, 7, 100};
+    MacroCommand second = first;
+    second.midiBytes = {144, 60, 100};
+    second.delayMs = 100;
+    MacroCommand third = first;
+    third.midiBytes = {128, 60, 0};
+    third.delayMs = 100;
+    cfg.keys[0] = {first, second, third};
+    state_.pendingMacros = cfg;
+
+    edit_->triggerMacro(0, 1000);
+    ASSERT_EQ(sent.size(), 1u);
+    EXPECT_EQ(sent[0], (std::vector<uint8_t>{176, 7, 100}));
+
+    edit_->update(101000 - 1);
+    EXPECT_EQ(sent.size(), 1u);
+    edit_->update(101000);
+    ASSERT_EQ(sent.size(), 2u);
+    EXPECT_EQ(sent[1], (std::vector<uint8_t>{144, 60, 100}));
+
+    edit_->update(201000);
+    ASSERT_EQ(sent.size(), 3u);
+    EXPECT_EQ(sent[2], (std::vector<uint8_t>{128, 60, 0}));
 }
 
 TEST_F(MacroTriggerTest, EmptyOrOutOfRangeMacroIsHarmless) {

@@ -11,10 +11,17 @@ class RecordingMidiOutAdapter : public MidiOutAdapter {
 public:
     bool begin() override { return true; }
     void send(const MidiMessage& msg) override { messages_.push_back(msg); }
+    void sendBytes(const uint8_t* data, size_t length) override {
+        if (!data) return;
+        rawMessages_.push_back(std::vector<uint8_t>(data, data + length));
+    }
     void flush() override {}
 
     const std::vector<MidiMessage>& messages() const { return messages_; }
-    void clear() { messages_.clear(); }
+    const std::vector<std::vector<uint8_t>>& rawMessages() const {
+        return rawMessages_;
+    }
+    void clear() { messages_.clear(); rawMessages_.clear(); }
 
     int noteOnCount() const {
         int n = 0;
@@ -42,5 +49,6 @@ public:
 
 private:
     std::vector<MidiMessage> messages_;
+    std::vector<std::vector<uint8_t>> rawMessages_;
 };
 

@@ -150,6 +150,26 @@ bool parseMacroCommand(JsonVariant v, MacroCommand& out) {
 
     std::string type = obj["type"].as<std::string>();
     MacroCommand cmd;
+    if (type == "midi") {
+        if (!obj.containsKey("bytes") || !obj["bytes"].is<JsonArray>()) return false;
+        auto bytes = obj["bytes"].as<JsonArray>();
+        if (bytes.size() == 0 || bytes.size() > MAX_MACRO_MIDI_BYTES) return false;
+        for (JsonVariant bv : bytes) {
+            if (!bv.is<int>()) return false;
+            int value = bv.as<int>();
+            if (value < 0 || value > 255) return false;
+            cmd.midiBytes.push_back(static_cast<uint8_t>(value));
+        }
+        if (obj.containsKey("delay_ms")) {
+            if (!obj["delay_ms"].is<int>()) return false;
+            int delay = obj["delay_ms"].as<int>();
+            if (delay < 0 || delay > MAX_MACRO_MIDI_DELAY_MS) return false;
+            cmd.delayMs = static_cast<uint16_t>(delay);
+        }
+        cmd.op = MacroOp::Midi;
+        out = cmd;
+        return true;
+    }
     if (type == "set") {
         if (!obj.containsKey("param") || !obj["param"].is<const char*>()) return false;
         if (!macroLookupParamName(obj["param"].as<std::string>(), cmd.param)) return false;
@@ -248,6 +268,7 @@ const char* macroOpName(MacroOp op) {
         case MacroOp::Inc:      return "inc";
         case MacroOp::Dec:      return "dec";
         case MacroOp::DrumMute: return "drum_mute";
+        case MacroOp::Midi:     return "midi";
         default:                return nullptr;
     }
 }
@@ -255,6 +276,14 @@ const char* macroOpName(MacroOp op) {
 void writeMacroCommand(JsonObject obj, const MacroCommand& cmd) {
     const char* type = macroOpName(cmd.op);
     if (!type) return;
+    if (cmd.op == MacroOp::Midi) {
+        if (cmd.midiBytes.empty()) return;
+        obj["type"] = type;
+        auto bytes = obj["bytes"].to<JsonArray>();
+        for (uint8_t b : cmd.midiBytes) bytes.add(b);
+        if (cmd.delayMs != 0) obj["delay_ms"] = cmd.delayMs;
+        return;
+    }
     obj["type"] = type;
 
     if (cmd.op == MacroOp::DrumMute) {

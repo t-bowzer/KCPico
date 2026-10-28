@@ -11,7 +11,10 @@ a = Analysis(
     ["../src/keybchord_configurator/app.py"],
     pathex=["../src"],
     binaries=[],
-    datas=[],
+    datas=[
+        ("../src/keybchord_configurator/libraries",
+         "keybchord_configurator/libraries"),
+    ],
     hiddenimports=["PySide6.QtSvg"],
     hookspath=[],
     hooksconfig={},

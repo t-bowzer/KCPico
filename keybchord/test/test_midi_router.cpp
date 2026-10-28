@@ -160,6 +160,48 @@ TEST(MidiRouter, UsbOutIdenticalToDin) {
     }
 }
 
+TEST(MidiRouter, SendBytesFansOutRawBytes) {
+    RecordingMidiOutAdapter din;
+    RecordingMidiOutAdapter usb;
+    din.begin();
+    usb.begin();
+    StateManager state;
+    state.loadDefaults();
+    state.config.usb_midi_enabled = true;
+
+    MidiRouter router(din, state);
+    router.setUsbOut(&usb);
+
+    const std::vector<uint8_t> sysex = {
+        0xF0, 0x41, 0x10, 0x42, 0x12, 0x18, 0x00, 0x00,
+        0x00, 0x01, 0x02, 0x03, 0x04, 0xF7};
+    router.sendBytes(sysex.data(), sysex.size());
+
+    ASSERT_EQ(din.rawMessages().size(), 1u);
+    ASSERT_EQ(usb.rawMessages().size(), 1u);
+    EXPECT_EQ(din.rawMessages()[0], sysex);
+    EXPECT_EQ(usb.rawMessages()[0], sysex);
+}
+
+TEST(MidiRouter, SendBytesRespectsUsbDisable) {
+    RecordingMidiOutAdapter din;
+    RecordingMidiOutAdapter usb;
+    din.begin();
+    usb.begin();
+    StateManager state;
+    state.loadDefaults();
+    state.config.usb_midi_enabled = false;
+
+    MidiRouter router(din, state);
+    router.setUsbOut(&usb);
+
+    const uint8_t bytes[] = {0xB0, 7, 100};
+    router.sendBytes(bytes, sizeof(bytes));
+
+    EXPECT_EQ(din.rawMessages().size(), 1u);
+    EXPECT_TRUE(usb.rawMessages().empty());
+}
+
 TEST(MidiRouter, UsbOutNullIsSafe) {
     RecordingMidiOutAdapter din;
     din.begin();

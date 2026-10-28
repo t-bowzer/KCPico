@@ -13,6 +13,7 @@ class NullMidiOutAdapter : public MidiOutAdapter {
 public:
     bool begin() override { return true; }
     void send(const MidiMessage&) override {}
+    void sendBytes(const uint8_t*, size_t) override {}
     void flush() override {}
 };
 

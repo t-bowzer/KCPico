@@ -20,6 +20,10 @@
 # OS junk
 .DS_Store
 Thumbs.db
+*:Zone.Identifier
+
+# Local reference material
+JD-Xi_MIDI_Imple_e01_W.pdf
 
 # Dependencies (PlatformIO fetches these)
 lib/.pio/

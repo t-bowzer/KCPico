@@ -48,6 +48,13 @@ void MidiOutUsb::send(const MidiMessage& msg) {
     }
 }
 
+void MidiOutUsb::sendBytes(const uint8_t* data, size_t length) {
+    if (!ready_ || !g_usbMidi || !data) return;
+    for (size_t i = 0; i < length; i++) {
+        g_usbMidi->write(data[i]);
+    }
+}
+
 void MidiOutUsb::flush() {
     // TinyUSB MIDI streams are sent on the next USB frame; there is no
     // blocking flush for the device path.

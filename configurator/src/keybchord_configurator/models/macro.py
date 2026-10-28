@@ -15,6 +15,12 @@ from .enums import (
     NumberKeyMode,
     parse_number_key_mode,
 )
+from .midi import (
+    MAX_MIDI_BYTES,
+    MAX_MIDI_DELAY_MS,
+    MidiMessageSpec,
+    describe_midi_bytes,
+)
 
 NUMBER_KEY_LABELS: tuple[str, ...] = (
     "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
@@ -25,7 +31,7 @@ MAX_MACRO_COMMANDS_PER_PRESET = 48
 MAX_MACRO_NAME_LEN = 16
 
 MACRO_COMMAND_TYPES: tuple[str, ...] = (
-    "set", "toggle", "cycle", "inc", "dec", "drum_mute",
+    "set", "toggle", "cycle", "inc", "dec", "drum_mute", "midi",
 )
 
 MACRO_VALUE_TYPES: frozenset[str] = frozenset({"set", "toggle", "cycle", "inc", "dec"})
@@ -44,6 +50,8 @@ class MacroCommand:
     a: Any = None
     b: Any = None
     piece: Optional[str] = None
+    bytes: list[int] = field(default_factory=list)
+    delay_ms: int = 0
 
     @classmethod
     def from_dict(cls, data: Any) -> "MacroCommand":
@@ -62,6 +70,16 @@ class MacroCommand:
         piece = data.get("piece")
         if isinstance(piece, str):
             cmd.piece = piece
+        if cmd.type == "midi":
+            raw = data.get("bytes")
+            if isinstance(raw, list):
+                cmd.bytes = [
+                    max(0, min(255, int(b))) for b in raw
+                    if isinstance(b, int) and not isinstance(b, bool)
+                ][:MAX_MIDI_BYTES]
+            delay = data.get("delay_ms")
+            if isinstance(delay, int) and not isinstance(delay, bool):
+                cmd.delay_ms = max(0, min(MAX_MIDI_DELAY_MS, delay))
         return cmd
 
     def to_dict(self) -> dict:
@@ -80,9 +98,15 @@ class MacroCommand:
                 out["piece"] = self.piece
             if self.value is not None:
                 out["value"] = self.value
+        if self.type == "midi":
+            out["bytes"] = list(self.bytes)
+            if self.delay_ms:
+                out["delay_ms"] = self.delay_ms
         return out
 
     def summary(self) -> str:
+        if self.type == "midi":
+            return describe_midi_bytes(self.bytes)
         if self.type == "drum_mute":
             return f"{self.piece or '?'} {'on' if self.value in (True, 'on', 1) else 'off'}"
         if self.type == "set":
@@ -142,6 +166,8 @@ class MacroConfig:
                 if cmd.type == "drum_mute" and not cmd.piece:
                     continue
                 if cmd.type in MACRO_VALUE_TYPES and not cmd.param:
+                    continue
+                if cmd.type == "midi" and not cmd.bytes:
                     continue
                 commands.append(cmd)
             if commands:

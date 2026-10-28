@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <vector>
 
 #include "base.h"
 #include "keymap.h"
@@ -37,6 +38,9 @@ public:
     // pattern. May be unset (drum mute then no-ops).
     void setPatternProvider(std::function<const RhythmPattern*(int index)> cb);
 
+    // Sends a macro MIDI byte stream. Wired to the MIDI router in main.cpp.
+    void setMidiSendCallback(std::function<void(const std::vector<uint8_t>&)> cb);
+
     // Returns true if the event was consumed (edit/menu key); false if it
     // should be forwarded to the chord/strum engines.
     bool handleKeyEvent(const KeyEvent& ev, uint64_t now_us);
@@ -57,6 +61,17 @@ private:
     std::function<void()> anyEdit_;
     std::function<void(uint8_t)> drumAudition_;
     std::function<const RhythmPattern*(int)> patternProvider_;
+    std::function<void(const std::vector<uint8_t>&)> midiSend_;
+
+    struct PendingMidi {
+        uint64_t dueUs = 0;
+        std::vector<uint8_t> bytes;
+    };
+    static constexpr size_t MAX_PENDING_MIDI = 32;
+    std::vector<PendingMidi> pendingMidi_;
+
+    void sendOrScheduleMidi(const std::vector<uint8_t>& bytes,
+                            uint64_t dueUs);
 
     uint8_t  repeatUsage_ = 0;
     int      repeatDelta_ = 0;

@@ -168,3 +168,83 @@ def test_legacy_macro_array_gets_default_name():
     assert cfg.number_keys == NumberKeyMode.MACRO
     assert cfg.name_for("1") == "M1"
     assert len(cfg.keys["1"]) == 1
+
+
+def test_midi_message_encoding_roundtrip():
+    from keybchord_configurator.models.midi import (
+        MidiMessageSpec,
+        decode_midi_bytes,
+        parse_hex_bytes,
+        format_hex_bytes,
+    )
+
+    cases = [
+        MidiMessageSpec(kind="note_on", channel=2, number=60, value=100),
+        MidiMessageSpec(kind="note_off", channel=2, number=60),
+        MidiMessageSpec(kind="cc", channel=16, number=74, value=42),
+        MidiMessageSpec(kind="program_change", channel=1, number=12),
+        MidiMessageSpec(kind="pitch_bend", channel=3, bend=-4096),
+        MidiMessageSpec(kind="channel_pressure", channel=4, value=99),
+        MidiMessageSpec(kind="poly_pressure", channel=5, number=64, value=20),
+        MidiMessageSpec(kind="sysex", bytes=[0x41, 0x10, 0x42, 0xF7]),
+        MidiMessageSpec(kind="raw", bytes=[0xF8]),
+    ]
+    for spec in cases:
+        encoded = spec.encoded()
+        decoded = decode_midi_bytes(encoded)
+        assert decoded.encoded() == encoded
+    assert parse_hex_bytes("F0 41, 10 42 F7") == [0xF0, 0x41, 0x10, 0x42, 0xF7]
+    assert format_hex_bytes([0, 15, 255]) == "00 0F FF"
+
+
+def test_midi_macro_roundtrip():
+    from keybchord_configurator.models.macro import MacroCommand
+
+    command = MacroCommand(
+        type="midi", bytes=[0xB0, 7, 100], delay_ms=250)
+    assert command.to_dict() == {
+        "type": "midi", "bytes": [0xB0, 7, 100], "delay_ms": 250}
+    loaded = MacroCommand.from_dict(command.to_dict())
+    assert loaded == command
+    assert "Volume" in command.summary()
+
+
+def test_midi_library_parses_groups_and_expands_messages():
+    from keybchord_configurator.models.library import MidiLibrary
+
+    library = MidiLibrary.from_dict({
+        "name": "Test Device",
+        "groups": [{
+            "name": "Programs",
+            "commands": [{
+                "name": "Bank A Program 1",
+                "messages": [
+                    {"type": "cc", "channel": 1, "controller": 0, "value": 85},
+                    {"type": "cc", "channel": 1, "controller": 32, "value": 64},
+                    {"type": "program_change", "channel": 1, "program": 0},
+                ],
+            }],
+        }],
+    })
+    assert library is not None
+    assert library.command_count() == 1
+    command = library.groups[0].commands[0]
+    expanded = command.macro_commands()
+    assert [c.bytes for c in expanded] == [
+        [0xB0, 0, 85], [0xB0, 32, 64], [0xC0, 0]]
+    assert all(c.type == "midi" for c in expanded)
+
+    expanded16 = command.macro_commands(channel=16)
+    assert [c.bytes for c in expanded16] == [
+        [0xBF, 0, 85], [0xBF, 32, 64], [0xCF, 0]]
+
+
+def test_midi_library_channel_override_leaves_sysex_unchanged():
+    from keybchord_configurator.models.library import MidiLibraryCommand
+    from keybchord_configurator.models.midi import MidiMessageSpec
+
+    command = MidiLibraryCommand(name="Setup", messages=[
+        MidiMessageSpec(kind="sysex", bytes=[0xF0, 0x7E, 0x7F, 0xF7]),
+    ])
+    assert command.macro_commands(channel=16)[0].bytes == [
+        0xF0, 0x7E, 0x7F, 0xF7]

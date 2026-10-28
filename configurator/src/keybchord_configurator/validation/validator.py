@@ -96,6 +96,7 @@ from ..models.macro import (
     MACRO_COMMAND_TYPES,
     NUMBER_KEY_LABELS,
 )
+from ..models.midi import MAX_MIDI_BYTES, MAX_MIDI_DELAY_MS
 from ..models.preset import DRUM_PIECES
 from ..models.rhythm import RHYTHM_NAMES
 from .errors import ValidationResult
@@ -532,6 +533,27 @@ def _validate_macro_command(result: ValidationResult, where: str, data: Any,
     typ = data.get("type")
     if not _is_str(typ) or typ not in MACRO_COMMAND_TYPES:
         result.add_error(f"{where}: unknown macro command type '{typ}'")
+        return
+
+    if typ == "midi":
+        raw = data.get("bytes")
+        if not isinstance(raw, list):
+            result.add_error(f"{where}: midi 'bytes' must be an array")
+            return
+        if not raw:
+            result.add_error(f"{where}: midi 'bytes' must not be empty")
+        if len(raw) > MAX_MIDI_BYTES:
+            result.add_error(
+                f"{where}: midi 'bytes' exceeds {MAX_MIDI_BYTES} bytes")
+        for i, value in enumerate(raw):
+            if not _is_int(value) or value < 0 or value > 255:
+                result.add_error(
+                    f"{where}: midi byte[{i}] must be an integer 0-255")
+        if "delay_ms" in data:
+            delay = data["delay_ms"]
+            if not _is_int(delay) or delay < 0 or delay > MAX_MIDI_DELAY_MS:
+                result.add_error(
+                    f"{where}: midi 'delay_ms' must be 0-{MAX_MIDI_DELAY_MS}")
         return
 
     if typ == "drum_mute":

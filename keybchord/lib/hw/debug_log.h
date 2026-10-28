@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 
 // Debug log + MIDI monitor (NFR-8).
@@ -72,6 +73,24 @@ inline void logMidiOut(uint8_t status, uint8_t data1, uint8_t data2) {
         Serial.print(data1);
         Serial.print(" d2=");
         Serial.print(data2);
+    }
+    Serial.println();
+#endif
+}
+
+inline void logMidiOutBytes(const uint8_t* data, size_t length) {
+#if KB_LOG_ON
+    if (!g_midiMonitorEnabled || !data) return;
+    unsigned long t = millis();
+    Serial.print("[");
+    Serial.print(t);
+    Serial.print("] MIDI raw len=");
+    Serial.print(length);
+    Serial.print(" ");
+    for (size_t i = 0; i < length; i++) {
+        if (i) Serial.print(' ');
+        if (data[i] < 0x10) Serial.print('0');
+        Serial.print(data[i], HEX);
     }
     Serial.println();
 #endif

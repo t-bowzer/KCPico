@@ -248,6 +248,47 @@ def test_macro_object_with_name_is_valid():
     assert result.ok(), result.errors
 
 
+def test_macro_midi_command_is_valid():
+    data = _macro_slot(
+        number_keys="macro",
+        macros={
+            "1": [
+                {"type": "midi", "bytes": [0xB0, 7, 100]},
+                {"type": "midi", "bytes": [0xF0, 0x41, 0x10, 0xF7],
+                 "delay_ms": 250},
+            ],
+        },
+    )
+    result = validate_preset_bank([data] * 8)
+    assert result.ok(), result.errors
+
+
+def test_macro_midi_command_rejects_bad_bytes_and_delay():
+    from keybchord_configurator.models.midi import (
+        MAX_MIDI_BYTES,
+        MAX_MIDI_DELAY_MS,
+    )
+
+    data = _macro_slot(
+        number_keys="macro",
+        macros={
+            "1": [
+                {"type": "midi", "bytes": []},
+                {"type": "midi", "bytes": [1, 300]},
+                {"type": "midi", "bytes": [1, 2, 3],
+                 "delay_ms": MAX_MIDI_DELAY_MS + 1},
+                {"type": "midi", "bytes": [0] * (MAX_MIDI_BYTES + 1)},
+            ],
+        },
+    )
+    result = validate_preset_bank([data] * 8)
+    text = "\n".join(result.errors)
+    assert "must not be empty" in text
+    assert "must be an integer 0-255" in text
+    assert "delay_ms" in text
+    assert "exceeds" in text
+
+
 def test_macro_name_too_long_errors():
     data = _macro_slot(
         number_keys="macro",

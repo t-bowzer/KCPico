@@ -16,6 +16,18 @@ def test_volume_name_match_is_case_insensitive():
     assert not device._matches_volume("")
 
 
+def test_device_display_path_windows_drive(monkeypatch):
+    from keybchord_configurator.io import device
+    monkeypatch.setattr(device, "_IS_WINDOWS", True)
+    assert device.display_path("D:\\") == "D:"
+
+
+def test_device_display_path_posix_mount(monkeypatch):
+    from keybchord_configurator.io import device
+    monkeypatch.setattr(device, "_IS_WINDOWS", False)
+    assert device.display_path("/media/user/KeybChord/") == "/media/user/KeybChord"
+
+
 def test_find_device_windows_uppercase_label(monkeypatch):
     from keybchord_configurator.io import device
     monkeypatch.setattr(device, "_IS_WINDOWS", True)
@@ -101,3 +113,43 @@ def test_restore_rejects_foreign_files(tmp_path):
     restored = restore_from_zip(zip_path, restore_dir)
     assert restored == ["config.json"]
     assert not (restore_dir / "evil.txt").exists()
+
+
+def test_builtin_jdxi_libraries_are_valid():
+    from keybchord_configurator.io.libraries import _load_file, builtin_library_dir
+
+    paths = sorted(builtin_library_dir().glob("roland-jd-xi-*.json"))
+    assert len(paths) == 4
+    libraries = {}
+    for path in paths:
+        library, error = _load_file(path)
+        assert error is None, error
+        assert library is not None
+        libraries[library.name] = library
+
+    assert set(libraries) == {
+        "Roland JD-Xi Programs",
+        "Roland JD-Xi Extra Programs",
+        "Roland JD-Xi Tones",
+        "Roland JD-Xi Controls",
+    }
+
+    programs = libraries["Roland JD-Xi Programs"]
+    assert programs.command_count() == 512
+    a01 = programs.groups[0].commands[0]
+    assert a01.name == "A01"
+    assert [msg.encoded() for msg in a01.messages] == [
+        [0xB0, 0, 85], [0xB0, 32, 64], [0xC0, 0]]
+    assert [msg.delay_ms for msg in a01.messages] == [0, 25, 25]
+    assert [cmd.bytes for cmd in a01.macro_commands()] == [
+        [0xB0, 0, 85], [0xB0, 32, 64], [0xC0, 0]]
+
+    e01 = programs.groups[4].commands[0]
+    assert e01.name == "E01"
+    assert [msg.encoded() for msg in e01.messages] == [
+        [0xB0, 0, 85], [0xB0, 32, 0], [0xC0, 0]]
+    assert [msg.delay_ms for msg in e01.messages] == [0, 25, 25]
+
+    assert libraries["Roland JD-Xi Extra Programs"].command_count() == 512
+    assert libraries["Roland JD-Xi Tones"].command_count() == 353
+    assert libraries["Roland JD-Xi Controls"].command_count() == 102

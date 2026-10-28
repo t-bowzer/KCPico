@@ -16,15 +16,20 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QPushButton,
+    QSpinBox,
     QTableWidget,
     QTableWidgetItem,
+    QTreeWidget,
+    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
+from ..io.libraries import load_libraries
 from ..models.bounds import PARAM_SPECS
 from ..models.enums import NumberKeyMode
 from ..models.keymap import BOOL_PARAMS, KEYMAP_PARAM_NAMES
+from ..models.library import MidiLibrary, MidiLibraryCommand
 from ..models.macro import (
     MACRO_COMMAND_TYPES,
     MAX_MACRO_COMMANDS_PER_KEY,
@@ -35,6 +40,7 @@ from ..models.macro import (
     MacroConfig,
 )
 from ..models.preset import DRUM_PIECES
+from .midi_command_dialog import MidiCommandDialog
 
 
 def macro_param_names() -> list[str]:
@@ -219,6 +225,7 @@ class MacroEditor(QWidget):
         self._rhythm_names: list[str] = []
         self._bass_names: list[str] = []
         self._chord_pattern_names: list[str] = []
+        self._libraries: list[MidiLibrary] = []
         self._build()
 
     def _build(self) -> None:
@@ -265,8 +272,10 @@ class MacroEditor(QWidget):
         right.addWidget(self.table, 1)
 
         buttons = QHBoxLayout()
-        self.add_btn = QPushButton("Add")
+        self.add_btn = QPushButton("Add Parameter")
         self.add_btn.clicked.connect(self._add_command)
+        self.add_midi_btn = QPushButton("Add MIDI...")
+        self.add_midi_btn.clicked.connect(self._add_midi_command)
         self.edit_btn = QPushButton("Edit")
         self.edit_btn.clicked.connect(self._edit_command)
         self.remove_btn = QPushButton("Remove")
@@ -275,8 +284,8 @@ class MacroEditor(QWidget):
         self.up_btn.clicked.connect(lambda: self._move_command(-1))
         self.down_btn = QPushButton("Move Down")
         self.down_btn.clicked.connect(lambda: self._move_command(+1))
-        for btn in (self.add_btn, self.edit_btn, self.remove_btn,
-                    self.up_btn, self.down_btn):
+        for btn in (self.add_btn, self.add_midi_btn, self.edit_btn,
+                    self.remove_btn, self.up_btn, self.down_btn):
             buttons.addWidget(btn)
         buttons.addStretch(1)
         right.addLayout(buttons)
@@ -285,9 +294,147 @@ class MacroEditor(QWidget):
         self.status_label.setWordWrap(True)
         right.addWidget(self.status_label)
         body.addLayout(right, 1)
+        body.addLayout(self._build_library_panel())
         root.addLayout(body, 1)
 
         self._refresh_key_list()
+        self._load_libraries()
+
+    def _build_library_panel(self) -> QVBoxLayout:
+        panel = QVBoxLayout()
+        panel.addWidget(QLabel("MIDI libraries"))
+
+        self.library_search = QLineEdit()
+        self.library_search.setPlaceholderText("Filter commands...")
+        self.library_search.textChanged.connect(self._filter_library_tree)
+        panel.addWidget(self.library_search)
+
+        channel_row = QHBoxLayout()
+        channel_row.addWidget(QLabel("Insert channel:"))
+        self.library_channel = QSpinBox()
+        self.library_channel.setRange(1, 16)
+        self.library_channel.setValue(1)
+        self.library_channel.setToolTip(
+            "MIDI channel applied to library commands when they are added")
+        channel_row.addWidget(self.library_channel)
+        channel_row.addStretch(1)
+        panel.addLayout(channel_row)
+
+        self.library_tree = QTreeWidget()
+        self.library_tree.setHeaderHidden(True)
+        self.library_tree.setFixedWidth(280)
+        self.library_tree.setUniformRowHeights(True)
+        self.library_tree.itemDoubleClicked.connect(
+            lambda _item, _col: self._add_library_command())
+        panel.addWidget(self.library_tree, 1)
+
+        row = QHBoxLayout()
+        self.library_add_btn = QPushButton("Add to Macro")
+        self.library_add_btn.clicked.connect(self._add_library_command)
+        self.library_refresh_btn = QPushButton("Refresh")
+        self.library_refresh_btn.clicked.connect(self._load_libraries)
+        row.addWidget(self.library_add_btn)
+        row.addWidget(self.library_refresh_btn)
+        panel.addLayout(row)
+
+        self.library_status = QLabel("")
+        self.library_status.setWordWrap(True)
+        panel.addWidget(self.library_status)
+        return panel
+
+    def _load_libraries(self) -> None:
+        self._libraries, errors = load_libraries()
+        self._refresh_library_tree()
+        if errors:
+            self.library_status.setStyleSheet("color: #e05353;")
+            self.library_status.setText(errors[0])
+        elif not self._libraries:
+            self.library_status.setStyleSheet("")
+            self.library_status.setText(
+                "No libraries found. Add JSON files to the libraries folder.")
+        else:
+            self.library_status.setStyleSheet("")
+            self.library_status.setText(
+                f"{len(self._libraries)} library file(s) loaded")
+
+    def _refresh_library_tree(self) -> None:
+        self.library_tree.clear()
+        for lib_index, library in enumerate(self._libraries):
+            lib_item = QTreeWidgetItem([library.name])
+            lib_item.setData(0, Qt.UserRole, None)
+            for group_index, group in enumerate(library.groups):
+                group_item = QTreeWidgetItem([group.name])
+                for cmd_index, command in enumerate(group.commands):
+                    child = QTreeWidgetItem([command.name])
+                    child.setToolTip(0, command.summary())
+                    child.setData(0, Qt.UserRole,
+                                  (lib_index, group_index, cmd_index))
+                    group_item.addChild(child)
+                lib_item.addChild(group_item)
+            self.library_tree.addTopLevelItem(lib_item)
+            lib_item.setExpanded(True)
+        self._filter_library_tree(self.library_search.text())
+
+    def _filter_library_tree(self, text: str) -> None:
+        query = text.strip().lower()
+
+        def apply(item: QTreeWidgetItem) -> bool:
+            child_visible = False
+            for i in range(item.childCount()):
+                child_visible = apply(item.child(i)) or child_visible
+            self_match = query in item.text(0).lower()
+            visible = not query or self_match or child_visible
+            item.setHidden(not visible)
+            if self_match and query:
+                for i in range(item.childCount()):
+                    self._show_item_tree(item.child(i))
+            return visible
+
+        for i in range(self.library_tree.topLevelItemCount()):
+            apply(self.library_tree.topLevelItem(i))
+
+    def _show_item_tree(self, item: QTreeWidgetItem) -> None:
+        item.setHidden(False)
+        for i in range(item.childCount()):
+            self._show_item_tree(item.child(i))
+
+    def _selected_library_command(self) -> MidiLibraryCommand | None:
+        item = self.library_tree.currentItem()
+        if item is None:
+            return None
+        data = item.data(0, Qt.UserRole)
+        if not isinstance(data, tuple) or len(data) != 3:
+            return None
+        lib_index, group_index, cmd_index = data
+        try:
+            return self._libraries[lib_index].groups[group_index].commands[cmd_index]
+        except (IndexError, TypeError):
+            return None
+
+    def _add_library_command(self) -> None:
+        command = self._selected_library_command()
+        label = self._current_label()
+        if command is None or self._config is None or label is None:
+            return
+        commands = self._config.keys.setdefault(label, [])
+        channel = self.library_channel.value()
+        added = 0
+        for macro_command in command.macro_commands(channel):
+            if not self._config.can_add(label):
+                break
+            commands.append(macro_command)
+            added += 1
+        if added == 0:
+            self.library_status.setStyleSheet("color: #e05353;")
+            self.library_status.setText("Macro command limit reached")
+            return
+        self._refresh_key_list()
+        self._refresh_table()
+        self.changed.emit()
+        self.library_status.setStyleSheet("")
+        suffix = "" if added == 1 else f"s"
+        self.library_status.setText(
+            f"Added {added} MIDI command{suffix} on channel {channel}")
 
     def set_names(self, rhythm_names: list[str], bass_names: list[str],
                   chord_pattern_names: list[str]) -> None:
@@ -408,12 +555,15 @@ class MacroEditor(QWidget):
         commands = self._current_commands()
         self.table.setRowCount(len(commands))
         for row, cmd in enumerate(commands):
-            values = [
-                cmd.type,
-                cmd.param or "",
-                self._command_value_text(cmd),
-                cmd.piece or "",
-            ]
+            if cmd.type == "midi":
+                values = ["midi", "", self._command_value_text(cmd), ""]
+            else:
+                values = [
+                    cmd.type,
+                    cmd.param or "",
+                    self._command_value_text(cmd),
+                    cmd.piece or "",
+                ]
             for col, text in enumerate(values):
                 item = QTableWidgetItem(text)
                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)
@@ -422,6 +572,11 @@ class MacroEditor(QWidget):
 
     @staticmethod
     def _command_value_text(cmd: MacroCommand) -> str:
+        if cmd.type == "midi":
+            text = cmd.summary()
+            if cmd.delay_ms:
+                text += f" (+{cmd.delay_ms} ms)"
+            return text
         if cmd.type == "set":
             return str(cmd.value)
         if cmd.type == "toggle":
@@ -443,8 +598,10 @@ class MacroEditor(QWidget):
         else:
             self.status_label.setStyleSheet("")
         self.status_label.setText(text)
-        self.add_btn.setEnabled(
-            self._config is not None and self._config.can_add(label))
+        can_add = self._config is not None and self._config.can_add(label)
+        self.add_btn.setEnabled(can_add)
+        self.add_midi_btn.setEnabled(can_add)
+        self.library_add_btn.setEnabled(can_add)
 
     def _selected_row(self) -> int:
         rows = self.table.selectionModel().selectedRows()
@@ -466,6 +623,19 @@ class MacroEditor(QWidget):
             self._refresh_table()
             self.changed.emit()
 
+    def _add_midi_command(self) -> None:
+        label = self._current_label()
+        if self._config is None or label is None or not self._config.can_add(label):
+            return
+        dialog = MidiCommandDialog(self)
+        if dialog.exec() == QDialog.Accepted:
+            command = dialog.result_command()
+            if command.bytes:
+                self._config.keys.setdefault(label, []).append(command)
+                self._refresh_key_list()
+                self._refresh_table()
+                self.changed.emit()
+
     def _edit_command(self) -> None:
         label = self._current_label()
         row = self._selected_row()
@@ -474,13 +644,16 @@ class MacroEditor(QWidget):
         commands = self._config.keys.get(label, [])
         if row >= len(commands):
             return
-        dialog = MacroCommandDialog(
-            self,
-            command=commands[row],
-            rhythm_names=self._rhythm_names,
-            bass_names=self._bass_names,
-            chord_pattern_names=self._chord_pattern_names,
-        )
+        if commands[row].type == "midi":
+            dialog = MidiCommandDialog(self, command=commands[row])
+        else:
+            dialog = MacroCommandDialog(
+                self,
+                command=commands[row],
+                rhythm_names=self._rhythm_names,
+                bass_names=self._bass_names,
+                chord_pattern_names=self._chord_pattern_names,
+            )
         if dialog.exec() == QDialog.Accepted:
             commands[row] = dialog.result_command()
             self._refresh_table()

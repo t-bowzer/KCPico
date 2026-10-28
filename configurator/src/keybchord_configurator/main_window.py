@@ -5,7 +5,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -40,6 +40,7 @@ class MainWindow(QMainWindow):
         self._build_actions()
         self._refresh_all()
         self._update_title()
+        QTimer.singleShot(0, self._offer_attached_device)
 
     # -- construction -------------------------------------------------------
     def _build_ui(self) -> None:
@@ -148,6 +149,36 @@ class MainWindow(QMainWindow):
         self._set_tree(default_tree())
 
     # -- open ---------------------------------------------------------------
+    def _offer_attached_device(self) -> None:
+        """On startup, offer to open a KeybChord volume that is already mounted."""
+        try:
+            path = device_io.find_device()
+        except Exception:  # noqa: BLE001
+            return
+        if path is None:
+            return
+        location = device_io.display_path(path)
+        label = f"drive {location}" if location.endswith(":") else location
+        ret = QMessageBox.question(
+            self, "KeybChord detected",
+            f"Detected KeybChord in {label}, would you like to open it?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+        if ret == QMessageBox.Yes:
+            self._load_device(path)
+
+    def _load_device(self, path: str) -> None:
+        try:
+            tree = run_with_progress(self, [
+                (f"Loading configuration from {device_io.display_path(path)}...",
+                 lambda: load_tree(path)),
+            ])[0]
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Error", f"Could not open device: {exc}")
+            return
+        self._last_directory = path
+        self._set_tree(tree)
+        self.statusBar().showMessage(f"Loaded {path}", 5000)
+
     def _open_device(self) -> None:
         if not self._confirm_discard():
             return

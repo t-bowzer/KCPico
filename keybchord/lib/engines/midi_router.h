@@ -26,6 +26,10 @@ public:
     // high-rate system clock byte.
     void sendRaw(const MidiMessage& msg);
 
+    // Send an arbitrary MIDI byte stream (used by macro MIDI commands). Fans
+    // out to DIN and USB exactly like the typed note/CC helpers.
+    void sendBytes(const uint8_t* data, size_t length);
+
     void sendTestNote();
 
     // Optional second output (USB MIDI device). Messages are fanned out to it

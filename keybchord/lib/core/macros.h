@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -21,22 +22,31 @@ enum class MacroOp : uint8_t {
     Inc,
     Dec,
     DrumMute,
+    Midi,
     COUNT,
 };
 
+constexpr size_t MAX_MACRO_MIDI_BYTES = 256;
+constexpr uint16_t MAX_MACRO_MIDI_DELAY_MS = 10000;
+
 // A single macro command. `valueA`/`valueB` hold the keymap-action values;
 // DrumMute stores the drum-piece index in `drumPiece` and on/off in `valueA`.
+// Midi stores an arbitrary byte stream (including SysEx) in `midiBytes` and an
+// optional delay in `delayMs`.
 struct MacroCommand {
     MacroOp op    = MacroOp::Set;
     ParamId param = ParamId::COUNT;
     int16_t valueA = 0;
     int16_t valueB = 0;
     uint8_t drumPiece = 0;
+    std::vector<uint8_t> midiBytes;
+    uint16_t delayMs = 0;
 
     bool operator==(const MacroCommand& other) const {
         return op == other.op && param == other.param &&
                valueA == other.valueA && valueB == other.valueB &&
-               drumPiece == other.drumPiece;
+               drumPiece == other.drumPiece &&
+               midiBytes == other.midiBytes && delayMs == other.delayMs;
     }
     bool operator!=(const MacroCommand& other) const { return !(*this == other); }
 };

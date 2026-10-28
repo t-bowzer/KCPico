@@ -46,6 +46,14 @@ def _windows_volume_label(drive_letter: str) -> Optional[str]:
     return volume_name.value
 
 
+def display_path(path: str) -> str:
+    """Return a concise location for prompts (``D:`` on Windows, path elsewhere)."""
+    path = str(path)
+    if (len(path) >= 2 and path[1] == ":") or _IS_WINDOWS:
+        return path[:2]
+    return path.rstrip("\\/") or path
+
+
 def find_device() -> Optional[str]:
     """Return the mount path of the KeybChord volume, or ``None``."""
     if _IS_WINDOWS:

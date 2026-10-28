@@ -29,6 +29,13 @@ void MidiOutUart::send(const MidiMessage& msg) {
     }
 }
 
+void MidiOutUart::sendBytes(const uint8_t* data, size_t length) {
+    if (!data) return;
+    for (size_t i = 0; i < length; i++) {
+        Serial2.write(data[i]);
+    }
+}
+
 void MidiOutUart::flush() {
     Serial2.flush();
 }

@@ -1,0 +1,1608 @@
+{
+  "schema": 1,
+  "name": "Roland JD-Xi Controls",
+  "device": "Roland JD-Xi",
+  "description": "Performance CCs, channel-mode messages, SuperNATURAL/analog/drum NRPN controls, and common system-exclusive commands. Commands use MIDI channel 1 and device ID 17 (0x10) unless noted.",
+  "source": "Roland JD-Xi MIDI Implementation, Version 1.00 (May 1, 2015)",
+  "groups": [
+    {
+      "name": "Channel Mode",
+      "commands": [
+        {
+          "name": "All Sounds Off",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 120,
+              "value": 0
+            }
+          ]
+        },
+        {
+          "name": "All Notes Off",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 123,
+              "value": 0
+            }
+          ]
+        },
+        {
+          "name": "Reset All Controllers",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 121,
+              "value": 0
+            }
+          ]
+        },
+        {
+          "name": "Omni Off",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 124,
+              "value": 0
+            }
+          ]
+        },
+        {
+          "name": "Omni On",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 125,
+              "value": 0
+            }
+          ]
+        },
+        {
+          "name": "Mono On",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 126,
+              "value": 1
+            }
+          ]
+        },
+        {
+          "name": "Poly On",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 127,
+              "value": 0
+            }
+          ]
+        },
+        {
+          "name": "Local Off",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 122,
+              "value": 0
+            }
+          ]
+        },
+        {
+          "name": "Local On",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 122,
+              "value": 127
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Volume & Expression",
+      "commands": [
+        {
+          "name": "Volume 127",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 7,
+              "value": 127
+            }
+          ]
+        },
+        {
+          "name": "Volume 100",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 7,
+              "value": 100
+            }
+          ]
+        },
+        {
+          "name": "Volume 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 7,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Expression 127",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 11,
+              "value": 127
+            }
+          ]
+        },
+        {
+          "name": "Expression 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 11,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Pan Center",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 10,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Modulation Off",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 1,
+              "value": 0
+            }
+          ]
+        },
+        {
+          "name": "Modulation Max",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 1,
+              "value": 127
+            }
+          ]
+        },
+        {
+          "name": "Hold Off",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 64,
+              "value": 0
+            }
+          ]
+        },
+        {
+          "name": "Hold On",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 64,
+              "value": 127
+            }
+          ]
+        },
+        {
+          "name": "Portamento Off",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 65,
+              "value": 0
+            }
+          ]
+        },
+        {
+          "name": "Portamento On",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 65,
+              "value": 127
+            }
+          ]
+        },
+        {
+          "name": "Portamento Time 0",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 5,
+              "value": 0
+            }
+          ]
+        },
+        {
+          "name": "Portamento Time 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 5,
+              "value": 64
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Tone & Filter",
+      "commands": [
+        {
+          "name": "Cutoff Min",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 74,
+              "value": 0
+            }
+          ]
+        },
+        {
+          "name": "Cutoff Center",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 74,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Cutoff Max",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 74,
+              "value": 127
+            }
+          ]
+        },
+        {
+          "name": "Resonance Center",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 71,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Resonance Max",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 71,
+              "value": 127
+            }
+          ]
+        },
+        {
+          "name": "Attack Center",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 73,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Decay Center",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 75,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Release Center",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 72,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Vibrato Rate Center",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 76,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Vibrato Depth Center",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 77,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Vibrato Delay Center",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 78,
+              "value": 64
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Effects",
+      "commands": [
+        {
+          "name": "Reverb Level 0",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 12,
+              "value": 0
+            }
+          ]
+        },
+        {
+          "name": "Reverb Level 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 12,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Reverb Level 127",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 12,
+              "value": 127
+            }
+          ]
+        },
+        {
+          "name": "Delay Level 0",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 13,
+              "value": 0
+            }
+          ]
+        },
+        {
+          "name": "Delay Level 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 13,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Delay Level 127",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 13,
+              "value": 127
+            }
+          ]
+        },
+        {
+          "name": "Effect 1 Level 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 14,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Effect 2 Level 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 15,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Vocoder Level 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 83,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Part Reverb Send 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 91,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Part Delay Send 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 94,
+              "value": 64
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SuperNATURAL Partial Controls",
+      "commands": [
+        {
+          "name": "Partial 1 Cutoff 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 102,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Partial 2 Cutoff 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 103,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Partial 3 Cutoff 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 104,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Partial 1 Resonance 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 105,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Partial 2 Resonance 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 106,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Partial 3 Resonance 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 107,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Partial 1 Level 127",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 117,
+              "value": 127
+            }
+          ]
+        },
+        {
+          "name": "Partial 2 Level 127",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 118,
+              "value": 127
+            }
+          ]
+        },
+        {
+          "name": "Partial 3 Level 127",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 119,
+              "value": 127
+            }
+          ]
+        },
+        {
+          "name": "Partial 1 LFO Rate 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 16,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Partial 2 LFO Rate 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 17,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Partial 3 LFO Rate 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 18,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Partial 1 Envelope 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 0
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 124
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Partial 2 Envelope 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 0
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 125
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Partial 3 Envelope 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 0
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 126
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Partial 1 LFO Pitch Depth 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 0
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 15
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Partial 2 LFO Pitch Depth 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 0
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 16
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Partial 3 LFO Pitch Depth 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 0
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 17
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Partial 1 LFO Filter Depth 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 0
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 18
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Partial 2 LFO Filter Depth 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 0
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 19
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Partial 3 LFO Filter Depth 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 0
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 20
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Partial 1 LFO Amp Depth 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 0
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 21
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Partial 2 LFO Amp Depth 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 0
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 22
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Partial 3 LFO Amp Depth 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 0
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 23
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Analog Synth Controls",
+      "commands": [
+        {
+          "name": "Cutoff Min",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 102,
+              "value": 0
+            }
+          ]
+        },
+        {
+          "name": "Cutoff Center",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 102,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Cutoff Max",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 102,
+              "value": 127
+            }
+          ]
+        },
+        {
+          "name": "Resonance Center",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 105,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Level 100",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 117,
+              "value": 100
+            }
+          ]
+        },
+        {
+          "name": "LFO Rate 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 16,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Envelope 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 0
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 124
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "LFO Pitch Depth 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 0
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 15
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "LFO Filter Depth 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 0
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 18
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "LFO Amp Depth 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 0
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 21
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Pulse Width 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 0
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 37
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Drum Kit Controls (Notes 36, 38, 42)",
+      "commands": [
+        {
+          "name": "Note 36 Cutoff 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 89
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 36
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Note 36 Resonance 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 92
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 36
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Note 36 Level 100",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 64
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 36
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 100
+            }
+          ]
+        },
+        {
+          "name": "Note 36 Envelope 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 119
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 36
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Note 38 Cutoff 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 89
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 38
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Note 38 Resonance 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 92
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 38
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Note 38 Level 100",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 64
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 38
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 100
+            }
+          ]
+        },
+        {
+          "name": "Note 38 Envelope 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 119
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 38
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Note 42 Cutoff 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 89
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 42
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Note 42 Resonance 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 92
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 42
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        },
+        {
+          "name": "Note 42 Level 100",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 64
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 42
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 100
+            }
+          ]
+        },
+        {
+          "name": "Note 42 Envelope 64",
+          "messages": [
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 99,
+              "value": 119
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 98,
+              "value": 42
+            },
+            {
+              "type": "cc",
+              "channel": 1,
+              "controller": 6,
+              "value": 64
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "System Exclusive",
+      "commands": [
+        {
+          "name": "Master Volume 0",
+          "messages": [
+            {
+              "type": "sysex",
+              "bytes": [
+                240,
+                127,
+                127,
+                4,
+                1,
+                0,
+                0,
+                247
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Master Volume 64",
+          "messages": [
+            {
+              "type": "sysex",
+              "bytes": [
+                240,
+                127,
+                127,
+                4,
+                1,
+                0,
+                64,
+                247
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Master Volume 100",
+          "messages": [
+            {
+              "type": "sysex",
+              "bytes": [
+                240,
+                127,
+                127,
+                4,
+                1,
+                0,
+                100,
+                247
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Master Volume 127",
+          "messages": [
+            {
+              "type": "sysex",
+              "bytes": [
+                240,
+                127,
+                127,
+                4,
+                1,
+                0,
+                127,
+                247
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Master Fine Tune Center",
+          "messages": [
+            {
+              "type": "sysex",
+              "bytes": [
+                240,
+                127,
+                127,
+                4,
+                3,
+                0,
+                64,
+                247
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Master Coarse Tune Center",
+          "messages": [
+            {
+              "type": "sysex",
+              "bytes": [
+                240,
+                127,
+                127,
+                4,
+                4,
+                0,
+                64,
+                247
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Identity Request",
+          "messages": [
+            {
+              "type": "sysex",
+              "bytes": [
+                240,
+                126,
+                127,
+                6,
+                1,
+                247
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Setup Master Level 100",
+          "messages": [
+            {
+              "type": "sysex",
+              "bytes": [
+                240,
+                65,
+                16,
+                0,
+                0,
+                0,
+                14,
+                18,
+                2,
+                0,
+                0,
+                5,
+                100,
+                21,
+                247
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Setup Receive Program Change On",
+          "messages": [
+            {
+              "type": "sysex",
+              "bytes": [
+                240,
+                65,
+                16,
+                0,
+                0,
+                0,
+                14,
+                18,
+                2,
+                0,
+                0,
+                41,
+                1,
+                84,
+                247
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Setup Receive Bank Select On",
+          "messages": [
+            {
+              "type": "sysex",
+              "bytes": [
+                240,
+                65,
+                16,
+                0,
+                0,
+                0,
+                14,
+                18,
+                2,
+                0,
+                0,
+                42,
+                1,
+                83,
+                247
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

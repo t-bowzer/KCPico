@@ -56,6 +56,23 @@ void MidiRouter::sendRaw(const MidiMessage& msg) {
     }
 }
 
+void MidiRouter::sendBytes(const uint8_t* data, size_t length) {
+    if (!data || length == 0) return;
+
+    if (length <= 3) {
+        logMidiOut(data[0],
+                   length > 1 ? data[1] : 0,
+                   length > 2 ? data[2] : 0);
+    } else {
+        logMidiOutBytes(data, length);
+    }
+
+    midiOut_.sendBytes(data, length);
+    if (usbOut_ && state_.config.usb_midi_enabled) {
+        usbOut_->sendBytes(data, length);
+    }
+}
+
 void MidiRouter::sendTestNote() {
     const uint8_t channel  = 1;
     const uint8_t note     = 60; // C4

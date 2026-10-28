@@ -42,7 +42,7 @@ keybchord-configurator = "keybchord_configurator.app:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-keybchord_configurator = ["py.typed"]
+keybchord_configurator = ["py.typed", "libraries/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

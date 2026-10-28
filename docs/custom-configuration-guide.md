@@ -245,6 +245,9 @@ presets. A command is one of:
       "commands": [
         { "type": "set", "param": "rhythm_mute", "value": "off" },
         { "type": "drum_mute", "piece": "kick", "value": "on" },
+        { "type": "midi", "bytes": [176, 0, 85] },
+        { "type": "midi", "bytes": [176, 32, 64], "delay_ms": 10 },
+        { "type": "midi", "bytes": [192, 0] },
         { "type": "set", "param": "tempo", "value": 88 }
       ]
     },
@@ -270,13 +273,18 @@ two lines for longer names).
 | `cycle` | `param` | Advance one step (same as a keymap `cycle` action). |
 | `inc` / `dec` | `param` | Step the value up/down using its normal increment. |
 | `drum_mute` | `piece`, `value` | `piece` is one of `kick`, `snare`, `hihat`, `open_hat`, `rimshot`, `clap`, `crash`, `ride`, `bongo`, `conga_lo`, `conga_hi`, `clave`, `shaker`; `value` is `on`/`off`. Mute-off sets the piece to Auto velocity (`0`). |
+| `midi` | `bytes`, `delay_ms` (optional) | Arbitrary MIDI bytes, `0`–`255` per byte, up to 256 bytes (for example a note, CC, program change, or complete SysEx message). The optional delay is `0`–`10000` ms and is cumulative within the macro. |
 
 Limits: **16 commands per key** and **48 commands per preset**. The firmware
 truncates excess commands; the configurator rejects them. Parameter names and
 value strings match the keymap names in §4.3/§4.4, plus the per-drum parameters
 `drum_kick`, `drum_kick_vel`, … (note / velocity). The firmware writes macro
 values as integers, names as default or custom strings, but `on`/`off`, enum
-names, and pattern names are accepted when editing by hand.
+names, and pattern names are accepted when editing by hand. MIDI commands are
+sent to both DIN and USB MIDI outputs; delayed commands are queued relative to
+the key press. The configurator can insert prebuilt multi-message sequences
+from JSON libraries (including the bundled Roland JD-Xi libraries); see the
+[configurator README](../configurator/README.md#midi-macros-and-command-libraries).
 
 > On-device preset Save preserves the preset's macro configuration; Clear
 > resets it to `number_keys: "strum"` with no macros.

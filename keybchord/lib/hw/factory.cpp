@@ -4,7 +4,6 @@
 #ifdef KEYBCHORD_NATIVE
 #include "storage_stub.h"
 #else
-#include "input_usbhost.h"
 #include "input_ch559.h"
 #include "lcd_hd44780.h"
 #include "midi_out_uart.h"
@@ -23,11 +22,7 @@ Adapters createAdapters() {
     a.storage = std::make_unique<StorageStub>();
 #else
     {
-#ifdef KEYBCHORD_CH559
         auto input = std::make_unique<InputCh559>();
-#else
-        auto input = std::make_unique<InputUsbHost>();
-#endif
         if (input->begin()) {
             a.input = std::move(input);
         } else {

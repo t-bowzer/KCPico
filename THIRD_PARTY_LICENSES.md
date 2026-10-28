@@ -13,7 +13,6 @@ accompanies any distribution of the firmware (source or binary).
 | Adafruit TinyUSB Library | Ha Thach for Adafruit Industries | MIT | Runtime (USB host / MSC) |
 | TinyUSB core | hathach | MIT | Runtime (USB stack) |
 | FatFs | ChaN | FatFs (permissive) | Runtime (filesystem) |
-| Pico PIO USB | sekigon-gonnoc | MIT | Runtime (keyboard host) |
 | CH559 USB-host firmware | atc1441 | GPL-3.0 | CH559 coprocessor (separate chip, see below) |
 | ArduinoJson | Benoit Blanchon | MIT | Runtime |
 | GoogleTest | Google Inc. | BSD-3-Clause | Native tests only |
@@ -86,9 +85,6 @@ Copyright (c) 2019 Ha Thach for Adafruit Industries. Licensed under MIT.
 
 ### TinyUSB core
 Copyright (c) 2018 hathach (https://github.com/hathach/tinyusb). Licensed under MIT.
-
-### Pico PIO USB
-Copyright (c) 2021 sekigon-gonnoc. Licensed under MIT.
 
 ### ArduinoJson
 Copyright (c) 2014-2026, Benoit BLANCHON. Licensed under MIT.

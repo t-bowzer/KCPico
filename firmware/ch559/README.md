@@ -58,11 +58,10 @@ Implemented (tracked against the bring-up plan):
       firmware issues a SET_REPORT(output) on the enumerated keyboard.
 - [x] Set the HID **boot protocol** during enumeration for the standard 8-byte
       report format.
+- [x] Detect a keyboard that is already attached at power-up/reset by polling
+      the root-hub attach levels, rather than waiting for a `UIF_DETECT` edge.
 
-> **Note:** the LED SET_REPORT path (control-write with a 1-byte data stage) is
-> implemented but must be validated on hardware (see the bring-up plan §7.2/§7.3,
-> checklist item #10). If it does not work, the beat LED degrades gracefully —
-> the RP2040 adapter returns `false` from `setLed()` until a SET_REPORT succeeds.
+The LED SET_REPORT and startup-detection paths are validated on hardware.
 
 ## Files
 

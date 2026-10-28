@@ -1,7 +1,7 @@
 #include "input_ch559.h"
 
-// Compiled only for the CH559 UART-bridge build.
-#if !defined(KEYBCHORD_NATIVE) && defined(KEYBCHORD_CH559)
+// Compiled only for the RP2040 firmware (not the native test build).
+#if !defined(KEYBCHORD_NATIVE)
 
 #include <Arduino.h>
 #include "pico/time.h"   // time_us_64()
@@ -75,4 +75,4 @@ bool InputCh559::setLed(uint8_t led_usage, bool on) {
     return true;
 }
 
-#endif // !KEYBCHORD_NATIVE && KEYBCHORD_CH559
+#endif // !KEYBCHORD_NATIVE

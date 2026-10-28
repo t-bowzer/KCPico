@@ -18,7 +18,7 @@ the custom firmware cannot be debugged (see "Fallback" at the end).
 | # | Item | Notes |
 |---|------|-------|
 | 1 | **CH559 USB-host breakout** | e.g. MatzElectronics CH559 USB Host Breakout (Tindie) or Electrodragon CH559 mini. Must break out `P2.6`/`P2.7` (UART1) and `5V`/`GND`. |
-| 2 | Fully built **KeybChord Pico** | Pico + DIN/TRS MIDI out + LCD + the existing USB-A keyboard receptacle (PIO-USB wiring) still in place. |
+| 2 | Fully built **KeybChord Pico** | Pico + DIN/TRS MIDI out + LCD + the existing USB-A keyboard receptacle still in place. |
 | 3 | USB keyboard | A plain HID keyboard. Later also a wireless-dongle or hub-connected keyboard (the "problem" cases). |
 | 4 | 4× **dupont jumper wires** (male-to-female or male-to-male as your headers dictate) | `5V`, `GND`, `GP0`↔`P2.6`, `GP1`↔`P2.7`. |
 | 5 | USB-A → micro-USB cable | Pico → PC (power + CDC debug log). |
@@ -129,7 +129,7 @@ summarizes what was changed and how to (re)build and flash it.
 
 ### 5.1 CH559 firmware (`firmware/ch559/`)
 
-Three changes from the upstream `atc1441/CH559sdccUSBHost` fork were made:
+Key changes from the upstream `atc1441/CH559sdccUSBHost` fork:
 
 1. **UART1 @ 115200** — the protocol now emits on UART1 (`RXD1`/`TXD1` =
    P2.6/P2.7) instead of UART0 @ 1 Mbps. `initUART1()` (in `util.c`) sets the pin
@@ -139,8 +139,12 @@ Three changes from the upstream `atc1441/CH559sdccUSBHost` fork were made:
    `SET_PROTOCOL = boot` so keyboards report the standard 8-byte boot format (no
    report ID). See `setHidBootProtocol()` in `USBHost.c`.
 3. **LED SET_REPORT relay** — the RP2040 sends `0xED` + 1 LED byte over UART1;
-   `processUart()` (in `uart.c`) calls `setHidKeyboardLed()` which issues a
-   `SET_REPORT(output)` with the 1-byte LED report. This powers the beat-LED.
+   `processUart()` (in `uart.c`) calls `setHidKeyboardLed()`, which issues a
+   `SET_REPORT(output)` through `hostCtrlTransfer()` with the 1-byte LED report.
+   This powers the beat-LED.
+4. **Startup/hot-plug detection** — `checkRootHubConnections()` polls the USB
+   attach levels instead of relying only on the `UIF_DETECT` edge, so a keyboard
+   already connected when the CH559 powers up still enumerates.
 
 Build (SDCC):
 
@@ -170,26 +174,24 @@ disconnect the Pico `VBUS`→`5V` jumper first so only the PC powers it.
 
 ### 5.2 RP2040 firmware (`keybchord/`)
 
-New parallel input path for the CH559 UART bridge:
+The RP2040 firmware has a single input path: the CH559 UART bridge.
 
 - `lib/hw/ch559_protocol.h` — streaming `0xFE`-delimited frame parser (pure C++).
-- `lib/hw/hid_report.h` — shared boot-report parser, extracted from
-  `InputUsbHost` so both adapters use the same `report → KeyEvent` logic.
+- `lib/hw/hid_report.h` — shared boot-report parser (`report → KeyEvent` logic).
 - `lib/hw/input_ch559.{h,cpp}` — `InputCh559` adapter: `Serial1` at 115200 on
   `GP0`/`GP1`, feeds frames to the parser, emits `KeyEvent`s, and relays
   `setLed()` as the `0xED` command.
 - `lib/hw/pins.h` — `PIN_CH559_TX 0`, `PIN_CH559_RX 1`, `CH559_UART_BAUD 115200`.
-- `lib/hw/factory.cpp` — instantiates `InputCh559` when `KEYBCHORD_CH559` is
-  defined (the legacy `InputUsbHost` PIO-USB build is unchanged).
-- `platformio.ini` — new `[env:pico-ch559]` (drops `Pico PIO USB`, adds
-  `-DKEYBCHORD_CH559`).
+- `lib/hw/factory.cpp` — instantiates `InputCh559`.
+- `platformio.ini` — `[env:pico]` is the CH559 build; the Pico PIO USB
+  dependency and the legacy PIO-USB build have been removed.
 - `test/test_ch559.cpp` — native unit tests for the frame + report parsers.
 
 Build and flash the RP2040:
 
 ```bash
 cd keybchord
-pio run -e pico-ch559          # builds .pio/build/pico-ch559/firmware.uf2
+pio run -e pico                # builds .pio/build/pico/firmware.uf2
 ```
 
 Flash the Pico: hold **BOOTSEL**, plug into USB, drag `firmware.uf2` onto the

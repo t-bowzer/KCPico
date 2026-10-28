@@ -6,9 +6,9 @@
 
 // Shared HID boot-protocol keyboard report parser.
 //
-// Used by both the PIO-USB `InputUsbHost` adapter and the CH559 UART-bridge
-// `InputCh559` adapter so the report -> KeyEvent logic lives in exactly one
-// place. Pure C++ (no Arduino), so it is unit-testable under KEYBCHORD_NATIVE.
+// Used by the CH559 UART-bridge `InputCh559` adapter so the report -> KeyEvent
+// logic lives in exactly one place. Pure C++ (no Arduino), so it is
+// unit-testable under KEYBCHORD_NATIVE.
 
 namespace hid_report {
 

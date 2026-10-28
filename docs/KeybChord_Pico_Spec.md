@@ -866,7 +866,7 @@ A checklist mapped 1:1 to the Acceptance Criteria (Section 13), executed on asse
 These milestones align with the Build Sequence (Section 1.6); stop for user feedback after each. Every milestone keeps the GoogleTest `native` suite green before its stop.
 
 1. **M1 — Scaffolding:** PlatformIO project (`pico` + `native` envs), pinned lib deps, `src/main.cpp` entry (`setup/loop` + `setup1/loop1`), LittleFS layout + config loader with first-boot defaults, adapter interfaces with null implementations, GoogleTest skeleton.
-2. **M2 — Core framework:** USB-host HID keyboard input (TinyUSB + Pico-PIO-USB); State Manager (pending vs active params scaffolding); MIDI Router (DIN via `Serial2`/UART1); Config/Preset store (LittleFS + ArduinoJson); hardcoded note on DIN; minimal USB-CDC debug log + MIDI monitor (on-device feedback instrument for M2–M5).
+2. **M2 — Core framework:** USB-host HID keyboard input (CH559 coprocessor + UART bridge); State Manager (pending vs active params scaffolding); MIDI Router (DIN via `Serial2`/UART1); Config/Preset store (LittleFS + ArduinoJson); hardcoded note on DIN; minimal USB-CDC debug log + MIDI monitor (on-device feedback instrument for M2–M5).
 3. **M3 — Chord Engine:** keymap resolver, chord/interval computation, full combination matrix, voicing modes, extensions, all four play modes with correct note lifecycle, Held-mode latching.
 4. **M4 — Strum Plate:** note-pool derivation, full + limited (Num-Lock-independent) layouts, strum params, immediate edit pickup.
 5. **M5 — Rhythm Engine:** Core 1 scheduler/clock, pattern playback on ch10, integer tempo/fixed-point swing, mute, MIDI clock toggle, chord sync, keyboard-LED BPM indicator (FR-R8).
@@ -917,7 +917,7 @@ These milestones align with the Build Sequence (Section 1.6); stop for user feed
 ---
 
 ## 14. Open Items for Review
-Resolved in this Pico port (see referenced sections): board/compute choice (RP2040 sufficient; see roadmap), language (C++17 / Arduino-Pico), USB keyboard hosting (TinyUSB + Pico-PIO-USB), MIDI path (DIN-only, USB host/gadget conflict eliminated), persistence (JSON on LittleFS via ArduinoJson), no-FPU integer/fixed-point swing, dual-core threading model, no-OS boot, testing via GoogleTest on a `native` env.
+Resolved in this Pico port (see referenced sections): board/compute choice (RP2040 sufficient; see roadmap), language (C++17 / Arduino-Pico), USB keyboard hosting (CH559 coprocessor + UART bridge), MIDI path (DIN-only, USB host/gadget conflict eliminated), persistence (JSON on LittleFS via ArduinoJson), no-FPU integer/fixed-point swing, dual-core threading model, no-OS boot, testing via GoogleTest on a `native` env.
 
 Still open (deferred to post-hardware testing):
 1. **Final GPIO pin map** (CH559 UART0 `GP0`/`GP1`, `Serial2`/UART1 TX `GP8`, I2C SDA/SCL `GP4`/`GP5`): defaults proposed in 2.2; finalize during M12 bring-up and record in the roadmap hardware section.

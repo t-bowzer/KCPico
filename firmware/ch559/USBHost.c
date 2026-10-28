@@ -306,20 +306,13 @@ unsigned char hostCtrlTransfer(unsigned char __xdata *DataBuf, unsigned short *R
 		else
 		{
 			DEBUG_OUT("Remaining bytes to write %i", RemLen);
-			//todo rework this TxBuffer overwritten
 			while (RemLen)
 			{
 				delayUs(200);
 				UH_TX_LEN = RemLen >= endpoint0Size ? endpoint0Size : RemLen;
-				//memcpy(TxBuffer, pBuf, UH_TX_LEN);
+				for (i = 0; i < UH_TX_LEN; i++)
+					TxBuffer[i] = pBuf[i];
 				pBuf += UH_TX_LEN;
-				if (pBuf[1] == 0x09)
-				{
-					SetPort = SetPort ^ 1 ? 1 : 0;
-					*pBuf = SetPort;
-
-					DEBUG_OUT("SET_PORT  %02X  %02X ", *pBuf, SetPort);
-				}
 				DEBUG_OUT("Sending %i bytes\n", (uint16_t)UH_TX_LEN);
 				s = hostTransfer(USB_PID_OUT << 4, UH_TX_CTRL, 10000);
 				if (s != ERR_SUCCESS)
@@ -403,31 +396,17 @@ unsigned char setHidBootProtocol( unsigned char interface )
 }
 
 // SET_REPORT (output) on the given interface with a 1-byte LED report. This is
-// a control write with a data stage, so it cannot reuse hostCtrlTransfer (whose
-// OUT data path does not copy a payload). The three stages are done explicitly.
+// a control write with a data stage; hostCtrlTransfer runs the standard
+// SETUP/DATA/STATUS sequence and copies the report into the USB OUT buffer.
 unsigned char setKeyboardLedTransfer( unsigned char interface, unsigned char led )
 {
     PXUSB_SETUP_REQ pSetupReq = ((PXUSB_SETUP_REQ)TxBuffer);
-    unsigned char s;
+    unsigned short len;
 
     fillTxBuffer(SetKeyboardLedRequest, sizeof(SetKeyboardLedRequest));
     pSetupReq->wIndexL = interface;
-
-    // SETUP stage (DATA0).
-    UH_TX_LEN = sizeof(USB_SETUP_REQ);
-    s = hostTransfer((unsigned char)(USB_PID_SETUP << 4), 0, 10000);
-    if (s != ERR_SUCCESS) return s;
-
-    // DATA stage: one OUT byte, DATA1 toggle.
-    TxBuffer[0] = led;
-    UH_TX_LEN = 1;
-    UH_TX_CTRL = bUH_T_TOG | bUH_T_AUTO_TOG;
-    s = hostTransfer((unsigned char)(USB_PID_OUT << 4), UH_TX_CTRL, 10000);
-    if (s != ERR_SUCCESS) return s;
-
-    // STATUS stage: zero-length IN.
-    UH_TX_LEN = 0;
-    return hostTransfer((unsigned char)(USB_PID_IN << 4), bUH_R_TOG | bUH_R_AUTO_TOG, 10000);
+    receiveDataBuffer[0] = led;
+    return hostCtrlTransfer(receiveDataBuffer, &len, 1);
 }
 
 unsigned char getDeviceString()
@@ -984,50 +963,55 @@ unsigned char checkRootHubConnections()
 {
 	unsigned char s;
 	s = ERR_SUCCESS;
-	if (UIF_DETECT)                                                        
+
+	// Poll the attach levels on every pass instead of only acting when
+	// UIF_DETECT is set. A keyboard that is already connected when the CH559
+	// comes out of reset does not generate an attach edge, so an edge-triggered
+	// check would leave it unenumerated until the user unplugged and replugged
+	// it. The flag is still cleared so a latched event cannot linger.
+	UIF_DETECT = 0;
+
+	if(USB_HUB_ST & bUHS_H0_ATTACH)
 	{
-		UIF_DETECT = 0;    
-			if(USB_HUB_ST & bUHS_H0_ATTACH)
-			{
-				if(rootHubDevice[0].status == ROOT_DEVICE_DISCONNECT || (UHUB0_CTRL & bUH_PORT_EN) == 0x00)
-				{
-					disableRootHubPort(0);	//todo really need to reset register?
-					rootHubDevice[0].status = ROOT_DEVICE_CONNECTED;
-					DEBUG_OUT("Device at root hub %i connected\n", 0);
-					sendProtocolMSG(MSG_TYPE_CONNECTED,0, 0x01, 0x01, 0x01, 0);
-					s = initializeRootHubConnection(0);
-				}
-			}
-			else
-			if(rootHubDevice[0].status >= ROOT_DEVICE_CONNECTED)
-			{
-    			resetHubDevices(0);
-				disableRootHubPort(0);
-				DEBUG_OUT("Device at root hub %i disconnected\n", 0);
-					sendProtocolMSG(MSG_TYPE_DISCONNECTED,0, 0x01, 0x01, 0x01, 0);
-				s = ERR_USB_DISCON;
-			}
-			if(USB_HUB_ST & bUHS_H1_ATTACH)
-			{
-				
-				if(rootHubDevice[1].status == ROOT_DEVICE_DISCONNECT || (UHUB1_CTRL & bUH_PORT_EN) == 0x00)
-				{
-					disableRootHubPort(1);	//todo really need to reset register?
-					rootHubDevice[1].status = ROOT_DEVICE_CONNECTED;
-					DEBUG_OUT("Device at root hub %i connected\n", 1);
-					sendProtocolMSG(MSG_TYPE_CONNECTED,0, 0x02, 0x02, 0x02, 0);
-					s = initializeRootHubConnection(1);
-				}
-			}
-			else
-			if(rootHubDevice[1].status >= ROOT_DEVICE_CONNECTED)
-			{
-    			resetHubDevices(1);
-				disableRootHubPort(1);
-				DEBUG_OUT("Device at root hub %i disconnected\n", 1);
-					sendProtocolMSG(MSG_TYPE_DISCONNECTED,0, 0x02, 0x02, 0x02, 0);
-				s = ERR_USB_DISCON;
-			}
+		if(rootHubDevice[0].status == ROOT_DEVICE_DISCONNECT ||
+		   (rootHubDevice[0].status == ROOT_DEVICE_CONNECTED && (UHUB0_CTRL & bUH_PORT_EN) == 0x00))
+		{
+			disableRootHubPort(0);	//todo really need to reset register?
+			rootHubDevice[0].status = ROOT_DEVICE_CONNECTED;
+			DEBUG_OUT("Device at root hub %i connected\n", 0);
+			sendProtocolMSG(MSG_TYPE_CONNECTED,0, 0x01, 0x01, 0x01, 0);
+			s = initializeRootHubConnection(0);
+		}
+	}
+	else
+	if(rootHubDevice[0].status >= ROOT_DEVICE_CONNECTED)
+	{
+		resetHubDevices(0);
+		disableRootHubPort(0);
+		DEBUG_OUT("Device at root hub %i disconnected\n", 0);
+		sendProtocolMSG(MSG_TYPE_DISCONNECTED,0, 0x01, 0x01, 0x01, 0);
+		s = ERR_USB_DISCON;
+	}
+	if(USB_HUB_ST & bUHS_H1_ATTACH)
+	{
+		if(rootHubDevice[1].status == ROOT_DEVICE_DISCONNECT ||
+		   (rootHubDevice[1].status == ROOT_DEVICE_CONNECTED && (UHUB1_CTRL & bUH_PORT_EN) == 0x00))
+		{
+			disableRootHubPort(1);	//todo really need to reset register?
+			rootHubDevice[1].status = ROOT_DEVICE_CONNECTED;
+			DEBUG_OUT("Device at root hub %i connected\n", 1);
+			sendProtocolMSG(MSG_TYPE_CONNECTED,0, 0x02, 0x02, 0x02, 0);
+			s = initializeRootHubConnection(1);
+		}
+	}
+	else
+	if(rootHubDevice[1].status >= ROOT_DEVICE_CONNECTED)
+	{
+		resetHubDevices(1);
+		disableRootHubPort(1);
+		DEBUG_OUT("Device at root hub %i disconnected\n", 1);
+		sendProtocolMSG(MSG_TYPE_DISCONNECTED,0, 0x02, 0x02, 0x02, 0);
+		s = ERR_USB_DISCON;
 	}
 	return s;
 }

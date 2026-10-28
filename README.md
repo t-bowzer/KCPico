@@ -38,8 +38,9 @@ out a DIN-5 connector — no computer required.
 
 | Part | Notes |
 |------|-------|
-| Raspberry Pi Pico (RP2040) | USB host + MIDI + I2C |
-| USB-A receptacle (keyboard host) | `GP0`=D+, `GP1`=D- (22 Ω series) |
+| Raspberry Pi Pico (RP2040) | MIDI + I2C + native USB device/debug |
+| CH559L USB-host coprocessor | Hosts the keyboard; UART bridge on `GP0`/`GP1` |
+| USB-A receptacle (keyboard host) | Wired to CH559 HP/HM via 22 Ω series |
 | DIN-5 MIDI OUT | `GP8` (TX) via 10 Ω / 33 Ω from 3V3 |
 | LCD1602 + PCF8574 (I2C) | `GP4`=SDA, `GP5`=SCL, 3V3 |
 
@@ -56,11 +57,21 @@ cd keybchord
 pio run -e pico          # builds keybchord/.pio/build/pico/firmware.uf2
 ```
 
+The keyboard is hosted by the CH559 coprocessor, which runs its own firmware.
+Build it with SDCC:
+
+```bash
+cd firmware/ch559
+make                     # produces ch559.hex + ch559.bin
+```
+
 ## Flashing
 
 1. Hold the Pico's **BOOTSEL** button while plugging it into USB — it mounts as
    a mass-storage drive.
 2. Drag `firmware.uf2` onto the drive; the Pico reboots and runs it.
+3. Flash the CH559 firmware (`firmware/ch559/ch559.bin`) over its device USB
+   port per [docs/wiring.md](docs/wiring.md#flashing-the-ch559).
 
 No BOOTSEL button accessible (enclosed build)? Power off, hold **Esc** on the
 connected keyboard, and power on — the firmware reboots straight into the

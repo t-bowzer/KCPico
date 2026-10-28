@@ -192,7 +192,7 @@ Message types (`MSG_TYPE_*`):
 
 `DEVICE_POLL` (`0x04`) payload = raw interrupt-IN report. Boot keyboards: 8
 bytes = `[modifiers, reserved, key0..key5]`. Report-protocol keyboards prefix a
-**Report ID** — the RP2040 parser skips it (same as the current PIO-USB adapter).
+**Report ID** — the RP2040 shared parser skips it when configured for a report ID.
 
 ### 4.5 Bootloader entry points (for flashing convenience)
 
@@ -234,14 +234,14 @@ is **not** a programming header).
 
 ## 6. Updating the keybchord firmware (RP2040)
 
-The current keyboard path is `InputUsbHost` (PIO-USB, `lib/hw/input_usbhost.*`).
-Add a parallel **UART-bridge** adapter. Suggested steps:
+> **M12 complete:** the CH559 UART bridge is now the only supported keyboard
+> input path. The legacy PIO-USB adapter and build have been removed.
 
-1. **Extract the report parser.** Pull the report→`KeyEvent` logic out of
-   `InputUsbHost::onReport()` (modifier byte + 6 keycodes, report-ID skip,
-   `modifierBitToUsage`) into a small shared helper (e.g.
-   `lib/hw/hid_report.h` / `.cpp`) so `InputUsbHost` and the new adapter both
-   use it. Keep the `MAX_KEYS = 6` boot-format semantics for now.
+Implementation steps (retained for reference):
+
+1. **Extract the report parser.** Put the report→`KeyEvent` logic (modifier
+   byte + 6 keycodes, report-ID skip, `modifierBitToUsage`) into the shared
+   `lib/hw/hid_report.h` helper. Keep the `MAX_KEYS = 6` boot-format semantics.
 2. **New adapter** `lib/hw/input_ch559.h/.cpp` implementing `InputAdapter`:
    - `begin()` — `Serial1.begin(115200)` (GP0/GP1).
    - `poll()` — read `Serial1`, re-sync on `0xFE`, parse the §4.4 frame, and on
@@ -250,15 +250,13 @@ Add a parallel **UART-bridge** adapter. Suggested steps:
    - `connected()` / `reportReceived()` — track `CONNECTED`/`DISCONNECTED`
      (`0x01`/`0x02`) and first report, so the boot-key scan (`detectBootMode()`)
      keeps working unchanged.
-   - `setLed()` — send the §4.3(3) LED command to the CH559; return `false`
-     until firmware supports it (the beat-LED degrades gracefully, as today).
+   - `setLed()` — send the §4.3(3) LED command to the CH559, which relays it
+     as a SET_REPORT on the enumerated keyboard.
 3. **`pins.h`** — add `PIN_CH559_TX 0` / `PIN_CH559_RX 1` (or rely on `Serial1`
    defaults); document alongside the existing `PIN_DIN_TX`.
-4. **`factory.cpp`** — instantiate `InputCh559` instead of `InputUsbHost`. Prefer
-   a build flag (e.g. `KEYBCHORD_CH559`) so the legacy PIO-USB build stays
-   intact, mirroring how `KEYBCHORD_NATIVE`/`KEYBCHORD_TEST_HOOK` are gated.
-5. **`platformio.ini`** — for the CH559 build: drop `sekigon-gonnoc/Pico PIO
-   USB` and `-DPIO_USB_DP_PIN_DEFAULT=0`; add the `KEYBCHORD_CH559` flag.
+4. **`factory.cpp`** — instantiate `InputCh559` for all firmware builds.
+5. **`platformio.ini`** — `[env:pico]` builds the CH559 path; the Pico PIO USB
+   dependency, `PIO_USB_DP_PIN_DEFAULT`, and the legacy build are removed.
 6. **Tests** — the frame parser + report parser are pure logic, so unit-test them
    natively (GoogleTest, `KEYBCHORD_NATIVE`) with captured frames (feed a
    `DEVICE_POLL` byte array, assert `KeyEvent`s). Keep the existing native suite
@@ -294,7 +292,7 @@ MIDI monitor on the device's USB-MIDI input.
 | 7 | Chord press (`T`) + strum (`1`) produce MIDI notes (USB MIDI monitor) | |
 | 8 | Rhythm (`F5`) + bass (`F7`) produce drums (ch10) + bass (ch3) | |
 | 9 | **Boot-key gestures:** power-on `Esc` → RPI-RP2 bootloader; power-on `Ctrl` → MSC drive | |
-| 10 | **Beat LED** on the keyboard flashes (only after §4.3(3) is implemented) | |
+| 10 | **Beat LED** on the keyboard flashes | |
 | 11 | **Hot-plug:** unplug/replug the keyboard mid-session recovers without reset | |
 | 12 | **Problem keyboards:** a hub-connected keyboard and a long-descriptor/NKRO keyboard that failed on PIO-USB now enumerate and type | |
 | 13 | Native GoogleTest suite green (`pio test -e native`) | |

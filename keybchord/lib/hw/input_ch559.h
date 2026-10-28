@@ -6,10 +6,10 @@
 
 
 // Keyboard input adapter that receives raw HID reports from the CH559 USB-host
-// coprocessor over a UART bridge (the M12 design that replaces PIO-USB). The
-// CH559 enumerates the keyboard and forwards DEVICE_POLL frames (0xFE-delimited,
-// see ch559_protocol.h); this adapter re-synchronises on frame boundaries and
-// feeds the payloads through the shared boot-report parser.
+// coprocessor over a UART bridge. The CH559 enumerates the keyboard and forwards
+// DEVICE_POLL frames (0xFE-delimited, see ch559_protocol.h); this adapter
+// re-synchronises on frame boundaries and feeds the payloads through the shared
+// boot-report parser.
 class InputCh559 : public InputAdapter {
 public:
     bool begin() override;

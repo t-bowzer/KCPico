@@ -5,7 +5,7 @@
 // Bridges the onboard FatFS (FAT filesystem over the RP2040 flash, via the
 // arduino-pico FatFS library) to the native USB port as a Mass Storage Class
 // drive (Adafruit TinyUSB MSC). Lets a PC drag-drop edit config.json, presets,
-// and rhythms. The keyboard host remains on the separate PIO-USB port.
+// and rhythms. The keyboard host remains on the CH559 coprocessor.
 //
 // Concurrency: while the host has the drive mounted the firmware must not write
 // to FatFS; on eject (Start-Stop load_eject) the drive is withdrawn and a reboot

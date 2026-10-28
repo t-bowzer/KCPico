@@ -61,7 +61,7 @@ Flash it:
 
 1. Connect the Pico's **native micro-USB** to the Windows PC (this powers the
    device *and* carries CDC + USB MIDI).
-2. Connect the **keyboard** to the PIO-USB host port.
+2. Connect the **keyboard** to the CH559 host port.
 3. Connect the **DIN MIDI OUT** to your **DIN MIDI → USB interface**; plug that
    interface into the PC.
 4. Let it enumerate for ~10 s.

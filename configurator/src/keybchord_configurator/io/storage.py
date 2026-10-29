@@ -4,9 +4,11 @@ The filesystem layout is (see ``docs/custom-configuration-guide.md``):
 
 * ``config.json`` — global settings (object)
 * ``keymap.json`` — key bindings (``{"bindings": [...]}``)
-* ``presets/bank1.json`` … ``bank10.json`` — arrays of 8 slots
+* ``presets/bank1.json`` … ``presets/bank5.json`` — arrays of 8 slots
+* ``sequences/b<N>p<M>.json`` — per-preset chord sequences (10 slots)
 * ``rhythms/*.json`` — rhythm patterns (12 built-ins + user files)
 * ``bass/*.json`` — bass patterns (9 built-ins + user files)
+* ``chordpatterns/*.json`` — chord patterns (9 built-ins + user files)
 """
 
 from __future__ import annotations
@@ -17,12 +19,18 @@ from pathlib import Path
 from typing import Optional
 
 from ..models.bass import BASS_FILES, BASS_NAMES, BassPattern
+from ..models.bounds import NUM_BANKS
 from ..models.chordpattern import CHORD_PATTERN_FILES, ChordPattern
 from ..models.config import AppConfig
 from ..models.defaults import BUILTIN_BASS, BUILTIN_CHORD_PATTERNS, BUILTIN_RHYTHMS
 from ..models.keymap import KeymapConfig, default_keymap
 from ..models.preset import PresetSlot
 from ..models.rhythm import RHYTHM_FILES, RHYTHM_NAMES, RhythmPattern
+from ..models.sequence import (
+    SequencerLibrary,
+    iter_sequence_files,
+    sequence_file_name,
+)
 
 CONFIG_FILE = "config.json"
 KEYMAP_FILE = "keymap.json"
@@ -30,6 +38,7 @@ PRESETS_DIR = "presets"
 RHYTHMS_DIR = "rhythms"
 BASS_DIR = "bass"
 CHORD_PATTERNS_DIR = "chordpatterns"
+SEQUENCES_DIR = "sequences"
 
 
 def _write_json(path: Path, data) -> None:
@@ -63,12 +72,20 @@ class ConfigTree:
     rhythms: list[tuple[str, RhythmPattern]] = field(default_factory=list)
     bass: list[tuple[str, BassPattern]] = field(default_factory=list)
     chordpatterns: list[tuple[str, ChordPattern]] = field(default_factory=list)
+    sequences: dict[tuple[int, int], SequencerLibrary] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.banks:
             self.banks = [
-                [PresetSlot.defaults() for _ in range(8)] for _ in range(10)
+                [PresetSlot.defaults() for _ in range(8)]
+                for _ in range(NUM_BANKS)
             ]
+        self.banks = self.banks[:NUM_BANKS]
+        while len(self.banks) < NUM_BANKS:
+            self.banks.append([PresetSlot.defaults() for _ in range(8)])
+        for bank in range(NUM_BANKS):
+            for slot in range(8):
+                self.sequences.setdefault((bank, slot), SequencerLibrary())
 
     # --- name lists (for pattern resolution) ------------------------------
     def rhythm_names(self) -> list[str]:
@@ -116,6 +133,7 @@ def load_tree(directory: str | Path) -> ConfigTree:
     tree.rhythms = load_rhythms(root)
     tree.bass = load_bass(root)
     tree.chordpatterns = load_chord_patterns(root)
+    tree.sequences = load_sequences(root)
     return tree
 
 
@@ -125,7 +143,7 @@ def default_tree() -> ConfigTree:
     tree.config = AppConfig.defaults()
     tree.keymap = default_keymap()
     tree.banks = [
-        [PresetSlot.defaults() for _ in range(8)] for _ in range(10)
+        [PresetSlot.defaults() for _ in range(8)] for _ in range(NUM_BANKS)
     ]
     tree.rhythms = [
         (RHYTHM_FILES[i], RhythmPattern.from_dict(BUILTIN_RHYTHMS[i]))
@@ -145,7 +163,7 @@ def default_tree() -> ConfigTree:
 def load_presets(root: Path) -> list[list[PresetSlot]]:
     banks: list[list[PresetSlot]] = []
     presets_dir = root / PRESETS_DIR
-    for bank in range(1, 11):
+    for bank in range(1, NUM_BANKS + 1):
         path = presets_dir / f"bank{bank}.json"
         data = _load_optional_json(path, None)
         slots: list[PresetSlot] = []
@@ -215,13 +233,22 @@ def load_chord_patterns(root: Path) -> list[tuple[str, ChordPattern]]:
     return out
 
 
+def load_sequences(root: Path) -> dict[tuple[int, int], SequencerLibrary]:
+    out: dict[tuple[int, int], SequencerLibrary] = {}
+    for bank, slot, filename in iter_sequence_files():
+        path = root / SEQUENCES_DIR / filename
+        data = _load_optional_json(path, None)
+        out[(bank, slot)] = SequencerLibrary.from_dict(data)
+    return out
+
+
 def save_tree(tree: ConfigTree, directory: str | Path) -> None:
     """Write the whole tree to a directory."""
     root = Path(directory)
     _write_json(root / CONFIG_FILE, tree.config.to_dict())
     _write_json(root / KEYMAP_FILE, tree.keymap.to_dict())
 
-    for bank in range(10):
+    for bank in range(NUM_BANKS):
         _write_json(root / PRESETS_DIR / f"bank{bank + 1}.json",
                     [slot.to_dict() for slot in tree.banks[bank]])
 
@@ -233,6 +260,39 @@ def save_tree(tree: ConfigTree, directory: str | Path) -> None:
 
     for filename, pattern in tree.chordpatterns:
         _write_json(root / CHORD_PATTERNS_DIR / filename, pattern.to_dict())
+
+    # Sequence files are compact (the firmware flash budget assumes no pretty
+    # whitespace). Empty libraries remove the file.
+    for (bank, slot), lib in tree.sequences.items():
+        if not (0 <= bank < NUM_BANKS and 0 <= slot < 8):
+            continue
+        path = root / SEQUENCES_DIR / sequence_file_name(bank, slot)
+        if lib.is_empty():
+            if path.exists():
+                path.unlink()
+            continue
+        _write_json_compact(path, lib.to_dict())
+
+
+def _write_json_compact(path: Path, data) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(data, separators=(",", ":"), ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
+def legacy_bank_files(root: str | Path) -> list[str]:
+    """Unsupported bank files from v0.1.x (bank6..bank10)."""
+    presets_dir = Path(root) / PRESETS_DIR
+    if not presets_dir.exists():
+        return []
+    legacy = []
+    for bank in range(NUM_BANKS + 1, 11):
+        path = presets_dir / f"bank{bank}.json"
+        if path.exists():
+            legacy.append(path.name)
+    return legacy
 
 
 def delete_user_patterns(directory: str | Path, subdir: str,

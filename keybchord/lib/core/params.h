@@ -76,6 +76,7 @@ enum class EditMenu : uint8_t {
     Rhythm,
     Bass,
     Drum,
+    Sequence,
     COUNT
 };
 
@@ -147,6 +148,10 @@ enum class ParamId : uint8_t {
     DrumClaveVel,
     DrumShakerNote,
     DrumShakerVel,
+    // Sequencer (M14)
+    SeqSlot,
+    SeqBars,
+    SeqSettings,
     COUNT
 };
 

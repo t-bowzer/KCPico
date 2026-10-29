@@ -256,6 +256,15 @@ KeyAction KeymapResolver::resolve(uint16_t usage_code, uint8_t modifiers,
         return a;  // Super+9/0 -> None
     }
 
+    // Ctrl+1..0 selects a sequence slot globally (M14). This deliberately wins
+    // over the reserved play-key fallback below; the main loop releases any
+    // strum note held before Ctrl was pressed on the matching key-up.
+    if (combo == KMOD_CTRL && isNumberRowStrum(usage)) {
+        a.cmd  = KeyCmd::SequenceSelect;
+        a.slot = static_cast<uint8_t>(usage - NUMBER_ROW_STRUM_LO);
+        return a;
+    }
+
     // Reserved play keys: chord grid, backtick, strum keys, held-extension
     // arrows, and Esc. These must resolve to their action even while Ctrl/Alt
     // is held, otherwise a chord/strum key released mid-combo would be dropped
@@ -298,6 +307,27 @@ KeyAction KeymapResolver::resolve(uint16_t usage_code, uint8_t modifiers,
     if (keymap_) {
         const KeyAction* found = keymap_->find(combo, hid_usage::PAGE_KEYBOARD, usage);
         if (found) return *found;
+    }
+
+    // v0.2 upgrade fallback: v0.1 keymaps predate the sequence controls. Keep
+    // them usable without forcing a keymap rewrite; an explicit binding above
+    // always wins.
+    if (combo == KMOD_CTRL && usage == 0x42) {
+        a.cmd = KeyCmd::SequenceRecord;
+        return a;
+    }
+    if (combo == KMOD_CTRL && usage == 0x43) {
+        a.cmd = KeyCmd::SequencePlay;
+        return a;
+    }
+    if (combo == KMOD_CTRL && usage == 0x44) {
+        a.cmd = KeyCmd::SequenceClear;
+        return a;
+    }
+    if (combo == KMOD_SUPER && usage == 0x45) {
+        a.cmd = KeyCmd::OpenMenu;
+        a.menu = EditMenu::Sequence;
+        return a;
     }
 
     return a;  // None

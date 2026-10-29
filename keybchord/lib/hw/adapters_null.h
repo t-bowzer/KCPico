@@ -30,6 +30,7 @@ public:
     bool exists(const std::string& /*path*/) override { return false; }
     std::string readFile(const std::string& /*path*/) override { return ""; }
     bool writeFile(const std::string& /*path*/, const std::string& /*data*/) override { return true; }
+    bool remove(const std::string& /*path*/) override { return true; }
     bool mkdir(const std::string& /*path*/) override { return true; }
     std::vector<std::string> listFiles(const std::string& /*dir*/) override { return {}; }
 };

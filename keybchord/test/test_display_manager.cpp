@@ -276,3 +276,47 @@ TEST_F(DisplayManagerTest, RecentChordKeepsChordName) {
     ASSERT_EQ(lcd_.frames().size(), 1u);
     EXPECT_EQ(lcd_.frames()[0].l1, pad("Eb" + sp(7) + " B1:P1"));
 }
+
+TEST_F(DisplayManagerTest, ShowPersistentDoesNotAutoRevert) {
+    DisplayManager dm(state_, lcd_);
+    dm.update(0);
+    lcd_.reset();
+
+    dm.showPersistent("Recording 1/4", "");
+    dm.update(1000);
+    ASSERT_EQ(lcd_.frames().size(), 1u);
+    EXPECT_EQ(lcd_.frames()[0].l1, pad("Recording 1/4"));
+
+    // Much later, the status is still there (unlike showValue).
+    lcd_.reset();
+    dm.update(60000000);
+    EXPECT_TRUE(lcd_.frames().empty());
+
+    dm.showPersistent("Recording 2/4", "");
+    dm.update(60001000);
+    ASSERT_EQ(lcd_.frames().size(), 1u);
+    EXPECT_EQ(lcd_.frames()[0].l1, pad("Recording 2/4"));
+
+    lcd_.reset();
+    dm.cancel();
+    dm.update(60002000);
+    ASSERT_EQ(lcd_.frames().size(), 1u);
+    EXPECT_EQ(lcd_.frames()[0].l1, pad("B1:P1" + sp(4) + " " + "B1:P1"));
+}
+
+TEST_F(DisplayManagerTest, ShowPersistentDoesNotClobberPrompt) {
+    DisplayManager dm(state_, lcd_);
+    dm.showPrompt("Save preset?", 1000);
+    dm.update(1000);
+    lcd_.reset();
+
+    dm.showPersistent("Recording 1/4", "");
+    dm.update(1001);
+    EXPECT_TRUE(lcd_.frames().empty());  // prompt remains, no frame change
+
+    dm.cancel();
+    dm.showPersistent("Recording 1/4", "");
+    dm.update(1002);
+    ASSERT_EQ(lcd_.frames().size(), 1u);
+    EXPECT_EQ(lcd_.frames()[0].l1, pad("Recording 1/4"));
+}

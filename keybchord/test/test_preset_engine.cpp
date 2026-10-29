@@ -79,7 +79,7 @@ TEST_F(PresetEngineTest, HomeEntersCursorAndWraps) {
 
     route(key(HOME, true));
     EXPECT_TRUE(state_.cursorActive);
-    EXPECT_EQ(state_.cursorBank, 9);   // wraps to last slot of previous bank
+    EXPECT_EQ(state_.cursorBank, 4);   // wraps to last slot of previous bank
     EXPECT_EQ(state_.cursorSlot, 7);
     // Active slot is unchanged.
     EXPECT_EQ(state_.currentBank, 0);
@@ -96,7 +96,7 @@ TEST_F(PresetEngineTest, EndMovesCursorForward) {
 TEST_F(PresetEngineTest, SuperHomeEndMoveBank) {
     route(key(HOME, true, SUPER));
     EXPECT_TRUE(state_.cursorActive);
-    EXPECT_EQ(state_.cursorBank, 9);
+    EXPECT_EQ(state_.cursorBank, 4);
     EXPECT_EQ(state_.cursorSlot, 0);
 
     route(key(END, true, SUPER));

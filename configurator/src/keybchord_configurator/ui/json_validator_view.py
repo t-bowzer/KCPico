@@ -27,10 +27,12 @@ from ..io.storage import (
     KEYMAP_FILE,
     PRESETS_DIR,
     RHYTHMS_DIR,
+    SEQUENCES_DIR,
     ConfigTree,
     load_tree,
 )
 from ..models.bass import BassPattern
+from ..models.bounds import NUM_BANKS
 from ..models.chordpattern import ChordPattern
 from ..models.rhythm import RhythmPattern
 from ..validation.validator import (
@@ -40,6 +42,7 @@ from ..validation.validator import (
     validate_keymap,
     validate_preset_bank,
     validate_rhythm,
+    validate_sequence_file,
 )
 
 
@@ -120,7 +123,8 @@ def validate_directory(directory: str | Path) -> list[tuple[str, object]]:
 
     for subdir, validator in ((RHYTHMS_DIR, validate_rhythm),
                               (BASS_DIR, validate_bass),
-                              (CHORD_PATTERNS_DIR, validate_chord_pattern)):
+                              (CHORD_PATTERNS_DIR, validate_chord_pattern),
+                              (SEQUENCES_DIR, validate_sequence_file)):
         directory_path = root / subdir
         if not directory_path.exists():
             continue
@@ -140,12 +144,19 @@ def validate_tree(tree: ConfigTree) -> list[tuple[str, object]]:
     results.append((KEYMAP_FILE, validate_keymap(
         tree.keymap.to_dict(), rhythm_names=rhythm_names, bass_names=bass_names,
         chord_pattern_names=chord_pattern_names)))
-    for bank in range(10):
+    for bank in range(NUM_BANKS):
         results.append((f"{PRESETS_DIR}/bank{bank + 1}.json",
                         validate_preset_bank(
                             [s.to_dict() for s in tree.banks[bank]],
                             rhythm_names=rhythm_names, bass_names=bass_names,
                             chord_pattern_names=chord_pattern_names)))
+    for (bank, slot), lib in sorted(tree.sequences.items()):
+        if bank >= NUM_BANKS:
+            continue
+        results.append((f"{SEQUENCES_DIR}/b{bank + 1}p{slot + 1}.json",
+                        validate_sequence_file(
+                            lib.to_dict(),
+                            filename=f"b{bank + 1}p{slot + 1}.json")))
     for filename, pattern in tree.rhythms:
         results.append((f"{RHYTHMS_DIR}/{filename}",
                         validate_rhythm(pattern.to_dict(), filename=filename)))

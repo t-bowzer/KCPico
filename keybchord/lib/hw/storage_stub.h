@@ -2,6 +2,7 @@
 
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include "base.h"
 
 
@@ -10,7 +11,8 @@ public:
     bool begin() override { return true; }
 
     bool exists(const std::string& path) override {
-        return store_.find(path) != store_.end();
+        return store_.find(path) != store_.end() ||
+               dirs_.find(path) != dirs_.end();
     }
 
     std::string readFile(const std::string& path) override {
@@ -24,7 +26,16 @@ public:
         return true;
     }
 
-    bool mkdir(const std::string&) override { return true; }
+    bool remove(const std::string& path) override {
+        bool removed = store_.erase(path) > 0;
+        removed = (dirs_.erase(path) > 0) || removed;
+        return removed;
+    }
+
+    bool mkdir(const std::string& path) override {
+        dirs_.insert(path);
+        return true;
+    }
 
     std::vector<std::string> listFiles(const std::string& dir) override {
         std::vector<std::string> out;
@@ -40,10 +51,11 @@ public:
         return out;
     }
 
-    void clear() { store_.clear(); }
+    void clear() { store_.clear(); dirs_.clear(); }
 
 private:
     std::unordered_map<std::string, std::string> store_;
+    std::unordered_set<std::string> dirs_;
 };
 
 

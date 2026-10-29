@@ -24,6 +24,14 @@ void PresetEngine::setModeChangedCallback(std::function<void()> cb) {
     modeChanged_ = std::move(cb);
 }
 
+void PresetEngine::setPresetChangedCallback(std::function<void(int, int)> cb) {
+    presetChanged_ = std::move(cb);
+}
+
+void PresetEngine::setPresetClearedCallback(std::function<void(int, int)> cb) {
+    presetCleared_ = std::move(cb);
+}
+
 std::string PresetEngine::locationString(int bank, int slot) const {
     return "B" + std::to_string(bank + 1) + ":P" + std::to_string(slot + 1);
 }
@@ -98,6 +106,9 @@ void PresetEngine::loadCursor(uint64_t now_us) {
     // Mirror edit behavior: a mode change releases a latched held chord.
     if (oldMode != stored.chord.play_mode && modeChanged_) modeChanged_();
 
+    // Load this preset's sequence file (stops any prior playback/recording).
+    if (presetChanged_) presetChanged_(bank, slot);
+
     display_.showValue("Loaded", locationString(bank, slot), false, now_us);
 }
 
@@ -148,6 +159,7 @@ void PresetEngine::confirmPrompt(uint64_t now_us) {
         if (oldMode != state_.pendingChord.play_mode && modeChanged_) {
             modeChanged_();
         }
+        if (presetCleared_) presetCleared_(bank, slot);
         display_.showValue("Cleared", locationString(bank, slot), false, now_us);
     }
 }

@@ -60,12 +60,22 @@ private:
     bool     clockArmed_ = false; // phase initialized (once, at first update)
     uint64_t clockTickIndex_ = 0; // total ticks emitted (monotonic)
 
+    // MIDI clock output is armed at the next 24-tick beat boundary when it is
+    // switched on, so external devices start their beat division in phase with
+    // the beat LED. Switching it off is immediate.
+    bool     clockOutWasEnabled_ = false;
+    bool     clockOutPending_ = false;
+    bool     clockOutActive_ = false;
+
+    uint16_t lastTempo_ = 0;
+
     const RhythmPattern* currentPattern() const;
 
     PerfStats jitter_;   // clock tick-lateness stats, written only by Core 1
 
     void advanceClock(uint64_t now_us);
     void start(uint64_t now_us);
+    void restartAtNextBeat();
     void stop();
     void fireStep(uint64_t now_us);
 };

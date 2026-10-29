@@ -82,14 +82,36 @@ void RhythmEngine::advanceClock(uint64_t now_us) {
         // fall through so tick #0 is emitted immediately
     }
 
+    const bool clockEnabled = state_.config.midi_clock_enabled;
+    if (clockEnabled != clockOutWasEnabled_) {
+        clockOutWasEnabled_ = clockEnabled;
+        if (clockEnabled) {
+            // Wait for the next beat boundary. Starting mid-beat makes an
+            // external device count its 24 clocks from an arbitrary phase, so
+            // the LED and the external beat appear offset.
+            clockOutPending_ = true;
+            clockOutActive_ = false;
+        } else {
+            clockOutPending_ = false;
+            clockOutActive_ = false;
+        }
+    }
+
     while (nextClockUs_ <= now_us) {
         // Record the tick lateness (NFR-2). The clock runs continuously from
         // boot, so this is measured even when the rhythm is stopped — it is the
         // timebase the beat LED and drums slave to.
         jitter_.record(static_cast<uint32_t>(now_us - nextClockUs_));
 
-        if (state_.config.midi_clock_enabled) {
-            out_.push(midi::makeSystem(midi::SYSTEM_CLOCK));
+        if (clockEnabled) {
+            if (!clockOutActive_ && clockOutPending_ &&
+                clockTickIndex_ % 24 == 0) {
+                clockOutActive_ = true;
+                clockOutPending_ = false;
+            }
+            if (clockOutActive_) {
+                out_.push(midi::makeSystem(midi::SYSTEM_CLOCK));
+            }
         }
         // Beat boundary every 24 ticks: the beat LED follows the master clock.
         if (clockTickIndex_ % 24 == 0 && state_.config.bpm_indicator) {
@@ -106,11 +128,18 @@ void RhythmEngine::update(uint64_t now_us) {
 
     // 2. Rhythm start/stop (slaved to the clock in start()).
     const RhythmParams& rp = state_.pendingRhythm;
+    bool tempoChanged = (rp.tempo != lastTempo_);
+    lastTempo_ = rp.tempo;
     bool wantRun = rp.enabled && !patterns_.empty();
     if (wantRun && !running_) {
         start(now_us);
     } else if (!wantRun && running_) {
         stop();
+    } else if (tempoChanged && running_) {
+        // A live tempo change must not leave the pattern between the master
+        // clock's beat edges. Re-slave the pattern to the next beat boundary
+        // (stepAbs stays monotonic for the sequencer/arp).
+        restartAtNextBeat();
     }
 
     if (!running_) return;
@@ -157,6 +186,15 @@ void RhythmEngine::start(uint64_t now_us) {
     stepDeadlineUs_ = downbeat;
 }
 
+void RhythmEngine::restartAtNextBeat() {
+    step_ = 0;
+    uint32_t tick = clockTickUs(state_.pendingRhythm.tempo);
+    uint64_t ticksToBeat = (24 - (clockTickIndex_ % 24)) % 24;
+    uint64_t downbeat = nextClockUs_ + ticksToBeat * tick;
+    barStartUs_ = downbeat;
+    stepDeadlineUs_ = downbeat;
+}
+
 void RhythmEngine::stop() {
     running_ = false;
     // NOTE: the master clock keeps running (its phase is the master timebase
@@ -167,6 +205,19 @@ void RhythmEngine::stop() {
 
 void RhythmEngine::fireStep(uint64_t now_us) {
     const RhythmParams& rp = state_.pendingRhythm;
+
+    // Recording guide: suppress the normal pattern and play a quarter-note
+    // closed hi-hat instead. The downbeat is accented so the bar is audible.
+    if (state_.recordGuideActive.load()) {
+        if (state_.recordGuideHatsActive.load() &&
+            stepAbs_ >= state_.recordGuideHatsStartAbs.load() &&
+            step_ % RHYTHM_STEPS_PER_BEAT == 0) {
+            uint8_t vel = (step_ == 0) ? 110 : 90;
+            out_.push(midi::makeNoteOn(rp.channel, rp.drums.hihat, vel));
+        }
+        return;
+    }
+
     const RhythmPattern* pat = currentPattern();
     if (!pat) return;
 

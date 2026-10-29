@@ -248,3 +248,86 @@ def test_midi_library_channel_override_leaves_sysex_unchanged():
     ])
     assert command.macro_commands(channel=16)[0].bytes == [
         0xF0, 0x7E, 0x7F, 0xF7]
+
+
+def test_sequence_chord_id_roundtrip_and_labels():
+    from keybchord_configurator.models.enums import ChordType
+    from keybchord_configurator.models.sequence import (
+        SequenceEvent, chord_id, chord_label, parse_chord_id,
+    )
+
+    cid = chord_id(5, ChordType.MIN7, add9=True, add13=True)
+    assert cid == 5 * 128 + int(ChordType.MIN7) * 8 + 5
+    parsed = parse_chord_id(cid)
+    assert parsed == (5, ChordType.MIN7, True, False, True)
+    assert chord_label(cid) == "Fm7+9+13"
+    assert SequenceEvent(root_pc=0, chord_type=ChordType.MAJOR).label == "C"
+    assert parse_chord_id(99999) is None
+
+
+def test_sequence_roundtrip_and_limits():
+    from keybchord_configurator.models.enums import ChordType
+    from keybchord_configurator.models.sequence import (
+        MAX_SEQUENCE_EVENTS, Sequence, SequenceEvent, SequencerLibrary,
+    )
+
+    lib = SequencerLibrary()
+    seq = lib.slot(1)
+    seq.bars = 2
+    seq.steps_per_bar = 16
+    seq.live_mask = 0b101
+    assert seq.set_event(0, SequenceEvent(step=0, root_pc=0,
+                                          chord_type=ChordType.MAJOR))
+    assert seq.set_event(16, SequenceEvent(step=16, root_pc=7,
+                                           chord_type=ChordType.DOM7))
+    assert not seq.set_event(32, SequenceEvent(step=32, root_pc=0,
+                                               chord_type=ChordType.MAJOR))
+
+    data = lib.to_dict()
+    assert data["sequences"][0] is None
+    assert data["sequences"][1]["bars"] == 2
+    assert data["sequences"][1]["live"] == 5
+    loaded = SequencerLibrary.from_dict(data)
+    assert loaded.slot(1).bars == 2
+    assert len(loaded.slot(1).events) == 2
+    assert loaded.slot(1).events[1].root_pc == 7
+
+    full = Sequence(bars=8)
+    for i in range(MAX_SEQUENCE_EVENTS):
+        assert full.set_event(i, SequenceEvent(step=i))
+    assert not full.set_event(64, SequenceEvent(step=64))
+
+
+def test_sequence_clamps_bars_and_steps():
+    from keybchord_configurator.models.sequence import Sequence, clamp_bars
+
+    assert clamp_bars(3) == 4
+    assert clamp_bars(7) == 8
+    seq = Sequence.from_dict({"bars": 3, "steps_per_bar": 999})
+    assert seq.bars == 4
+    assert seq.steps_per_bar == 64
+
+
+def test_sequence_worst_case_json_fits_budget():
+    import json
+
+    from keybchord_configurator.models.enums import ChordType
+    from keybchord_configurator.models.sequence import (
+        MAX_SEQUENCE_EVENTS, SequenceEvent, SequencerLibrary,
+    )
+
+    lib = SequencerLibrary()
+    for seq in lib.slots:
+        seq.bars = 8
+        seq.steps_per_bar = 16
+        seq.recorded.octave = 1
+        seq.recorded.velocity = 101
+        seq.recorded.pattern = 3
+        seq.live_mask = 0x5A5
+        for i in range(MAX_SEQUENCE_EVENTS):
+            seq.set_event(i * 2, SequenceEvent(
+                root_pc=i % 12,
+                chord_type=ChordType(i % 11),
+                add9=bool(i & 1), add11=bool(i & 2), add13=bool(i & 4)))
+    text = json.dumps(lib.to_dict(), separators=(",", ":"))
+    assert len(text) < 7000

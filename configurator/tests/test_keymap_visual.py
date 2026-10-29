@@ -132,6 +132,9 @@ def test_all_action_types_have_labels():
         "preset_save": KeyAction(type="preset_save"),
         "preset_clear": KeyAction(type="preset_clear"),
         "tap_tempo": KeyAction(type="tap_tempo"),
+        "sequence_record": KeyAction(type="sequence_record"),
+        "sequence_play": KeyAction(type="sequence_play"),
+        "sequence_clear": KeyAction(type="sequence_clear"),
     }
     assert set(samples) == set(ACTION_TYPES)
     for action_type, action in samples.items():

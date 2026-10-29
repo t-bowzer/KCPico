@@ -41,9 +41,11 @@ need to prepare anything.
 |------|----------|
 | `/config.json` | Global settings (single JSON object). |
 | `/keymap.json` | Configurable key bindings (`bindings` array). |
-| `/presets/bank1.json` … `/presets/bank10.json` | 10 banks × 8 preset slots (each file is a JSON **array of 8** objects). |
+| `/presets/bank1.json` … `/presets/bank5.json` | 5 banks × 8 preset slots (each file is a JSON **array of 8** objects). |
+| `/sequences/b1p1.json` … `/sequences/b5p8.json` | Per-preset chord sequences (all 10 slots in one compact file; see §3.8). |
 | `/rhythms/*.json` | Rhythm patterns — the 12 built-ins plus any user files you add. |
 | `/bass/*.json` | Bass patterns — the 9 built-ins plus any user files you add. |
+| `/chordpatterns/*.json` | Chord patterns — the 9 built-ins plus any user files you add. |
 | `/keymap_error.log` | Written only when `/keymap.json` fails validation (see §4). |
 
 ---
@@ -72,7 +74,7 @@ A single object. Any omitted key uses its default.
 |-----|------|-------|---------|-------|
 | `midi.din_enabled` | bool | — | `true` | Reserved; parsed but not currently used (DIN MIDI out is always active). |
 | `midi.usb_enabled` | bool | — | `true` | USB MIDI device output on/off (v0.2). The interface always enumerates; this only gates whether bytes are sent. Toggle = `Ctrl+F8`. |
-| `midi.clock_enabled` | bool | — | `false` | Transmit MIDI clock (`0xF8`) on DIN and USB. Toggle = `F8`. |
+| `midi.clock_enabled` | bool | — | `false` | Transmit MIDI clock (`0xF8`) on DIN and USB. Toggle = `F8`. Switching it on starts at the next 24-tick beat boundary so external devices stay in phase with the beat LED; switching off is immediate. |
 | `chord.base_root_midi` | int | 0–127 | `60` | Anchor MIDI note for chord root position (60 = C4). |
 | `chord.note_range` | [int,int] | 0–127 each | `[48, 84]` | Voicing note window. An inverted pair is auto-swapped. |
 | `display.revert_timeout_ms` | int | 250–5000 | `1500` | How long a parameter value stays on the LCD before reverting. |
@@ -82,7 +84,7 @@ A single object. Any omitted key uses its default.
 | `led.bpm_indicator` | bool | — | `true` | Flash a keyboard LED on each beat. |
 | `led.led` | enum | — | `num_lock` | Which LED(s): `num_lock`, `caps_lock`, `scroll_lock`, or `all`. |
 | `led.flash_ms` | int | 5–500 | `40` | Beat-flash duration (ms). |
-| `startup_preset` | string | `"B#:P#"` | `"B1:P1"` | Preset loaded at boot (bank 1–10, slot 1–8). |
+| `startup_preset` | string | `"B#:P#"` | `"B1:P1"` | Preset loaded at boot (bank 1–5, slot 1–8). Values above B5 fall back to B1:P1. |
 | `logging.debug_log` | bool | — | `true` | Key/strum/LED debug log over USB-CDC. |
 | `logging.midi_monitor` | bool | — | `true` | Decode outgoing MIDI over USB-CDC. |
 
@@ -91,7 +93,9 @@ A single object. Any omitted key uses its default.
 ## 3. Presets — `/presets/bankN.json`
 
 Each bank file is a JSON **array of exactly 8** objects (slot 0 … slot 7),
-covering 10 banks × 8 slots = 80 presets. Editing one object changes that slot.
+covering 5 banks × 8 slots = **40 presets**. Editing one object changes that
+slot. v0.2 removed the old banks 6–10; back them up before upgrading (the
+firmware deletes those files on first boot to reclaim flash).
 
 ### 3.1 Example slot
 
@@ -290,6 +294,89 @@ from JSON libraries (including the bundled Roland JD-Xi libraries); see the
 > On-device preset Save preserves the preset's macro configuration; Clear
 > resets it to `number_keys: "strum"` with no macros.
 
+### 3.8 Chord sequences — `/sequences/bNpM.json`
+
+Each preset owns **10 sequence slots** (1–10, selected with `Ctrl+1`…`Ctrl+0`).
+They are stored in one file per preset, named with the preset bank/slot:
+`/sequences/b1p1.json` for bank 1 slot 1, through `/sequences/b5p8.json`. The
+file holds all ten slots; an unused slot is `null`. Files are compact JSON (no
+pretty whitespace) so the 40-preset × 10-slot worst case fits the 512 KB
+filesystem.
+
+```json
+{
+  "version": 1,
+  "sequences": [
+    null,
+    {
+      "bars": 4,
+      "steps_per_bar": 16,
+      "recorded": [0, 500, 100, 64, 0, 0, 3, 0, 0, 0, 0],
+      "live": 0,
+      "events": [[0, 0], [16, 640]]
+    }
+  ]
+}
+```
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `bars` | int | `1`, `2`, `4`, or `8`. |
+| `steps_per_bar` | int | Recorded meter, 4–64 (usually `16`, or `12` for 3/4). |
+| `recorded` | int[11] | Settings snapshot, in this order: `octave`, `note_duration_ms`, `velocity`, `pan`, `voicing_mode` (0–3), `chord_roll_ms`, `min_notes`, `min_interval`, `inversion` (0–3), `arp_mode` (0–4), `pattern` index. |
+| `live` | int | Bitmask; bit *i* set = use the **live** value for `recorded[i]` during playback. Play mode is always forced to `held`; channel stays live. |
+| `events` | `[step, chord_id]` array | Max **64** events. `step` is a 16th-note index in `0 .. bars*steps_per_bar-1`. The last event at a duplicate step wins. |
+
+**Chord ID encoding:** `chord_id = root_pc * 128 + type * 8 + extension_mask`.
+`root_pc` is 0–11 (C = 0). `type` follows the firmware `ChordType` order:
+`0` major, `1` minor, `2` dom7, `3` maj7, `4` min7, `5` dim, `6` dim7, `7` aug,
+`8` sus4, `9` sus2, `10` min7b5. Extension bits are add9 = `1`, add11 = `2`,
+add13 = `4` (combine them). Example: C major = `0`; G7 = `7*128 + 2*8 = 912`;
+Fm7 with add9+add13 = `5*128 + 4*8 + 5 = 677`.
+
+**Recording/playback:**
+- `Ctrl+F9` arms recording. The normal pattern is muted immediately, but the
+  hi-hat guide stays silent until the next bar boundary. It then plays
+  **exactly one bar** of quarter-note closed hi-hats; recording starts at the
+  following bar boundary and the hi-hat guide continues for the whole take.
+  Chord changes are quantized to the nearest 16th; only chord changes are
+  captured (strum is never recorded). When the take ends, the guide stops and
+  the original pattern resumes. The LCD count-in/recording status is
+  persistent (`Rec arm`/`Wait bar` → `Count-in`/`1 bar` → `Recording N/N`), so
+  it does not flash back to idle between bars.
+- `Ctrl+F10` arms playback; it loops from the next rhythm bar until stopped.
+- Rhythm must be **enabled** (it may be muted). If it is off, the LCD shows
+  `Enable rhythm`.
+- While a live chord is held or latched, sequence events are skipped; the
+  sequence resumes at the next event after the live chord ends.
+- Recording, bar changes, and clearing save immediately. The preset dirty `*`
+  marker does not track sequences.
+- `Ctrl+F11` clears the selected sequence (confirm with `Enter`). Clearing a
+  preset also removes its sequence file.
+- `Super+F12` opens **Seq Edit** (`Slot`, `Bars`, `Settings`). `Settings`
+  chooses the global Recorded/Live override; per-setting Live bits are edited in
+  the configurator's **Sequences** tab.
+
+**Quick start (on the device):**
+
+1. Press `F5` to enable rhythm; press `F6` to mute drums if you want a
+   chord-only recording.
+2. Press `Ctrl+1` to select sequence slot 1 (use `Ctrl+1`…`Ctrl+9`, `Ctrl+0`
+   for slots 1–10).
+3. Press `Ctrl+F9`. The LCD shows `Rec arm` / `Wait bar`; the normal pattern is
+   muted. Wait for the next bar, then exactly one bar of quarter-note closed
+   hi-hats plays (`Count-in` / `1 bar`). Recording then starts at the following
+   bar (`Recording 1/N`) and the hi-hat guide continues.
+4. Play chord changes on the chord grid. Do not strum — only chord changes are
+   recorded. The take saves automatically after the last bar (`Seq saved`), and
+   the original rhythm pattern resumes.
+5. Press `Ctrl+F10` to loop it (`Play arm` / `Wait bar`, then `Seq N` /
+   `play`). Press `Ctrl+F10` again to stop.
+6. Press `Super+F12` to change the slot, bar length, or the global
+   Recorded/Live setting. Use `Ctrl+F11` to clear the selected sequence.
+7. For per-setting Live mixing, open the device in the configurator and use the
+   preset's **Sequences** tab.
+
 ---
 
 ## 4. `keymap.json` — configurable key bindings
@@ -362,7 +449,7 @@ fixed keys `Mute`, `VolumeUp`, and `VolumeDown`. `Super`+`Esc` (panic) and
 
 | `type` | Extra fields | Effect |
 |--------|--------------|--------|
-| `open_menu` | `menu` | Open an edit menu (`chord`/`strum`/`rhythm`/`bass`/`drum`). |
+| `open_menu` | `menu` | Open an edit menu (`chord`/`strum`/`rhythm`/`bass`/`drum`/`sequence`). |
 | `cycle` | `param` | Advance the parameter by one (wraps). |
 | `set` | `param`, `value` | Set the parameter to an absolute value. |
 | `inc` | `param` | Step the parameter +1 (clamps; auto-repeats where applicable). |
@@ -375,6 +462,9 @@ fixed keys `Mute`, `VolumeUp`, and `VolumeDown`. `Super`+`Esc` (panic) and
 | `preset_load` | `slot` (0–7) | Load slot N of the current bank. |
 | `preset_save` / `preset_clear` | — | Save/Clear prompt for the active slot. |
 | `tap_tempo` | — | Tap tempo (sets rhythm tempo). |
+| `sequence_record` | — | Arm/stop chord-sequence recording. |
+| `sequence_play` | — | Arm/stop chord-sequence playback. |
+| `sequence_clear` | — | Clear the selected sequence (confirm with `Enter`). |
 
 ### 4.3 Parameter names (`param`)
 
@@ -386,10 +476,11 @@ fixed keys `Mute`, `VolumeUp`, and `VolumeDown`. `Super`+`Esc` (panic) and
 `tempo`, `swing`, `rhythm_pattern`, `rhythm_mute`, `rhythm_enable`,
 `rhythm_clock`, `rhythm_led`, `usb_midi`,
 `bass_enable`, `bass_octave`, `bass_duration`, `bass_velocity`,
-`bass_channel`, `bass_pattern`.
+`bass_channel`, `bass_pattern`, `seq_slot`, `seq_bars`, `seq_settings`.
 
 (Channel parameters and the per-drum note/velocity parameters are **not**
-bindable in the keymap — they are edited in the Drum menu only.)
+bindable in the keymap — they are edited in the Drum menu only. `seq_*`
+parameters are the on-device Sequencer menu values; `seq_settings` is a bool.)
 
 ### 4.4 Value strings for `set` / `toggle` (and `inc`/`dec` params)
 
@@ -406,7 +497,7 @@ these **short** names (which differ slightly from the preset JSON names):
 | `strum_scale` | `ionian`, `dorian`, `phrygian`, `lydian`, `mixolydian`, `aeolian`, `locrian`, `harmonic_minor`, `melodic_minor`, `major_pentatonic`, `minor_pentatonic`, `blues` |
 | `bass_pattern` | `Walking`, `Whole`, `Half`, `Quarter`, `Half Alt`, `Quarter Alt`, `3/4 Alt`, `Hold`, `No 6th` (or 0–8, or any user pattern's `name`) |
 | `rhythm_pattern` | any built-in or user rhythm `name` (e.g. `Rock 1`, `Test Groove`), or an index 0–N |
-| bool params (`strum_layout`, `rhythm_mute`, `rhythm_enable`, `rhythm_clock`, `rhythm_led`, `usb_midi`, `bass_enable`) | `on`/`off`, `true`/`false`, `1`/`0` |
+| bool params (`strum_layout`, `rhythm_mute`, `rhythm_enable`, `rhythm_clock`, `rhythm_led`, `usb_midi`, `bass_enable`, `seq_settings`) | `on`/`off`, `true`/`false`, `1`/`0` |
 
 > `rhythm_pattern` / `bass_pattern` names are resolved against the patterns
 > loaded at boot (built-ins + user files), so a name that doesn't match a loaded
@@ -423,6 +514,10 @@ processed until the file is fixed (remount via the boot key).
 Even a valid keymap must still cover these (else it is rejected as missing a
 required binding): an `open_menu` for each of **chord, strum, rhythm, bass,
 drum**, plus **`preset_prev`**, **`preset_next`**, and **`preset_save`**.
+The `sequence` menu and the three sequence actions are optional (the default
+keymap binds `Super+F12`, `Ctrl+F9`, `Ctrl+F10`, and `Ctrl+F11`), so existing
+v0.1 keymaps remain valid. Older keymaps that do not bind them still get those
+four combos as fallbacks. `Ctrl+1`…`Ctrl+0` sequence selection is hard-coded.
 
 ---
 

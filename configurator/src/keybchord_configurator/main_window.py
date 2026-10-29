@@ -16,7 +16,13 @@ from PySide6.QtWidgets import (
 
 from .io import backup as backup_io
 from .io import device as device_io
-from .io.storage import ConfigTree, default_tree, load_tree, save_tree
+from .io.storage import (
+    ConfigTree,
+    default_tree,
+    legacy_bank_files,
+    load_tree,
+    save_tree,
+)
 from .ui.backup_view import BackupView
 from .ui.bass_editor import BassEditor
 from .ui.busy import run_with_progress
@@ -177,6 +183,7 @@ class MainWindow(QMainWindow):
             return
         self._last_directory = path
         self._set_tree(tree)
+        self._warn_legacy_banks(path)
         self.statusBar().showMessage(f"Loaded {path}", 5000)
 
     def _open_device(self) -> None:
@@ -208,6 +215,7 @@ class MainWindow(QMainWindow):
             return
         self._last_directory = path
         self._set_tree(results[1])
+        self._warn_legacy_banks(path)
         self.statusBar().showMessage(f"Loaded {path}", 5000)
 
     def _open_folder(self) -> None:
@@ -228,7 +236,22 @@ class MainWindow(QMainWindow):
             return
         self._last_directory = directory
         self._set_tree(tree)
+        self._warn_legacy_banks(directory)
         self.statusBar().showMessage(f"Loaded {directory}", 5000)
+
+    def _warn_legacy_banks(self, directory: str) -> None:
+        try:
+            legacy = legacy_bank_files(directory)
+        except OSError:
+            return
+        if legacy:
+            QMessageBox.warning(
+                self, "Legacy preset banks",
+                "This folder/device contains v0.1 preset banks that v0.2 no "
+                "longer supports:\n\n" + ", ".join(legacy) + "\n\n"
+                "Only the first 5 banks (40 presets) are loaded. Back up the "
+                "old files before saving if you need their contents; the "
+                "firmware removes them on the next boot to reclaim flash.")
 
     # -- save ---------------------------------------------------------------
     def _save_to_device(self) -> None:

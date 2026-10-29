@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 #include "base.h"
@@ -44,6 +45,29 @@ public:
     // walking bass `Hold` pattern.
     bool isSounding() const { return sounding_; }
 
+    // Called whenever a *live* chord is triggered (chord-grid press or
+    // extension merge), never for sequencer playback. The sequencer uses this
+    // to capture chord changes while recording.
+    void setChordTriggeredCallback(
+        std::function<void(const ResolvedChord&, uint64_t)> cb);
+
+    // True while a live chord is held or latched. The sequencer skips its own
+    // events while this is true so live playing takes priority.
+    bool liveChordActive() const;
+
+    // True while the chord currently sounding came from sequencer playback.
+    bool sequenceChordSounding() const { return sequenceActive_ && sounding_; }
+
+    // Sequencer playback: sound `chord` with an explicit parameter snapshot
+    // (play mode is forced to Held) without changing the live pending params
+    // or the strum note pool. Stops any previous sequence chord first.
+    void playSequenceChord(const ResolvedChord& chord, const ChordParams& params,
+                           uint64_t now_us);
+
+    // Release sequence playback notes only (no-op if a live chord has taken
+    // over). Called when playback stops.
+    void releaseSequenceChord();
+
 private:
     StateManager& state_;
     MidiRouter&   router_;
@@ -56,6 +80,8 @@ private:
     bool ext13Held_ = false;   // Right arrow (held add13, FR-C7)
 
     bool sounding_ = false;
+    bool sequenceActive_ = false;
+    std::function<void(const ResolvedChord&, uint64_t)> chordTriggered_;
     uint8_t activeChannel_ = 1;
     std::vector<uint8_t> voicing_;       // full chord note set (base + extensions)
     std::vector<uint8_t> activeNotes_;   // notes currently note-on'd (for release)

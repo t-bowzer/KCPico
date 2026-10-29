@@ -212,6 +212,15 @@ void ChordEngine::resetVoicing() {
     prevVoicing_.clear();
 }
 
+void ChordEngine::setChordTriggeredCallback(
+        std::function<void(const ResolvedChord&, uint64_t)> cb) {
+    chordTriggered_ = std::move(cb);
+}
+
+bool ChordEngine::liveChordActive() const {
+    return !heldCells_.empty() || (sounding_ && !sequenceActive_);
+}
+
 void ChordEngine::setPatterns(std::vector<ChordPattern> patterns) {
     patterns_ = std::move(patterns);
     if (!patterns_.empty() && state_.pendingChord.pattern >= patterns_.size()) {
@@ -353,6 +362,7 @@ bool ChordEngine::followRhythmClock() const {
 
 void ChordEngine::allNotesOff() {
     stopSound();
+    sequenceActive_ = false;
     prevVoicing_.clear();
     currentChordValid_ = false;
     baseChordValid_ = false;
@@ -450,6 +460,7 @@ void ChordEngine::triggerChord(const ResolvedChord& chord, uint64_t now_us) {
     prevVoicing_ = base;
 
     stopSound();
+    sequenceActive_ = false;
     activeChannel_ = p.channel;
     voicing_ = notes;
 
@@ -496,6 +507,57 @@ void ChordEngine::triggerChord(const ResolvedChord& chord, uint64_t now_us) {
             }
             break;
     }
+
+    if (chordTriggered_) chordTriggered_(chord, now_us);
+}
+
+void ChordEngine::playSequenceChord(const ResolvedChord& chord,
+                                    const ChordParams& params,
+                                    uint64_t now_us) {
+    stopSound();
+    sequenceActive_ = true;
+
+    // The sequence's mixed parameter snapshot becomes the active voice. It does
+    // not touch pending params, selectedChord, or the strum note pool.
+    state_.activeChord = params;
+    state_.activeChord.play_mode = PlayMode::Held;
+    const ChordParams& p = state_.activeChord;
+    activeChannel_ = p.channel;
+
+    std::vector<uint8_t> base, notes;
+    computeVoicing(chord, base, notes);
+    prevVoicing_ = base;
+    voicing_ = notes;
+    currentChord_ = chord;
+    currentChordValid_ = true;
+    baseChord_ = chord;
+    baseChordValid_ = true;
+
+    if (notes.empty()) {
+        sounding_ = false;
+        sequenceActive_ = false;
+        return;
+    }
+
+    sounding_ = true;
+    router_.cc(p.channel, midi::CC_PAN, p.pan);
+    if (p.chord_roll_ms == 0) {
+        activeNotes_ = notes;
+        for (uint8_t n : notes) {
+            router_.noteOn(p.channel, n, p.velocity);
+        }
+    } else {
+        activeNotes_.clear();
+        scheduleRoll(notes, now_us);
+    }
+}
+
+void ChordEngine::releaseSequenceChord() {
+    if (!sequenceActive_) return;
+    stopSound();
+    sequenceActive_ = false;
+    currentChordValid_ = false;
+    baseChordValid_ = false;
 }
 
 // Staggered chord note-ons (VR-9): positive ascends, negative descends;
@@ -602,6 +664,7 @@ void ChordEngine::stepArpeggio(uint64_t now_us) {
 
 void ChordEngine::releaseChord() {
     stopSound();
+    sequenceActive_ = false;
     currentChordValid_ = false;
     baseChordValid_ = false;
     pendingSwitch_ = false;

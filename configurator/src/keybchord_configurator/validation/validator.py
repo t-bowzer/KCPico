@@ -45,6 +45,7 @@ from ..models.bounds import (
     MAX_BASS_PATTERNS,
     MAX_CHORD_PATTERNS,
     MAX_RHYTHMS,
+    MAX_SEQUENCE_EVENTS,
     NOTE_DURATION_MAX,
     NOTE_DURATION_MIN,
     NOTE_RANGE_MAX,
@@ -57,6 +58,12 @@ from ..models.bounds import (
     PAN_MIN,
     PARAM_SPECS,
     RHYTHM_COUNT,
+    SEQUENCE_BARS_CHOICES,
+    SEQUENCE_LIVE_MASK_ALL,
+    SEQUENCE_MAX_STEPS_PER_BAR,
+    SEQUENCE_MIN_STEPS_PER_BAR,
+    SEQUENCE_SLOTS,
+    SEQUENCE_SETTING_COUNT,
     STRUM_ROOT_MAX,
     STRUM_ROOT_MIN,
     SWING_MAX,
@@ -100,6 +107,7 @@ from ..models.macro import (
 from ..models.midi import MAX_MIDI_BYTES, MAX_MIDI_DELAY_MS
 from ..models.preset import DRUM_PIECES
 from ..models.rhythm import RHYTHM_NAMES
+from ..models.sequence import parse_chord_id
 from .errors import ValidationResult
 
 
@@ -907,6 +915,118 @@ def validate_chord_pattern(data: Any, *, filename: str = "") -> ValidationResult
     return result
 
 
+# --- chord sequencer ------------------------------------------------------
+
+_SEQUENCE_RECORDED_RULES: tuple[tuple[int, int], ...] = (
+    (-3, 3), (50, 4000), (1, 127), (0, 127), (0, 3),
+    (-2000, 2000), (2, 6), (0, 12), (0, 3), (0, 4),
+)
+
+
+def validate_sequence_file(data: Any, *, filename: str = "") -> ValidationResult:
+    result = ValidationResult()
+    where = f"sequences/{filename}" if filename else "sequence"
+    if isinstance(data, dict):
+        raw = data.get("sequences")
+    elif isinstance(data, list):
+        raw = data
+    else:
+        result.add_error(f"{where}: expected an object with a 'sequences' array")
+        return result
+    if not isinstance(raw, list):
+        result.add_error(f"{where}: 'sequences' must be an array")
+        return result
+    if len(raw) > SEQUENCE_SLOTS:
+        result.add_error(f"{where}: at most {SEQUENCE_SLOTS} sequence slots are allowed")
+    if len(raw) < SEQUENCE_SLOTS:
+        result.add_warning(f"{where}: only {len(raw)} slots present; the rest load empty")
+
+    for slot_index, slot in enumerate(raw[:SEQUENCE_SLOTS]):
+        label = f"{where}: slot {slot_index + 1}"
+        if slot is None:
+            continue
+        if not isinstance(slot, dict):
+            result.add_error(f"{label}: must be null or an object")
+            continue
+
+        bars = slot.get("bars", 4)
+        if not _is_int(bars) or bars not in SEQUENCE_BARS_CHOICES:
+            result.add_warning(f"{label}: 'bars' should be one of "
+                               f"{list(SEQUENCE_BARS_CHOICES)} (will be rounded)")
+            bars = 4
+        steps = slot.get("steps_per_bar", 16)
+        if not _is_int(steps) or not (
+                SEQUENCE_MIN_STEPS_PER_BAR <= steps <= SEQUENCE_MAX_STEPS_PER_BAR):
+            result.add_warning(f"{label}: 'steps_per_bar' should be "
+                               f"{SEQUENCE_MIN_STEPS_PER_BAR}.."
+                               f"{SEQUENCE_MAX_STEPS_PER_BAR} (will be clamped)")
+            steps = 16
+
+        recorded = slot.get("recorded")
+        if recorded is not None:
+            if not isinstance(recorded, list) or len(recorded) != SEQUENCE_SETTING_COUNT:
+                result.add_error(f"{label}: 'recorded' must be an array of "
+                                 f"{SEQUENCE_SETTING_COUNT} integers")
+            else:
+                for i, value in enumerate(recorded):
+                    if not _is_int(value):
+                        result.add_error(f"{label}: recorded[{i}] must be an integer")
+                        continue
+                    if i < len(_SEQUENCE_RECORDED_RULES):
+                        lo, hi = _SEQUENCE_RECORDED_RULES[i]
+                    elif i == 10:
+                        lo, hi = 0, MAX_CHORD_PATTERNS - 1
+                    else:
+                        lo, hi = 0, 0
+                    if value < lo or value > hi:
+                        result.add_warning(f"{label}: recorded[{i}] = {value} out "
+                                           f"of range [{lo}..{hi}] (will be clamped)")
+
+        live = slot.get("live", 0)
+        if live is not None and (not _is_int(live) or live < 0 or live > SEQUENCE_LIVE_MASK_ALL):
+            result.add_warning(f"{label}: 'live' must be 0..{SEQUENCE_LIVE_MASK_ALL}")
+            live = 0
+        else:
+            live = live or 0
+
+        events = slot.get("events", [])
+        if not isinstance(events, list):
+            result.add_error(f"{label}: 'events' must be an array")
+            continue
+        if len(events) > MAX_SEQUENCE_EVENTS:
+            result.add_error(f"{label}: {len(events)} events exceeds the "
+                             f"{MAX_SEQUENCE_EVENTS}-event cap")
+        loop_steps = int(bars) * int(steps)
+        seen: set[int] = set()
+        last_step = -1
+        for event_index, event in enumerate(events[:MAX_SEQUENCE_EVENTS]):
+            ev_label = f"{label}: event {event_index + 1}"
+            step: Any = None
+            chord: Any = None
+            if isinstance(event, list) and len(event) >= 2:
+                step, chord = event[0], event[1]
+            elif isinstance(event, dict):
+                step, chord = event.get("step"), event.get("chord")
+            if not _is_int(step):
+                result.add_error(f"{ev_label}: missing integer 'step'")
+                continue
+            if step < 0 or step >= loop_steps:
+                result.add_error(f"{ev_label}: step {step} outside the "
+                                 f"{loop_steps}-step sequence")
+                continue
+            if parse_chord_id(chord) is None:
+                result.add_error(f"{ev_label}: invalid chord id {chord!r}")
+                continue
+            if step in seen:
+                result.add_warning(f"{ev_label}: duplicate step {step} "
+                                   f"(the last event wins)")
+            seen.add(step)
+            if step < last_step:
+                result.add_warning(f"{ev_label}: events are not sorted by step")
+            last_step = step
+    return result
+
+
 # --- document dispatch ----------------------------------------------------
 
 def validate_document(path: str, data: Any, *, rhythm_names: Optional[list[str]] = None,
@@ -929,6 +1049,8 @@ def validate_document(path: str, data: Any, *, rhythm_names: Optional[list[str]]
         return validate_bass(data, filename=base.rsplit("/", 1)[-1])
     if base.startswith("chordpatterns/") or "/chordpatterns/" in path:
         return validate_chord_pattern(data, filename=base.rsplit("/", 1)[-1])
+    if base.startswith("sequences/") or "/sequences/" in path:
+        return validate_sequence_file(data, filename=base.rsplit("/", 1)[-1])
     result = ValidationResult()
     result.add_warning(f"'{path}' is not a recognized configuration file")
     return result

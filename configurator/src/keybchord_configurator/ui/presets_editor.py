@@ -1,4 +1,4 @@
-"""Preset browser and editor (10 banks x 8 slots)."""
+"""Preset browser and editor (5 banks x 8 slots, plus per-preset sequences)."""
 
 from __future__ import annotations
 
@@ -29,9 +29,10 @@ from ..models.enums import (
     StrumMode,
     VoicingMode,
 )
-from ..models.bounds import PARAM_SPECS
+from ..models.bounds import NUM_BANKS, PARAM_SPECS
 from ..models.preset import DRUM_PIECES, PresetSlot
 from .macro_editor import MacroEditor
+from .sequence_editor import SequenceEditor
 from .widgets import bool_check, enum_combo, int_spin
 
 
@@ -49,6 +50,7 @@ class PresetsEditor(QWidget):
 
     def set_tree(self, tree: ConfigTree) -> None:
         self._tree = tree
+        self.sequence_editor.set_tree(tree)
         self._refresh_bank_list()
         self._refresh_slot_buttons()
         self._load()
@@ -59,7 +61,7 @@ class PresetsEditor(QWidget):
     def select_preset(self, bank: int, slot: int) -> None:
         if self._tree is None:
             return
-        bank = max(0, min(9, bank))
+        bank = max(0, min(NUM_BANKS - 1, bank))
         slot = max(0, min(7, slot))
         self._bank = bank
         self._slot = slot
@@ -104,6 +106,7 @@ class PresetsEditor(QWidget):
         self._build_rhythm_tab()
         self._build_drums_tab()
         self._build_macros_tab()
+        self._build_sequences_tab()
         right.addWidget(self.tabs)
         layout.addLayout(right, 1)
 
@@ -225,6 +228,11 @@ class PresetsEditor(QWidget):
         self.macro_editor.changed.connect(self._on_macro_changed)
         self.tabs.addTab(self.macro_editor, "Macros")
 
+    def _build_sequences_tab(self) -> None:
+        self.sequence_editor = SequenceEditor()
+        self.sequence_editor.changed.connect(self._on_sequence_changed)
+        self.tabs.addTab(self.sequence_editor, "Sequences")
+
     def _form_widget(self):
         from PySide6.QtWidgets import QFormLayout
         box = QGroupBox()
@@ -242,14 +250,18 @@ class PresetsEditor(QWidget):
 
     # -- state --------------------------------------------------------------
     def _refresh_bank_list(self) -> None:
+        if not (0 <= self._bank < NUM_BANKS):
+            self._bank = 0
         self.bank_list.blockSignals(True)
         self.bank_list.clear()
-        for i in range(10):
+        for i in range(NUM_BANKS):
             self.bank_list.addItem(f"Bank {i + 1}")
         self.bank_list.setCurrentRow(self._bank)
         self.bank_list.blockSignals(False)
 
     def _refresh_slot_buttons(self) -> None:
+        if self._tree is not None:
+            self._bank = max(0, min(len(self._tree.banks) - 1, self._bank))
         for i, btn in enumerate(self.slot_buttons):
             if self._tree is not None:
                 slot = self._tree.banks[self._bank][i]
@@ -292,6 +304,7 @@ class PresetsEditor(QWidget):
         self.macro_editor.set_names(
             self._tree.rhythm_names(), self._tree.bass_names(),
             self._tree.chord_pattern_names())
+        self.sequence_editor.set_pattern_names(self._tree.chord_pattern_names())
 
     def refresh_macros(self) -> None:
         if self._tree is None:
@@ -365,6 +378,7 @@ class PresetsEditor(QWidget):
                 self._drum_vel_spins[key].setValue(slot.rhythm.drums.velocities[key])
 
             self.refresh_macros()
+            self.sequence_editor.set_preset(self._bank, self._slot)
         finally:
             self._loading = False
 
@@ -427,6 +441,8 @@ class PresetsEditor(QWidget):
             slot.rhythm.drums.notes[key] = self._drum_note_spins[key].value()
             slot.rhythm.drums.velocities[key] = self._drum_vel_spins[key].value()
 
+        self.sequence_editor.store_current()
+
     def connect_signals(self) -> None:
         for widget in self._chord_widgets + self._strum_widgets + \
                 self._bass_widgets + self._rhythm_widgets:
@@ -443,5 +459,9 @@ class PresetsEditor(QWidget):
         self.changed.emit()
 
     def _on_macro_changed(self) -> None:
+        if not self._loading:
+            self.changed.emit()
+
+    def _on_sequence_changed(self) -> None:
         if not self._loading:
             self.changed.emit()

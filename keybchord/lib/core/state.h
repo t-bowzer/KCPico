@@ -36,6 +36,19 @@ struct LedIndicator {
     std::atomic<bool> flash{false};
 };
 
+// Runtime view of the per-preset chord sequencer (M14). Owned by Core 0; the
+// SequencerEngine writes it and the edit menu/LCD read it. The selected slot
+// and its bar count are mirrored here so the parameter menu can edit them.
+struct SequencerState {
+    uint8_t  slot = 0;        // 0..9 (Ctrl+1..0)
+    uint8_t  bars = 4;        // 1/2/4/8, mirrors the selected sequence
+    bool     useRecorded = true;  // global Recorded/Live settings switch
+    bool     armed = false;       // waiting for the next bar
+    bool     recording = false;
+    bool     playing = false;
+    uint16_t eventCount = 0;
+};
+
 class StateManager {
 public:
     // Pending params are edited live on Core 0 (EditEngine/presets); Core 1's
@@ -66,6 +79,16 @@ public:
     // Core 1 rhythm scheduler snapshot + LED indicator (see structs above).
     RhythmClock  rhythmClock;
     LedIndicator ledIndicator;
+
+    // Core 0 chord sequencer runtime state (M14).
+    SequencerState sequencer;
+
+    // While `recordGuideActive` is true, the RhythmEngine suppresses the
+    // normal pattern. `recordGuideHatsActive` additionally enables the
+    // quarter-note closed-hi-hat guide (count-in/recording).
+    std::atomic<bool> recordGuideActive{false};
+    std::atomic<bool> recordGuideHatsActive{false};
+    std::atomic<uint32_t> recordGuideHatsStartAbs{0};
 
     std::vector<ActiveNote> activeNotes;
 

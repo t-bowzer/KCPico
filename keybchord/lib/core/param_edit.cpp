@@ -4,6 +4,7 @@
 #include "chordpattern.h"
 #include "naming.h"
 #include "rhythm.h"
+#include "sequence.h"
 #include "strum.h"
 
 
@@ -33,6 +34,10 @@ const ParamId kBassParams[] = {
     ParamId::BassVelocity, ParamId::BassChannel, ParamId::BassPattern,
 };
 
+const ParamId kSequenceParams[] = {
+    ParamId::SeqSlot, ParamId::SeqBars, ParamId::SeqSettings,
+};
+
 const ParamId kDrumParams[] = {
     ParamId::DrumKickNote, ParamId::DrumKickVel, ParamId::DrumSnareNote,
     ParamId::DrumSnareVel, ParamId::DrumHihatNote, ParamId::DrumHihatVel,
@@ -50,6 +55,7 @@ const ParamId kDrumParams[] = {
 
 const char* const kTitles[] = {
     "", "Chord Edit", "Strum Edit", "Rhythm Edit", "Bass Edit", "Drum Edit",
+    "Seq Edit",
 };
 
 const char* const kShortName[] = {
@@ -65,6 +71,7 @@ const char* const kShortName[] = {
     "Bongo", "Bongo Vel", "Conga Lo", "Conga Lo Vel",
     "Conga Hi", "Conga Hi Vel", "Clave", "Clave Vel",
     "Shaker", "Shaker Vel",
+    "Slot", "Bars", "Settings",
 };
 
 const char* const kFullName[] = {
@@ -84,6 +91,7 @@ const char* const kFullName[] = {
     "Bongo Note", "Bongo Vel", "Conga Lo Note", "Conga Lo Vel",
     "Conga Hi Note", "Conga Hi Vel", "Clave Note", "Clave Vel",
     "Shaker Note", "Shaker Vel",
+    "Sequence Slot", "Sequence Bars", "Sequence Settings",
 };
 
 const char* const kPcNames[12] = {
@@ -166,6 +174,8 @@ int menuParamCount(EditMenu menu) {
         case EditMenu::Rhythm: return static_cast<int>(sizeof(kRhythmParams) / sizeof(kRhythmParams[0]));
         case EditMenu::Bass:   return static_cast<int>(sizeof(kBassParams) / sizeof(kBassParams[0]));
         case EditMenu::Drum:   return static_cast<int>(sizeof(kDrumParams) / sizeof(kDrumParams[0]));
+        case EditMenu::Sequence:
+            return static_cast<int>(sizeof(kSequenceParams) / sizeof(kSequenceParams[0]));
         default:               return 0;
     }
 }
@@ -178,6 +188,7 @@ ParamId menuParamAt(EditMenu menu, int index) {
         case EditMenu::Rhythm: return kRhythmParams[index];
         case EditMenu::Bass:   return kBassParams[index];
         case EditMenu::Drum:   return kDrumParams[index];
+        case EditMenu::Sequence: return kSequenceParams[index];
         default:               return ParamId::COUNT;
     }
 }
@@ -261,6 +272,14 @@ std::string paramValueString(const StateManager& state, ParamId id) {
         case ParamId::DrumClaveVel:    return drumVelString(state.pendingRhythm.drums.clave_vel);
         case ParamId::DrumShakerNote:  return std::to_string(state.pendingRhythm.drums.shaker);
         case ParamId::DrumShakerVel:   return drumVelString(state.pendingRhythm.drums.shaker_vel);
+
+        case ParamId::SeqSlot:
+            return std::to_string(state.sequencer.slot + 1) + "/" +
+                   std::to_string(SEQUENCE_SLOTS);
+        case ParamId::SeqBars:
+            return std::to_string(state.sequencer.bars);
+        case ParamId::SeqSettings:
+            return state.sequencer.useRecorded ? "Recorded" : "Live";
 
         default: return "";
     }
@@ -506,6 +525,24 @@ void paramStep(StateManager& state, ParamId id, int delta) {
             state.pendingRhythm.drums.shaker_vel = stepDrumVel(state.pendingRhythm.drums.shaker_vel, dir);
             break;
 
+        case ParamId::SeqSlot:
+            state.sequencer.slot = static_cast<uint8_t>(
+                cycleEnum(state.sequencer.slot, SEQUENCE_SLOTS, dir));
+            break;
+        case ParamId::SeqBars: {
+            static const uint8_t kChoices[] = {1, 2, 4, 8};
+            int idx = 0;
+            for (int i = 0; i < 4; i++) {
+                if (kChoices[i] == state.sequencer.bars) { idx = i; break; }
+            }
+            idx = cycleEnum(idx, 4, dir);
+            state.sequencer.bars = kChoices[idx];
+            break;
+        }
+        case ParamId::SeqSettings:
+            state.sequencer.useRecorded = delta > 0;
+            break;
+
         default: break;
     }
 }
@@ -553,6 +590,7 @@ void paramCycle(StateManager& state, ParamId id) {
         case ParamId::RhythmLed:    state.config.bpm_indicator       = !state.config.bpm_indicator;       break;
         case ParamId::UsbMidi:      state.config.usb_midi_enabled    = !state.config.usb_midi_enabled;    break;
         case ParamId::BassEnable:   state.pendingBass.enabled = !state.pendingBass.enabled; break;
+        case ParamId::SeqSettings:  state.sequencer.useRecorded = !state.sequencer.useRecorded; break;
         default:
             // Int params: treat a single-key "cycle" as +1.
             paramStep(state, id, 1);
@@ -665,6 +703,9 @@ int paramValueInt(const StateManager& s, ParamId id) {
         case ParamId::DrumClaveVel:     return s.pendingRhythm.drums.clave_vel;
         case ParamId::DrumShakerNote:   return s.pendingRhythm.drums.shaker;
         case ParamId::DrumShakerVel:    return s.pendingRhythm.drums.shaker_vel;
+        case ParamId::SeqSlot:          return s.sequencer.slot;
+        case ParamId::SeqBars:          return s.sequencer.bars;
+        case ParamId::SeqSettings:      return s.sequencer.useRecorded ? 1 : 0;
         default:                        return 0;
     }
 }
@@ -889,6 +930,16 @@ void paramSet(StateManager& state, ParamId id, int value) {
         case ParamId::DrumShakerVel:
             state.pendingRhythm.drums.shaker_vel = static_cast<uint8_t>(clamp<int>(
                 value, param_bounds::DRUM_VELOCITY_MIN, param_bounds::DRUM_VELOCITY_OFF));
+            break;
+        case ParamId::SeqSlot:
+            state.sequencer.slot = static_cast<uint8_t>(
+                clamp<int>(value, 0, SEQUENCE_SLOTS - 1));
+            break;
+        case ParamId::SeqBars:
+            state.sequencer.bars = clampSequenceBars(value);
+            break;
+        case ParamId::SeqSettings:
+            state.sequencer.useRecorded = value != 0;
             break;
 
         default: break;

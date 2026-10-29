@@ -99,6 +99,7 @@ ACTION_TYPES: tuple[str, ...] = (
     "open_menu", "cycle", "set", "inc", "dec", "toggle", "ext", "drum_mute",
     "preset_prev", "preset_next", "preset_bank_prev", "preset_bank_next",
     "preset_load", "preset_save", "preset_clear", "tap_tempo",
+    "sequence_record", "sequence_play", "sequence_clear",
 )
 
 # Actions that carry a parameter.
@@ -243,6 +244,7 @@ def default_keymap() -> KeymapConfig:
         {"keys": ["Super", "Home"], "action": {"type": "preset_bank_prev"}},
         {"keys": ["Super", "End"], "action": {"type": "preset_bank_next"}},
         {"keys": ["Super", "F11"], "action": {"type": "open_menu", "menu": "drum"}},
+        {"keys": ["Super", "F12"], "action": {"type": "open_menu", "menu": "sequence"}},
         {"keys": ["Ctrl", "F1"], "action": {"type": "cycle", "param": "chord_voicing"}},
         {"keys": ["Ctrl", "F2"], "action": {"type": "cycle", "param": "chord_inversion"}},
         {"keys": ["Ctrl", "F3"], "action": {"type": "cycle", "param": "arp_mode"}},

@@ -93,6 +93,7 @@ class EditMenu(IntEnum):
     RHYTHM = 2
     BASS = 3
     DRUM = 4
+    SEQUENCE = 5
 
 
 class NumberKeyMode(IntEnum):
@@ -108,6 +109,22 @@ class ChordQuality(IntEnum):
     MAJOR = 0
     MINOR = 1
     SEVENTH = 2
+
+
+class ChordType(IntEnum):
+    """Resolved chord type (firmware ``ChordType`` order)."""
+
+    MAJOR = 0
+    MINOR = 1
+    DOM7 = 2
+    MAJ7 = 3
+    MIN7 = 4
+    DIM = 5
+    DIM7 = 6
+    AUG = 7
+    SUS4 = 8
+    SUS2 = 9
+    MIN7B5 = 10
 
 
 # JSON (preset) names. Keys are the enum members, values are the string the
@@ -183,6 +200,21 @@ EDIT_MENU_JSON: dict[EditMenu, str] = {
     EditMenu.RHYTHM: "rhythm",
     EditMenu.BASS: "bass",
     EditMenu.DRUM: "drum",
+    EditMenu.SEQUENCE: "sequence",
+}
+
+CHORD_TYPE_JSON: dict[ChordType, str] = {
+    ChordType.MAJOR: "major",
+    ChordType.MINOR: "minor",
+    ChordType.DOM7: "dom7",
+    ChordType.MAJ7: "maj7",
+    ChordType.MIN7: "min7",
+    ChordType.DIM: "dim",
+    ChordType.DIM7: "dim7",
+    ChordType.AUG: "aug",
+    ChordType.SUS4: "sus4",
+    ChordType.SUS2: "sus2",
+    ChordType.MIN7B5: "min7b5",
 }
 
 
@@ -199,6 +231,7 @@ SCALE_TYPE_BY_JSON: dict[str, ScaleType] = _reverse(SCALE_TYPE_JSON)
 LED_TARGET_BY_JSON: dict[str, LedTarget] = _reverse(LED_TARGET_JSON)
 EDIT_MENU_BY_JSON: dict[str, EditMenu] = _reverse(EDIT_MENU_JSON)
 NUMBER_KEY_MODE_BY_JSON: dict[str, NumberKeyMode] = _reverse(NUMBER_KEY_MODE_JSON)
+CHORD_TYPE_BY_JSON: dict[str, ChordType] = _reverse(CHORD_TYPE_JSON)
 
 
 def parse_enum(name_to_member: dict[str, object], value, default: object):

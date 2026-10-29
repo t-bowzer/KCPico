@@ -16,6 +16,7 @@ from keybchord_configurator.validation.validator import (
     validate_keymap,
     validate_preset_bank,
     validate_rhythm,
+    validate_sequence_file,
 )
 
 
@@ -324,3 +325,45 @@ def test_media_keys_cannot_use_modifiers():
     ]}
     result = validate_keymap(data)
     assert any("media keys cannot use modifiers" in e for e in result.errors)
+
+
+def test_sequence_validation_accepts_valid_file():
+    data = {"version": 1, "sequences": [None, {
+        "bars": 2, "steps_per_bar": 16,
+        "recorded": [0, 500, 100, 64, 0, 0, 3, 0, 0, 0, 0],
+        "live": 1,
+        "events": [[0, 0], [16, 640]],
+    }]}
+    result = validate_sequence_file(data, filename="b1p2.json")
+    assert result.ok(), result.errors
+
+
+def test_sequence_validation_rejects_bad_events_and_caps():
+    data = {"sequences": [{
+        "bars": 1, "steps_per_bar": 16,
+        "events": [[0, 0], [999, 0], [4, 99999], [8, 0]],
+    }]}
+    result = validate_sequence_file(data, filename="b1p1.json")
+    assert not result.ok()
+    assert any("outside" in e for e in result.errors)
+    assert any("invalid chord id" in e for e in result.errors)
+
+    too_many = {"sequences": [{"bars": 4, "steps_per_bar": 16,
+                               "events": [[i, 0] for i in range(65)]}]}
+    result = validate_sequence_file(too_many, filename="b1p1.json")
+    assert not result.ok()
+    assert any("64-event cap" in e for e in result.errors)
+
+
+def test_sequence_validation_warns_on_duplicates_and_ranges():
+    data = {"sequences": [{
+        "bars": 1, "steps_per_bar": 16,
+        "recorded": [99, 500, 100, 64, 0, 0, 3, 0, 0, 0, 0],
+        "live": 99999,
+        "events": [[8, 0], [8, 128], [0, 0]],
+    }]}
+    result = validate_sequence_file(data, filename="b1p1.json")
+    assert result.ok(), result.errors
+    assert any("duplicate step" in w for w in result.warnings)
+    assert any("recorded[0]" in w for w in result.warnings)
+    assert any("'live'" in w for w in result.warnings)

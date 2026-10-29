@@ -2,6 +2,7 @@
 #include "pins.h"
 #include "factory.h"
 #include "config.h"
+#include "defaults.h"
 #include "keymap.h"
 #include "state.h"
 #include "midi_router.h"
@@ -15,6 +16,7 @@
 #include "edit_engine.h"
 #include "display_manager.h"
 #include "preset_engine.h"
+#include "sequencer_engine.h"
 #include "perf.h"
 #include "debug_log.h"
 #include "msc_fatfs.h"
@@ -46,6 +48,7 @@ static RhythmEngine*   g_rhythmEngine = nullptr;
 static DisplayManager* g_display = nullptr;
 static EditEngine*     g_editEngine = nullptr;
 static PresetEngine*   g_presetEngine = nullptr;
+static SequencerEngine* g_sequencer = nullptr;
 static MscFatFs*       g_msc = nullptr;
 static bool            g_keymapError = false;  // set when keymap.json fails validation
 
@@ -135,6 +138,7 @@ static void cancelChordStrum() {
 // transient UI, and force the beat LED off for the current pulse (it resumes on
 // the next beat — the master clock keeps running).
 static void handlePanic() {
+    if (g_sequencer) g_sequencer->stopAll(true);
     cancelChordStrum();
     g_state.pendingRhythm.enabled = false;   // drums stop and stay stopped
     if (g_router) g_router->panic();         // CC120 + CC123 on all 16 channels
@@ -245,6 +249,15 @@ void setup() {
     auto& storage = *g_adapters.storage;
     g_state.config = AppConfig::load(storage);
 
+    // v0.2.0 reduces the preset count from 10 banks to 5. Reclaim the legacy
+    // bank/sequence files before loading anything (users should back them up
+    // first; see the release notes).
+    int legacyRemoved = migrateLegacyPresetBanks(storage);
+    if (legacyRemoved > 0) {
+        logWarn("Removed legacy preset/sequence files (5-bank v0.2 layout)");
+    }
+    storage.mkdir("/sequences");
+
     // Load rhythm + bass patterns first so their names are available to keymap
     // validation (set/toggle actions may reference a pattern by name).
     RhythmLibrary rlib = loadRhythmPatterns(storage);
@@ -314,7 +327,21 @@ void setup() {
     g_presetEngine->setModeChangedCallback([]() { g_chordEngine->onModeChanged(); });
     g_editEngine->setAnyEditCallback([]() { g_presetEngine->recomputeDirty(); });
 
+    g_sequencer = new SequencerEngine(g_state, *g_adapters.storage,
+                                      *g_chordEngine, *g_display);
+    g_chordEngine->setChordTriggeredCallback(
+        [](const ResolvedChord& chord, uint64_t now_us) {
+            if (g_sequencer) g_sequencer->onLiveChordTriggered(chord, now_us);
+        });
+    g_presetEngine->setPresetChangedCallback([](int bank, int slot) {
+        if (g_sequencer) g_sequencer->loadForPreset(bank, slot);
+    });
+    g_presetEngine->setPresetClearedCallback([](int bank, int slot) {
+        if (g_sequencer) g_sequencer->onPresetCleared(bank, slot);
+    });
+
     g_presetEngine->loadStartupPreset();
+    g_sequencer->loadForPreset(g_state.currentBank, g_state.currentSlot);
     g_display->update(nowUs());
 
 #ifdef KEYBCHORD_TEST_HOOK
@@ -401,7 +428,7 @@ void loop() {
     // not process any input until the file is fixed and the device rebooted.
     if (g_keymapError) {
         if (g_display) g_display->update(now_us);
-        delay(10);
+        delay(1);
 #if defined(ARDUINO_ARCH_RP2040)
         rp2040.wdt_reset();
 #endif
@@ -414,6 +441,7 @@ void loop() {
     if (g_hotplugArmed) {
         if (!inputConnected && g_wasConnected) {
             logWarn("Keyboard disconnected: releasing notes");
+            if (g_sequencer) g_sequencer->stopAll(true);
             cancelChordStrum();
             g_ledDirty = false;
         } else if (inputConnected && !g_wasConnected) {
@@ -492,6 +520,34 @@ void loop() {
             }
         }
 
+        // M14 sequence controls are global performance shortcuts. They are
+        // suppressed while a preset prompt/name edit owns the keyboard, but a
+        // Ctrl+number key-up must always release a strum that was started
+        // before Ctrl was pressed.
+        KeyAction sa = g_keymap.resolve(ev.hid_usage, ev.modifiers,
+                                        ev.usage_page);
+        if (!ev.pressed && sa.cmd == KeyCmd::SequenceSelect) {
+            g_strumEngine->releaseUsage(ev.hid_usage, now_us);
+        }
+        if (ev.pressed && g_msc && g_msc->driveEnabled() &&
+            (sa.cmd == KeyCmd::SequenceRecord ||
+             sa.cmd == KeyCmd::SequenceClear ||
+             (sa.cmd == KeyCmd::OpenMenu &&
+              sa.menu == EditMenu::Sequence))) {
+            logWarn("Sequencer write disabled while MSC drive is active");
+            if (g_display) {
+                g_display->showValue("USB drive active", "Seq write off",
+                                     false, now_us);
+            }
+            continue;
+        }
+        if (g_sequencer && !g_presetEngine->nameEditing() &&
+            !g_presetEngine->promptActive()) {
+            if (g_sequencer->handleKeyEvent(ev, now_us)) {
+                continue;
+            }
+        }
+
         bool consumed = g_presetEngine->handleKeyEvent(ev, now_us);
         if (!consumed) {
             consumed = g_editEngine->handleKeyEvent(ev, now_us);
@@ -510,6 +566,27 @@ void loop() {
         }
     }
 
+    // Beat LED (FR-R8): Core 1 posts a flash request; Core 0 owns the on/off
+    // state — deterministic off after led_flash_ms, retried until the report
+    // is queued so a dropped SET_REPORT can't leave the LED stuck on. Handle
+    // this before the LCD/engine updates so the flash is not delayed by them.
+    if (g_state.ledIndicator.flash) {
+        g_state.ledIndicator.flash = false;
+        g_ledOn = true;
+        g_ledOffAtUs = now_us + static_cast<uint64_t>(g_state.config.led_flash_ms) * 1000ULL;
+        g_ledDirty = true;
+    }
+    if (g_ledOn && now_us >= g_ledOffAtUs) {
+        g_ledOn = false;
+        g_ledDirty = true;
+    }
+    if (g_ledDirty && inputConnected) {
+        if (applyLedState(g_ledOn)) {
+            g_ledDirty = false;   // retry on the next loop if not queued
+        }
+    }
+
+    g_sequencer->update(nowUs());
     g_chordEngine->update(nowUs());
     g_strumEngine->update(nowUs());
     g_bassEngine->update(nowUs());
@@ -531,25 +608,6 @@ void loop() {
     MidiMessage msg;
     while (g_rhythmQueue.pop(msg)) {
         g_router->sendRaw(msg);
-    }
-
-    // Beat LED (FR-R8): Core 1 posts a flash request; Core 0 owns the on/off
-    // state — deterministic off after led_flash_ms, retried until the report
-    // is queued so a dropped SET_REPORT can't leave the LED stuck on.
-    if (g_state.ledIndicator.flash) {
-        g_state.ledIndicator.flash = false;
-        g_ledOn = true;
-        g_ledOffAtUs = now_us + static_cast<uint64_t>(g_state.config.led_flash_ms) * 1000ULL;
-        g_ledDirty = true;
-    }
-    if (g_ledOn && now_us >= g_ledOffAtUs) {
-        g_ledOn = false;
-        g_ledDirty = true;
-    }
-    if (g_ledDirty && inputConnected) {
-        if (applyLedState(g_ledOn)) {
-            g_ledDirty = false;   // retry on the next loop if not queued
-        }
     }
 
     // Push any queued MIDI bytes out of the UART FIFO before the next poll so a
@@ -577,7 +635,7 @@ void loop() {
                 jitter.maxUs(), jitter.avgUs());
     }
 
-    delay(10);
+    delay(1);
 #if defined(ARDUINO_ARCH_RP2040)
     rp2040.wdt_reset();
 #endif

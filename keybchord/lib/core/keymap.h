@@ -75,6 +75,10 @@ enum class KeyCmd : uint8_t {
     TapTempo,       // tap tempo (sets rhythm tempo)
     VolumeUp,       // hard-coded Consumer Volume Increment (tempo / menu value)
     VolumeDown,     // hard-coded Consumer Volume Decrement (tempo / menu value)
+    SequenceSelect, // Ctrl+1..0 selects sequence slot (slot 0..9)
+    SequenceRecord, // arm/stop sequence recording (M14)
+    SequencePlay,   // arm/stop sequence playback (M14)
+    SequenceClear,  // clear the selected sequence (with confirmation)
     COUNT
 };
 

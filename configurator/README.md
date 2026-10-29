@@ -2,14 +2,14 @@
 
 A cross-platform (Windows, Linux, macOS) GUI for configuring the
 [KeybChord Pico](../README.md) — an Omnichord-inspired MIDI chord instrument.
-Edit presets, rhythm and bass patterns, the keymap, and global settings; back up
+Edit presets, chord sequences, rhythm/bass/chord patterns, the keymap, and global settings; back up
 and restore your whole configuration; and write the result straight to the
 device's mass-storage drive.
 
 ## Features
 
-- **Presets** — browse and edit all 10 banks × 8 slots (chord / strum / bass /
-  rhythm / drum sections).
+- **Presets** — browse and edit all 5 banks × 8 slots (chord / strum / bass /
+  rhythm / drum / macro / sequence sections).
 - **Macros** — per-preset top-row number-key mode (strum or macro), optional
   macro names (default `M1`…`M9`, `M0`), and an ordered macro-command editor
   (set/toggle/cycle/inc/dec, per-drum mute, and arbitrary MIDI messages
@@ -17,17 +17,23 @@ device's mass-storage drive.
 - **MIDI command libraries** — insert named multi-message commands from JSON
   libraries, including bundled Roland JD-Xi program, tone, and control
   libraries.
+- **Chord sequences** — a full per-preset sequence editor: 10 slots, 1/2/4/8-bar
+  loops, a chord picker (root/type/add9/add11/add13), the recorded settings
+  snapshot, and per-setting **Live** checkboxes. Sequences are stored in
+  `/sequences/` and are not copied when saving a preset.
 - **Rhythm editor** — step-grid editor for drum patterns (tracks × 16th-note
   steps) with velocity editing.
 - **Bass editor** — step-grid editor for bass patterns (chord-degree + sustain).
 - **Keymap editor** — map non-reserved keys and combos to parameters, with live
   validation and coverage checking, plus a live ANSI 104-key overlay of the
   keymap (fixed chord/strum maps, modifier layers, click-to-select / double-click
-  to edit, and PNG/SVG export). A media-key strip shows configurable Consumer
+  to edit, and PNG/SVG export). Sequence record/play/clear actions and the Seq
+  Edit menu are bindable here. A media-key strip shows configurable Consumer
   keys plus the fixed Volume +/− controls. A synced preset selector shows the top
   row as strum or per-preset macros, with the macro editor embedded in the same tab.
 - **JSON validator** — validate every file against the same rules the firmware
-  enforces (bounds, enums, reserved keys, required keymap coverage).
+  enforces (bounds, enums, reserved keys, required keymap coverage, sequence
+  event/chord limits).
 - **Backup / restore** — save the whole configuration to a `.zip`, or restore
   from one.
 - **Save to device or folder** — write directly to a mounted **"KeybChord"**
@@ -35,6 +41,20 @@ device's mass-storage drive.
   Ejecting reboots the KeybChord automatically so it reloads the new files.
 - **Startup device detection** — when a KeybChord volume is already mounted,
   the configurator offers to open it when it starts.
+
+## Chord sequences
+
+The **Sequences** tab inside a preset edits that preset's 10 sequence slots.
+Choose a slot, set the bar length, then click a step to choose a chord and
+right-click to clear it. Bars are rows; each row is one bar of 16th notes. Use
+**Capture settings from preset** to start the recorded-settings snapshot from
+the preset's current chord parameters, then tick **Live** beside any setting
+that playback should take from the current preset instead of the snapshot.
+The firmware plays the sequence as held chords, so play mode is not part of the
+snapshot.
+
+See the main [custom configuration guide](../docs/custom-configuration-guide.md#38-chord-sequences--sequencesbnpmjson)
+for the file schema and the on-device controls.
 
 ## MIDI macros and command libraries
 

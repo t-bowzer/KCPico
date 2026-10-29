@@ -286,3 +286,32 @@ TEST(ParamEdit, VoicingValueStrings) {
     s.pendingChord.voicing_mode = VoicingMode::Up;
     EXPECT_EQ(paramValueString(s, ParamId::ChordVoicing), "Up");
 }
+
+TEST(ParamEdit, SequenceMenuAndValues) {
+    EXPECT_STREQ(menuTitle(EditMenu::Sequence), "Seq Edit");
+    EXPECT_EQ(menuParamCount(EditMenu::Sequence), 3);
+    EXPECT_EQ(menuParamAt(EditMenu::Sequence, 0), ParamId::SeqSlot);
+    EXPECT_EQ(menuParamAt(EditMenu::Sequence, 1), ParamId::SeqBars);
+    EXPECT_EQ(menuParamAt(EditMenu::Sequence, 2), ParamId::SeqSettings);
+    EXPECT_STREQ(paramShortName(ParamId::SeqSlot), "Slot");
+    EXPECT_STREQ(paramFullName(ParamId::SeqBars), "Sequence Bars");
+
+    StateManager s;
+    EXPECT_EQ(paramValueString(s, ParamId::SeqSlot), "1/10");
+    EXPECT_EQ(paramValueString(s, ParamId::SeqBars), "4");
+    EXPECT_EQ(paramValueString(s, ParamId::SeqSettings), "Recorded");
+
+    paramStep(s, ParamId::SeqSlot, +1);
+    EXPECT_EQ(s.sequencer.slot, 1);
+    paramStep(s, ParamId::SeqBars, +1);
+    EXPECT_EQ(s.sequencer.bars, 8);   // 4 -> 8
+    paramCycle(s, ParamId::SeqSettings);
+    EXPECT_FALSE(s.sequencer.useRecorded);
+    paramCycle(s, ParamId::SeqSettings);
+    EXPECT_TRUE(s.sequencer.useRecorded);
+
+    paramSet(s, ParamId::SeqSlot, 99);
+    EXPECT_EQ(s.sequencer.slot, 9);
+    paramSet(s, ParamId::SeqBars, 3);
+    EXPECT_EQ(s.sequencer.bars, 4);
+}

@@ -33,6 +33,10 @@ void StateManager::loadDefaults() {
     rhythmClock.beat.store(0);
     rhythmClock.nextStepUs.store(0);
     ledIndicator.flash.store(false);
+    sequencer = SequencerState{};
+    recordGuideActive.store(false);
+    recordGuideHatsActive.store(false);
+    recordGuideHatsStartAbs.store(0);
 }
 
 void StateManager::snapshotActive() {

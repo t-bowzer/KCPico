@@ -111,6 +111,8 @@ RESERVED_KEYS: frozenset[str] = frozenset(
 HARDCODED_COMBOS: dict[tuple[Optional[str], str], str] = {
     ("Super", "Esc"): "Panic",
     **{("Super", str(slot)): f"Load preset {slot}" for slot in range(1, 9)},
+    **{("Ctrl", "0" if slot == 10 else str(slot)): f"Sequence {slot}"
+       for slot in range(1, 11)},
 }
 
 RESERVED_DESCRIPTIONS: dict[str, str] = {
@@ -380,6 +382,7 @@ MENU_LABELS: dict[str, str] = {
     "rhythm": "Rhythm menu",
     "bass": "Bass menu",
     "drum": "Drum menu",
+    "sequence": "Sequence menu",
 }
 
 PARAM_VALUE_LABELS: dict[str, dict[Any, str]] = {
@@ -588,6 +591,12 @@ def format_action(action: Any, *,
         return ActionLabel("Clear preset", "Clear the current preset")
     if action_type == "tap_tempo":
         return ActionLabel("Tap tempo", "Tap to set the rhythm tempo")
+    if action_type == "sequence_record":
+        return ActionLabel("Seq record", "Arm or stop sequence recording")
+    if action_type == "sequence_play":
+        return ActionLabel("Seq play", "Arm or stop sequence playback")
+    if action_type == "sequence_clear":
+        return ActionLabel("Seq clear", "Clear the selected sequence")
 
     return ActionLabel(action_type, action_type)
 

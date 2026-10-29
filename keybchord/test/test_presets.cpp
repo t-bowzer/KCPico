@@ -110,8 +110,8 @@ TEST(Presets, ParsePresetLocation) {
     EXPECT_EQ(bank, 0);
     EXPECT_EQ(slot, 0);
 
-    EXPECT_TRUE(parsePresetLocation("B10:P8", bank, slot));
-    EXPECT_EQ(bank, 9);
+    EXPECT_TRUE(parsePresetLocation("B5:P8", bank, slot));
+    EXPECT_EQ(bank, 4);
     EXPECT_EQ(slot, 7);
 
     // Case-insensitive.
@@ -125,6 +125,7 @@ TEST(Presets, ParsePresetLocationInvalid) {
 
     EXPECT_FALSE(parsePresetLocation("", bank, slot));
     EXPECT_FALSE(parsePresetLocation("B0:P1", bank, slot));   // bank 0 out of range
+    EXPECT_FALSE(parsePresetLocation("B6:P1", bank, slot));   // bank 6 out of range
     EXPECT_FALSE(parsePresetLocation("B11:P1", bank, slot));  // bank 11 out of range
     EXPECT_FALSE(parsePresetLocation("B1:P0", bank, slot));   // slot 0 out of range
     EXPECT_FALSE(parsePresetLocation("B1:P9", bank, slot));   // slot 9 out of range

@@ -66,6 +66,20 @@ void DisplayManager::showPrompt(const std::string& text, uint64_t now_us) {
     revertDeadlineUs_ = now_us + static_cast<uint64_t>(state_.config.display_prompt_ms) * 1000ULL;
 }
 
+void DisplayManager::showPersistent(const std::string& line1,
+                                    const std::string& line2) {
+    // Don't steal the screen from a menu prompt/name editor/error/info.
+    if (screen_ == Screen::Menu || screen_ == Screen::Prompt ||
+        screen_ == Screen::NameEdit || screen_ == Screen::Error ||
+        screen_ == Screen::Info) {
+        return;
+    }
+    screen_ = Screen::Status;
+    revertToMenu_ = false;
+    statusLine1_ = line1;
+    statusLine2_ = line2;
+}
+
 void DisplayManager::showNameEdit(const std::string& text) {
     screen_       = Screen::NameEdit;
     revertToMenu_ = false;
@@ -151,6 +165,10 @@ void DisplayManager::render(std::string& l1, std::string& l2, uint64_t now_us) c
         case Screen::Info:
             l1 = padTrunc(infoLine1_, kCols);
             l2 = padTrunc(infoLine2_, kCols);
+            break;
+        case Screen::Status:
+            l1 = padTrunc(statusLine1_, kCols);
+            l2 = padTrunc(statusLine2_, kCols);
             break;
         case Screen::Idle:
         default:

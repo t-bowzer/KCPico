@@ -15,7 +15,7 @@ TEST(Defaults, ProvisionsConfigPresetsAndRhythms) {
     // Config written and loadable.
     EXPECT_TRUE(storage.exists("/config.json"));
 
-    // 10 banks x 8 slots of presets written (each bank is one JSON file).
+    // 5 banks x 8 slots of presets written (each bank is one JSON file).
     for (int bank = 0; bank < NUM_BANKS; bank++) {
         char path[32];
         snprintf(path, sizeof(path), "/presets/bank%d.json", bank + 1);
@@ -27,6 +27,8 @@ TEST(Defaults, ProvisionsConfigPresetsAndRhythms) {
             EXPECT_EQ(p.rhythm.channel, DEFAULT_RHYTHM_CHANNEL);
         }
     }
+
+    EXPECT_TRUE(storage.exists("/sequences"));
 
     // All 12 rhythms written and parseable.
     for (int i = 0; i < RHYTHM_COUNT; i++) {
@@ -47,4 +49,20 @@ TEST(Defaults, ProvisionsConfigPresetsAndRhythms) {
         EXPECT_FALSE(p.steps.empty()) << path;
         EXPECT_EQ(p.name, bassName(i)) << path;
     }
+}
+
+TEST(Defaults, MigratesLegacyBanksAndSequences) {
+    StorageStub storage;
+    storage.writeFile("/presets/bank6.json", "[]");
+    storage.writeFile("/presets/bank10.json", "[]");
+    storage.writeFile("/sequences/b6p1.json", "{}");
+    storage.writeFile("/presets/bank5.json", "[]");   // supported, stays
+    storage.writeFile("/sequences/b5p1.json", "{}");
+
+    EXPECT_EQ(migrateLegacyPresetBanks(storage), 3);
+    EXPECT_FALSE(storage.exists("/presets/bank6.json"));
+    EXPECT_FALSE(storage.exists("/presets/bank10.json"));
+    EXPECT_FALSE(storage.exists("/sequences/b6p1.json"));
+    EXPECT_TRUE(storage.exists("/presets/bank5.json"));
+    EXPECT_TRUE(storage.exists("/sequences/b5p1.json"));
 }

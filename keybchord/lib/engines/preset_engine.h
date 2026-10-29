@@ -25,6 +25,14 @@ public:
     // releases a latched chord when leaving Held/Rhythm with no key held).
     void setModeChangedCallback(std::function<void()> cb);
 
+    // Fired after a preset is loaded (bank, slot) so the sequencer can load its
+    // per-preset sequence file.
+    void setPresetChangedCallback(std::function<void(int, int)> cb);
+
+    // Fired after a preset is cleared (bank, slot) so the sequencer can remove
+    // its sequence file.
+    void setPresetClearedCallback(std::function<void(int, int)> cb);
+
     // Returns true if the event was consumed.
     bool handleKeyEvent(const KeyEvent& ev, uint64_t now_us);
 
@@ -53,6 +61,8 @@ private:
     DisplayManager& display_;
     KeymapResolver keymap_;
     std::function<void()> modeChanged_;
+    std::function<void(int, int)> presetChanged_;
+    std::function<void(int, int)> presetCleared_;
 
     PendingOp   op_ = PendingOp::None;
     uint64_t    promptDeadlineUs_ = 0;

@@ -34,6 +34,11 @@ public:
     // Prompt (FR-D3), auto-cancelling after display_prompt_ms (FR-P10).
     void showPrompt(const std::string& text, uint64_t now_us);
 
+    // Persistent status screen (e.g. an in-progress sequence recording). It
+    // stays until another screen replaces it or cancel() is called. It does not
+    // clobber prompts, name editing, errors, or info screens.
+    void showPersistent(const std::string& line1, const std::string& line2);
+
     // Persistent name-edit screen (preset naming). Shows "Rename" + the current
     // buffer (with a trailing cursor); cleared by cancel().
     void showNameEdit(const std::string& text);
@@ -51,7 +56,9 @@ public:
     void cancel();
 
 private:
-    enum class Screen : uint8_t { Idle, Menu, Edit, Prompt, NameEdit, Error, Info };
+    enum class Screen : uint8_t {
+        Idle, Menu, Edit, Prompt, NameEdit, Error, Info, Status,
+    };
 
     StateManager& state_;
     LcdAdapter&   lcd_;
@@ -71,6 +78,8 @@ private:
     std::string errorLine2_;
     std::string infoLine1_;
     std::string infoLine2_;
+    std::string statusLine1_;
+    std::string statusLine2_;
 
     std::string lastLine1_;
     std::string lastLine2_;

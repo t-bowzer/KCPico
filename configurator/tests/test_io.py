@@ -86,10 +86,11 @@ def test_save_and_load_roundtrip(tmp_path):
     loaded = load_tree(tmp_path)
     assert len(loaded.rhythms) == 12
     assert len(loaded.bass) == 9
-    assert len(loaded.banks) == 10
+    assert len(loaded.banks) == 5
     assert all(len(bank) == 8 for bank in loaded.banks)
     assert loaded.config.to_dict() == tree.config.to_dict()
     assert loaded.keymap.to_dict() == tree.keymap.to_dict()
+    assert len(loaded.sequences) == 40
 
 
 def test_rhythm_name_list_order(tmp_path):
@@ -107,12 +108,19 @@ def test_rhythm_name_list_order(tmp_path):
 
 
 def test_backup_and_restore(tmp_path):
+    from keybchord_configurator.models.enums import ChordType
+    from keybchord_configurator.models.sequence import SequenceEvent
+
     tree = default_tree()
+    tree.sequences[(0, 0)].slot(0).set_event(
+        0, SequenceEvent(root_pc=5, chord_type=ChordType.MAJOR))
     save_tree(tree, tmp_path)
 
     zip_path = tmp_path / "backup.zip"
     archived = backup_to_zip(tmp_path, zip_path)
-    assert len(archived) >= 22  # config + keymap + 10 banks + 12 rhythms + 9 bass
+    # config + keymap + 5 banks + 12 rhythms + 9 bass + 9 chord patterns
+    assert len(archived) >= 37
+    assert any(name.startswith("sequences/") for name in archived)
 
     restore_dir = tmp_path / "restored"
     restore_dir.mkdir()
@@ -122,6 +130,7 @@ def test_backup_and_restore(tmp_path):
     loaded = load_tree(restore_dir)
     assert len(loaded.rhythms) == 12
     assert len(loaded.bass) == 9
+    assert len(loaded.sequences[(0, 0)].slot(0).events) == 1
 
 
 def test_restore_rejects_foreign_files(tmp_path):
@@ -175,3 +184,35 @@ def test_builtin_jdxi_libraries_are_valid():
     assert libraries["Roland JD-Xi Extra Programs"].command_count() == 512
     assert libraries["Roland JD-Xi Tones"].command_count() == 353
     assert libraries["Roland JD-Xi Controls"].command_count() == 102
+
+
+def test_sequence_save_and_load_roundtrip(tmp_path):
+    from keybchord_configurator.models.enums import ChordType
+    from keybchord_configurator.models.sequence import SequenceEvent
+
+    tree = default_tree()
+    seq = tree.sequences[(0, 1)].slot(2)
+    seq.bars = 2
+    seq.steps_per_bar = 16
+    seq.set_event(0, SequenceEvent(
+        step=0, root_pc=5, chord_type=ChordType.MAJOR))
+    seq.set_event(16, SequenceEvent(
+        step=16, root_pc=0, chord_type=ChordType.MIN7, add9=True))
+
+    save_tree(tree, tmp_path)
+    loaded = load_tree(tmp_path)
+    out = loaded.sequences[(0, 1)].slot(2)
+    assert out.bars == 2
+    assert len(out.events) == 2
+    assert out.events[1].step == 16
+    assert out.events[1].add9
+    assert (tmp_path / "sequences" / "b1p2.json").exists()
+
+
+def test_legacy_bank_files_are_detected(tmp_path):
+    from keybchord_configurator.io.storage import legacy_bank_files
+
+    presets = tmp_path / "presets"
+    presets.mkdir()
+    (presets / "bank6.json").write_text("[]", encoding="utf-8")
+    assert legacy_bank_files(tmp_path) == ["bank6.json"]

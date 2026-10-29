@@ -51,6 +51,14 @@ protected:
         return out;
     }
 
+    int countClock(const std::vector<MidiMessage>& msgs) {
+        int n = 0;
+        for (const auto& m : msgs) {
+            if (m.status == midi::SYSTEM_CLOCK) n++;
+        }
+        return n;
+    }
+
     int countNoteOn(const std::vector<MidiMessage>& msgs, uint8_t note,
                     uint8_t channel) {
         int n = 0;
@@ -321,4 +329,143 @@ TEST(RhythmLoader, AppendsUserRhythmsSortedByFilename) {
     EXPECT_EQ(lib.patterns[RHYTHM_COUNT].name, "A Groove");     // aa sorts first
     EXPECT_EQ(lib.patterns[RHYTHM_COUNT + 1].name, "Z Groove");
     EXPECT_EQ(lib.names[RHYTHM_COUNT], "A Groove");
+}
+
+TEST_F(RhythmEngineTest, ClockOutStartsOnBeatBoundaryAfterEnable) {
+    uint32_t tick = clockTickUs(120);
+    state_.config.midi_clock_enabled = false;
+
+    engine_->update(0);          // tick 0 (clock off)
+    drain();
+    engine_->update(2 * tick);   // ticks 1..2
+    drain();
+
+    state_.config.midi_clock_enabled = true;
+    engine_->update(3 * tick);   // tick 3 -> pending, no clock
+    EXPECT_EQ(countClock(drain()), 0);
+
+    engine_->update(23 * tick);  // ticks 4..23 -> still pending
+    EXPECT_EQ(countClock(drain()), 0);
+
+    engine_->update(24 * tick);  // tick 24 = beat boundary -> start
+    EXPECT_EQ(countClock(drain()), 1);
+
+    engine_->update(25 * tick);
+    EXPECT_EQ(countClock(drain()), 1);
+}
+
+TEST_F(RhythmEngineTest, DisablingClockOutIsImmediate) {
+    uint32_t tick = clockTickUs(120);
+    state_.config.midi_clock_enabled = true;
+    engine_->update(0);
+    drain();
+
+    state_.config.midi_clock_enabled = false;
+    engine_->update(3 * tick);
+    EXPECT_EQ(countClock(drain()), 0);
+}
+
+TEST_F(RhythmEngineTest, RecordGuidePlaysQuarterHiHatsAndMutesPattern) {
+    uint32_t tick = clockTickUs(120);
+    uint32_t base = tick * CLOCK_TICKS_PER_STEP;
+    state_.pendingRhythm.enabled = true;
+    state_.recordGuideActive.store(true);
+    state_.recordGuideHatsActive.store(true);
+    state_.recordGuideHatsStartAbs.store(0);
+
+    engine_->update(0);
+    drain();
+    engine_->update(24 * tick + 12 * base);  // steps 0..12 (beats 1..4)
+
+    auto msgs = drain();
+    EXPECT_EQ(countNoteOn(msgs, 36, 10), 0);  // kick suppressed
+    EXPECT_EQ(countNoteOn(msgs, 38, 10), 0);  // snare suppressed
+    EXPECT_EQ(countNoteOn(msgs, 42, 10), 4);  // quarter-note hi-hats
+}
+
+TEST_F(RhythmEngineTest, RecordGuideStopsWhenCleared) {
+    uint32_t tick = clockTickUs(120);
+    state_.pendingRhythm.enabled = true;
+    state_.recordGuideActive.store(true);
+    state_.recordGuideHatsActive.store(true);
+    state_.recordGuideHatsStartAbs.store(0);
+    engine_->update(0);
+    drain();
+
+    state_.recordGuideActive.store(false);
+    state_.recordGuideHatsActive.store(false);
+    state_.recordGuideHatsStartAbs.store(0);
+    engine_->update(24 * tick);
+    auto msgs = drain();
+    EXPECT_EQ(countNoteOn(msgs, 36, 10), 1);  // normal pattern resumes
+    EXPECT_EQ(countNoteOn(msgs, 38, 10), 0);
+}
+
+TEST_F(RhythmEngineTest, LedAndBarStayAlignedAfterTempoChange) {
+    state_.pendingRhythm.enabled = true;
+    state_.config.bpm_indicator = true;
+    engine_->update(0);
+    drain();
+    state_.ledIndicator.flash = false;
+
+    // Run two bars at 120 BPM.
+    for (uint64_t t = 0; t <= 4 * stepUs(120); t += 1000) {
+        engine_->update(t);
+        state_.ledIndicator.flash = false;
+        drain();
+    }
+
+    // Change tempo live, then run four bars at 90 BPM in 1 ms increments.
+    state_.pendingRhythm.tempo = 90;
+    int kickCount = 0;
+    int unalignedKicks = 0;
+    uint64_t end = 4 * stepUs(120) + 16 * stepUs(90);
+    for (uint64_t t = 4 * stepUs(120); t <= end; t += 1000) {
+        engine_->update(t);
+        bool flash = state_.ledIndicator.flash;
+        state_.ledIndicator.flash = false;
+        auto msgs = drain();
+        int kicks = countNoteOn(msgs, 36, 10);
+        if (kicks > 0) {
+            kickCount += kicks;
+            if (!flash) unalignedKicks++;
+        }
+    }
+    EXPECT_GT(kickCount, 0);
+    EXPECT_EQ(unalignedKicks, 0);
+}
+
+
+TEST_F(RhythmEngineTest, RecordGuideMuteOnlyHasNoHats) {
+    uint32_t tick = clockTickUs(120);
+    uint32_t base = tick * CLOCK_TICKS_PER_STEP;
+    state_.pendingRhythm.enabled = true;
+    state_.recordGuideActive.store(true);
+    state_.recordGuideHatsActive.store(false);
+
+    engine_->update(0);
+    drain();
+    engine_->update(24 * tick + 12 * base);  // steps 0..12
+
+    auto msgs = drain();
+    EXPECT_EQ(countNoteOn(msgs, 36, 10), 0);  // pattern suppressed
+    EXPECT_EQ(countNoteOn(msgs, 42, 10), 0);  // no hats before the count-in
+}
+
+
+TEST_F(RhythmEngineTest, RecordGuideHatsHonorAbsoluteStartStep) {
+    uint32_t tick = clockTickUs(120);
+    uint32_t base = tick * CLOCK_TICKS_PER_STEP;
+    state_.pendingRhythm.enabled = true;
+    state_.recordGuideActive.store(true);
+    state_.recordGuideHatsActive.store(true);
+    state_.recordGuideHatsStartAbs.store(24);  // no hats before absolute step 24
+
+    engine_->update(0);
+    drain();
+    engine_->update(24 * tick + 23 * base);  // steps 0..23
+    EXPECT_EQ(countNoteOn(drain(), 42, 10), 0);
+
+    engine_->update(24 * tick + 24 * base);  // absolute step 24 (count-in)
+    EXPECT_EQ(countNoteOn(drain(), 42, 10), 1);
 }

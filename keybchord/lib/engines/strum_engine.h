@@ -21,6 +21,10 @@ public:
     void update(uint64_t now_us);
     void allNotesOff();
 
+    // Release any strum note started by this HID usage. Used when Ctrl+number
+    // sequence selection takes over a key that was already strumming.
+    void releaseUsage(uint8_t usage, uint64_t now_us);
+
 private:
     // A strummed note. note_duration_ms is a *minimum*: the note stays sounding
     // while its key is held, and is released at max(release, deadline).

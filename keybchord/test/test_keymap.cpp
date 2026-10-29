@@ -211,8 +211,8 @@ TEST(Keymap, PlayKeysResolveWhileCtrlAltHeld) {
     // to its play action, or the chord engine would miss the release and latch.
     EXPECT_EQ(resolve(0x17, CTRL).cmd, KeyCmd::ChordKey);  // T with Ctrl
     EXPECT_EQ(resolve(0x17, ALT).cmd, KeyCmd::ChordKey);   // T with Alt
-    EXPECT_EQ(resolve(0x1E, CTRL).cmd, KeyCmd::StrumKey);  // 1 with Ctrl
-    EXPECT_EQ(resolve(0x1E, ALT).cmd, KeyCmd::StrumKey);   // 1 with Alt
+    EXPECT_EQ(resolve(0x1E, CTRL).cmd, KeyCmd::SequenceSelect);  // Ctrl+1
+    EXPECT_EQ(resolve(0x1E, ALT).cmd, KeyCmd::StrumKey);         // 1 with Alt
     EXPECT_EQ(resolve(0x35, CTRL).cmd, KeyCmd::Backtick);  // ` with Ctrl
     EXPECT_EQ(resolve(0x50, CTRL).cmd, KeyCmd::Ext9);      // Left with Ctrl
 }
@@ -456,4 +456,39 @@ TEST(Keymap, ConsumerKeysProduceNoText) {
     EXPECT_EQ(keymapCharForUsage(hid_usage::CONSUMER_PLAY_PAUSE, 0,
                                  hid_usage::PAGE_CONSUMER),
               '\0');
+}
+
+TEST(Keymap, CtrlNumberSelectsSequenceSlots) {
+    KeyAction a = resolve(0x1E, CTRL);  // Ctrl+1
+    EXPECT_EQ(a.cmd, KeyCmd::SequenceSelect);
+    EXPECT_EQ(a.slot, 0);
+
+    a = resolve(0x27, CTRL);  // Ctrl+0
+    EXPECT_EQ(a.cmd, KeyCmd::SequenceSelect);
+    EXPECT_EQ(a.slot, 9);
+
+    // Super+number still loads a preset; Alt+number still strums.
+    EXPECT_EQ(resolve(0x1E, CTRL | SUPER).cmd, KeyCmd::PresetLoad);
+    EXPECT_EQ(resolve(0x1E, ALT).cmd, KeyCmd::StrumKey);
+}
+
+TEST(Keymap, SequenceControlsAndMenu) {
+    EXPECT_EQ(resolve(0x42, CTRL).cmd, KeyCmd::SequenceRecord);  // Ctrl+F9
+    EXPECT_EQ(resolve(0x43, CTRL).cmd, KeyCmd::SequencePlay);    // Ctrl+F10
+    EXPECT_EQ(resolve(0x44, CTRL).cmd, KeyCmd::SequenceClear);   // Ctrl+F11
+
+    KeyAction a = resolve(0x45, SUPER);  // Super+F12
+    EXPECT_EQ(a.cmd, KeyCmd::OpenMenu);
+    EXPECT_EQ(a.menu, EditMenu::Sequence);
+}
+
+TEST(Keymap, OldKeymapStillGetsSequenceFallbacks) {
+    KeymapConfig cfg;  // no bindings at all (old v0.1 keymap shape)
+    KeymapResolver resolver(&cfg);
+    EXPECT_EQ(resolver.resolve(0x42, CTRL).cmd, KeyCmd::SequenceRecord);
+    EXPECT_EQ(resolver.resolve(0x43, CTRL).cmd, KeyCmd::SequencePlay);
+    EXPECT_EQ(resolver.resolve(0x44, CTRL).cmd, KeyCmd::SequenceClear);
+    KeyAction menu = resolver.resolve(0x45, SUPER);
+    EXPECT_EQ(menu.cmd, KeyCmd::OpenMenu);
+    EXPECT_EQ(menu.menu, EditMenu::Sequence);
 }

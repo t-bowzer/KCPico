@@ -21,18 +21,23 @@ out a DIN-5 connector — no computer required.
   arbitrary MIDI messages, including commands from JSON libraries.
 - **Chord patterns** — 9 built-in polyphonic patterns (Block, Alberti, Pulse,
   …) played in lockstep with the rhythm, all editable as JSON (`/chordpatterns/`).
+- **Chord sequencer** — record and loop chord changes per preset: 10 sequence
+  slots, 1/2/4/8-bar loops, 64 events each, recorded/live chord settings, and a
+  full configurator editor (`/sequences/`).
 - **Rhythm engine** — 12 built-in drum patterns (Rock, Waltz, Swing, Bossa Nova,
   …) plus user-loadable patterns, tempo, swing, mute, MIDI clock out, and a
   keyboard-LED beat indicator.
 - **Walking bass** — beat-synced patterns (walking, whole, half, quarter, hold,
   …) following the active chord, all editable as JSON.
-- **Presets** — 10 banks × 8 slots (80 presets) with on-device naming.
+- **Presets** — 5 banks × 8 slots (40 presets) with on-device naming.
 - **DIN-5 MIDI OUT** — 3.3 V loop, standards-compliant per the MIDI 1.0 spec.
 - **USB MIDI OUT** — composite USB MIDI device on the native port (alongside the
   debug serial), toggleable via `Ctrl+F8` / `midi.usb_enabled`.
 - **LCD1602** status/parameter display over I2C.
-- **Fully configurable** — `config.json`, `keymap.json`, presets, rhythms, and
-  bass patterns are all editable JSON on a USB Mass Storage drive.
+- **Fully configurable** — `config.json`, `keymap.json`, presets, rhythms, bass
+  and chord patterns, and chord sequences are all editable JSON on a USB Mass
+  Storage drive. v0.2 reduces the preset count from 80 to 40 and removes the old
+  banks 6–10 on first boot (back them up before upgrading).
 
 ## Hardware
 
@@ -90,6 +95,13 @@ On first boot the firmware self-provisions its config, presets, and rhythms.
   tempo, `Super`+`Esc` is panic.
 - `Ctrl`+`Esc` shows the firmware version and current git commit (any key
   dismisses the debug screen).
+- `Ctrl`+`1`…`Ctrl`+`0` select one of the preset's 10 sequence slots;
+  `Ctrl`+`F9` arms/stops recording, `Ctrl`+`F10` arms/stops playback, and
+  `Ctrl`+`F11` clears the selected sequence. `Super`+`F12` opens the Seq Edit
+  menu (slot / bars / settings). Recording and playback require rhythm to be
+  enabled (it may be muted). Arming record mutes the normal pattern, stays
+  silent until the next bar, then plays exactly one bar of quarter-note closed
+  hi-hats before recording; the hi-hats continue through the take.
 - The keyboard's **Volume +/−** keys are fixed controls: on the main screen they
   change tempo; inside an edit menu they scroll parameters, then edit the
   selected value after `Enter`/`Mute`. **Mute** is also fixed and behaves like
@@ -119,6 +131,7 @@ straight to the device — use the cross-platform
 - [Product spec](docs/KeybChord_Pico_Spec.md) — full behavior and data models.
 - [Wiring](docs/wiring.md) — connection diagram.
 - [Custom configuration guide](docs/custom-configuration-guide.md) — JSON reference.
+- [Sequencer hardware test plan](hardware-test-plan-sequencer.md) — step-by-step verification.
 - [v0.1.0 roadmap](docs/v0.1.0-roadmap.md) — milestones and acceptance coverage.
 - [v0.2.0 roadmap](docs/v0.2.0-roadmap.md) — current development plan.
 

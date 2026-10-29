@@ -72,6 +72,7 @@ public:
     virtual bool exists(const std::string& path) = 0;
     virtual std::string readFile(const std::string& path) = 0;
     virtual bool writeFile(const std::string& path, const std::string& data) = 0;
+    virtual bool remove(const std::string& path) = 0;
     virtual bool mkdir(const std::string& path) = 0;
 
     // Lists the entries (basenames, no directory prefix) of a directory, or an

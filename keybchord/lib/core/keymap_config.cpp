@@ -141,6 +141,9 @@ const ParamName kParamNames[] = {
     {"bass_velocity", ParamId::BassVelocity},
     {"bass_channel", ParamId::BassChannel},
     {"bass_pattern", ParamId::BassPattern},
+    {"seq_slot", ParamId::SeqSlot},
+    {"seq_bars", ParamId::SeqBars},
+    {"seq_settings", ParamId::SeqSettings},
 };
 
 bool lookupParamName(const std::string& name, ParamId& id) {
@@ -210,6 +213,7 @@ bool isBoolParam(ParamId id) {
         case ParamId::RhythmLed:
         case ParamId::UsbMidi:
         case ParamId::BassEnable:
+        case ParamId::SeqSettings:
             return true;
         default:
             return false;
@@ -271,6 +275,7 @@ bool lookupMenuName(const std::string& s, EditMenu& menu) {
     if (s == "rhythm") { menu = EditMenu::Rhythm; return true; }
     if (s == "bass")   { menu = EditMenu::Bass;   return true; }
     if (s == "drum")   { menu = EditMenu::Drum;   return true; }
+    if (s == "sequence") { menu = EditMenu::Sequence; return true; }
     return false;
 }
 
@@ -391,6 +396,7 @@ KeymapConfig KeymapConfig::defaults() {
     bind(KMOD_SUPER, HID_USAGE_HOME, preset(KeyCmd::PresetBankPrev));
     bind(KMOD_SUPER, HID_USAGE_END,  preset(KeyCmd::PresetBankNext));
     bind(KMOD_SUPER, HID_USAGE_F1 + 10, openMenu(EditMenu::Drum));  // Super+F11
+    bind(KMOD_SUPER, HID_USAGE_F1 + 11, openMenu(EditMenu::Sequence)); // Super+F12
 
     // Ctrl combos.
     bind(KMOD_CTRL, HID_USAGE_F1,     cycle(ParamId::ChordVoicing));
@@ -399,6 +405,9 @@ KeymapConfig KeymapConfig::defaults() {
     bind(KMOD_CTRL, HID_USAGE_F1 + 3, toggle(ParamId::ChordRoll, 0, 50)); // Ctrl+F4
     bind(KMOD_CTRL, HID_USAGE_F1 + 4, toggle(ParamId::RhythmLed, 1, 0));  // Ctrl+F5
     bind(KMOD_CTRL, HID_USAGE_F1 + 7, toggle(ParamId::UsbMidi, 1, 0));    // Ctrl+F8
+    bind(KMOD_CTRL, HID_USAGE_F1 + 8, preset(KeyCmd::SequenceRecord));    // Ctrl+F9
+    bind(KMOD_CTRL, HID_USAGE_F1 + 9, preset(KeyCmd::SequencePlay));      // Ctrl+F10
+    bind(KMOD_CTRL, HID_USAGE_F1 + 10, preset(KeyCmd::SequenceClear));    // Ctrl+F11
     bind(KMOD_CTRL, HID_USAGE_EQUALS, incp(ParamId::ChordVelocity));
     bind(KMOD_CTRL, HID_USAGE_MINUS,  decp(ParamId::ChordVelocity));
     bind(KMOD_CTRL, HID_USAGE_KP_ENTER, cycle(ParamId::StrumLayout));
@@ -683,6 +692,9 @@ KeymapLoadResult KeymapConfig::load(StorageAdapter& storage) {
         else if (type == "preset_save")        { a.cmd = KeyCmd::PresetSave; }
         else if (type == "preset_clear")       { a.cmd = KeyCmd::PresetClear; }
         else if (type == "tap_tempo")          { a.cmd = KeyCmd::TapTempo; }
+        else if (type == "sequence_record")    { a.cmd = KeyCmd::SequenceRecord; }
+        else if (type == "sequence_play")      { a.cmd = KeyCmd::SequencePlay; }
+        else if (type == "sequence_clear")     { a.cmd = KeyCmd::SequenceClear; }
         else {
             result.errors.push_back(where + ": unknown action type '" + type + "'");
             result.ok = false;
@@ -771,12 +783,16 @@ R"({
     { "keys": ["Super", "Home"], "action": { "type": "preset_bank_prev" } },
     { "keys": ["Super", "End"], "action": { "type": "preset_bank_next" } },
     { "keys": ["Super", "F11"], "action": { "type": "open_menu", "menu": "drum" } },
+    { "keys": ["Super", "F12"], "action": { "type": "open_menu", "menu": "sequence" } },
     { "keys": ["Ctrl", "F1"], "action": { "type": "cycle", "param": "chord_voicing" } },
     { "keys": ["Ctrl", "F2"], "action": { "type": "cycle", "param": "chord_inversion" } },
     { "keys": ["Ctrl", "F3"], "action": { "type": "cycle", "param": "arp_mode" } },
     { "keys": ["Ctrl", "F4"], "action": { "type": "toggle", "param": "chord_roll", "a": 0, "b": 50 } },
     { "keys": ["Ctrl", "F5"], "action": { "type": "toggle", "param": "rhythm_led", "a": 1, "b": 0 } },
     { "keys": ["Ctrl", "F8"], "action": { "type": "toggle", "param": "usb_midi", "a": 1, "b": 0 } },
+    { "keys": ["Ctrl", "F9"], "action": { "type": "sequence_record" } },
+    { "keys": ["Ctrl", "F10"], "action": { "type": "sequence_play" } },
+    { "keys": ["Ctrl", "F11"], "action": { "type": "sequence_clear" } },
     { "keys": ["Ctrl", "="], "action": { "type": "inc", "param": "chord_velocity" } },
     { "keys": ["Ctrl", "-"], "action": { "type": "dec", "param": "chord_velocity" } },
     { "keys": ["Ctrl", "KpEnter"], "action": { "type": "cycle", "param": "strum_layout" } },

@@ -7,6 +7,7 @@ from .bass import BassPattern
 from .chordpattern import ChordPattern
 from .keymap import KeyAction, KeyBinding, KeymapConfig
 from .macro import MacroCommand, MacroConfig
+from .sequence import Sequence, SequenceEvent, SequencerLibrary
 
 __all__ = [
     "AppConfig",
@@ -21,4 +22,7 @@ __all__ = [
     "PresetSlot",
     "RhythmPattern",
     "RhythmTrack",
+    "Sequence",
+    "SequenceEvent",
+    "SequencerLibrary",
 ]

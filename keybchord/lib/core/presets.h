@@ -6,7 +6,7 @@
 #include "params.h"
 
 
-constexpr int NUM_BANKS   = 10;
+constexpr int NUM_BANKS   = 5;
 constexpr int NUM_SLOTS   = 8;
 constexpr int NUM_PRESETS = NUM_BANKS * NUM_SLOTS;
 

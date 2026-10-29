@@ -1,5 +1,7 @@
 #include "defaults.h"
 
+#include <cstdio>
+
 #include "base.h"
 #include "bass.h"
 #include "chordpattern.h"
@@ -7,6 +9,7 @@
 #include "keymap_config.h"
 #include "presets.h"
 #include "rhythm.h"
+#include "sequence.h"
 
 
 namespace {
@@ -319,13 +322,14 @@ void provisionDefaults(StorageAdapter& storage) {
     storage.mkdir("/rhythms");
     storage.mkdir("/bass");
     storage.mkdir("/chordpatterns");
+    storage.mkdir("/sequences");
     // Global config (defaults).
     AppConfig::defaults().save(storage);
 
     // Default keymap (configurable main-menu shortcuts).
     storage.writeFile("/keymap.json", keymapDefaultJson());
 
-    // 10 banks x 8 default preset slots.
+    // 5 banks x 8 default preset slots.
     for (int bank = 0; bank < NUM_BANKS; bank++) {
         for (int slot = 0; slot < NUM_SLOTS; slot++) {
             savePreset(storage, bank, slot, PresetSlot::defaults());
@@ -349,6 +353,27 @@ void provisionDefaults(StorageAdapter& storage) {
         storage.writeFile("/chordpatterns/" + std::string(chordPatternFileName(i)),
                           kChordPatternJson[i]);
     }
+}
+
+int migrateLegacyPresetBanks(StorageAdapter& storage) {
+    // v0.1.x shipped 10 banks (bank1.json .. bank10.json). v0.2.0 supports five.
+    // Remove the unsupported files (and any sequences for those slots) so the
+    // space is available to the 40-preset / 10-sequence layout.
+    constexpr int kLegacyBanks = 10;
+    int removed = 0;
+    for (int bank = NUM_BANKS; bank < kLegacyBanks; bank++) {
+        char path[32];
+        std::snprintf(path, sizeof(path), "/presets/bank%d.json", bank + 1);
+        if (storage.exists(path)) {
+            if (storage.remove(path)) removed++;
+        }
+        for (int slot = 0; slot < NUM_SLOTS; slot++) {
+            std::string seq = sequenceFileName(bank, slot);
+            if (seq.empty() || !storage.exists(seq)) continue;
+            if (storage.remove(seq)) removed++;
+        }
+    }
+    return removed;
 }
 
 const char* defaultRhythmJson(int index) {

@@ -7,14 +7,18 @@ from pathlib import Path
 
 from .storage import (
     BASS_DIR,
+    CHORD_PATTERNS_DIR,
     CONFIG_FILE,
     KEYMAP_FILE,
     PRESETS_DIR,
     RHYTHMS_DIR,
+    SEQUENCES_DIR,
 )
 
 CONFIG_PATHS = (CONFIG_FILE, KEYMAP_FILE)
-CONFIG_DIRS = (PRESETS_DIR, RHYTHMS_DIR, BASS_DIR)
+CONFIG_DIRS = (
+    PRESETS_DIR, RHYTHMS_DIR, BASS_DIR, CHORD_PATTERNS_DIR, SEQUENCES_DIR,
+)
 
 
 def _is_config_path(name: str) -> bool:

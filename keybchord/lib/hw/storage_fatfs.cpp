@@ -56,6 +56,11 @@ bool StorageFatFs::writeFile(const std::string& path, const std::string& data) {
     return true;
 }
 
+bool StorageFatFs::remove(const std::string& path) {
+    if (!FatFS.exists(path.c_str())) return true;
+    return FatFS.remove(path.c_str());
+}
+
 bool StorageFatFs::mkdir(const std::string& path) {
     if (!FatFS.exists(path.c_str())) {
         FatFS.mkdir(path.c_str());

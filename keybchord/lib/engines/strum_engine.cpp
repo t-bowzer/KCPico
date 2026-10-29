@@ -68,6 +68,10 @@ void StrumEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
     }
 }
 
+void StrumEngine::releaseUsage(uint8_t usage, uint64_t now_us) {
+    releaseStrum(usage, now_us);
+}
+
 void StrumEngine::update(uint64_t now_us) {
     for (auto& n : notes_) {
         if (n.active && n.released && now_us >= n.deadline_us) {

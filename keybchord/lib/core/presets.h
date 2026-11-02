@@ -22,13 +22,15 @@ struct PresetSlot {
     BassParams  bass;
     RhythmParams rhythm;
     MacroConfig macros;
+    // Global Recorded/Live sequence-settings switch (Seq Edit > Settings).
+    bool seq_use_recorded = true;
 
     static PresetSlot defaults();
     bool operator==(const PresetSlot& other) const;
     bool operator!=(const PresetSlot& other) const;
 
-    // True when every chord/strum/bass/rhythm/macro field matches, ignoring the
-    // name (used for dirty-state tracking, FR-P11 / AC-20).
+    // True when every chord/strum/bass/rhythm/macro/sequence field matches,
+    // ignoring the name (used for dirty-state tracking, FR-P11 / AC-20).
     bool sameParams(const PresetSlot& other) const;
 };
 
@@ -43,7 +45,8 @@ PresetSlot   loadPresetOrDefault(StorageAdapter& storage, int bank, int slot);
 PresetSlot makePreset(const ChordParams& chord, const StrumParams& strum,
                       const BassParams& bass, const RhythmParams& rhythm,
                       const std::string& name,
-                      const MacroConfig& macros = MacroConfig::defaults());
+                      const MacroConfig& macros = MacroConfig::defaults(),
+                      bool seq_use_recorded = true);
 
 // Parses a preset location string like "B3:P7" into 0-based bank/slot.
 // Returns false on malformed input or out-of-range values (1..10 / 1..8).

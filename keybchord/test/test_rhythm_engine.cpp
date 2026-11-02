@@ -59,6 +59,14 @@ protected:
         return n;
     }
 
+    int countSystem(const std::vector<MidiMessage>& msgs, uint8_t status) {
+        int n = 0;
+        for (const auto& m : msgs) {
+            if (m.status == status) n++;
+        }
+        return n;
+    }
+
     int countNoteOn(const std::vector<MidiMessage>& msgs, uint8_t note,
                     uint8_t channel) {
         int n = 0;
@@ -233,6 +241,24 @@ TEST_F(RhythmEngineTest, LedDisabledWhenIndicatorOff) {
     EXPECT_FALSE(state_.ledIndicator.flash);
 }
 
+TEST_F(RhythmEngineTest, PublishesTickSnapshotWithoutRhythm) {
+    state_.pendingRhythm.enabled = false;
+    uint32_t tick = clockTickUs(120);
+
+    engine_->update(0);
+    // tickAbs is the last emitted tick: tick #0 fires at boot, and the next
+    // tick is one interval away.
+    EXPECT_EQ(state_.rhythmClock.tickAbs.load(), 0u);
+    EXPECT_EQ(state_.rhythmClock.nextTickUs.load(), tick);
+
+    uint64_t before = state_.rhythmClock.tickAbs.load();
+    uint64_t nextBefore = state_.rhythmClock.nextTickUs.load();
+    engine_->update(4 * tick);
+    EXPECT_GT(state_.rhythmClock.tickAbs.load(), before);
+    EXPECT_GT(state_.rhythmClock.nextTickUs.load(), nextBefore);
+    EXPECT_FALSE(state_.rhythmClock.running);
+}
+
 TEST_F(RhythmEngineTest, PublishesClockSnapshot) {
     state_.pendingRhythm.enabled = true;
     engine_->update(0);
@@ -354,7 +380,7 @@ TEST_F(RhythmEngineTest, ClockOutStartsOnBeatBoundaryAfterEnable) {
     EXPECT_EQ(countClock(drain()), 1);
 }
 
-TEST_F(RhythmEngineTest, DisablingClockOutIsImmediate) {
+TEST_F(RhythmEngineTest, DisablingClockOutIsImmediateAndSendsNoStop) {
     uint32_t tick = clockTickUs(120);
     state_.config.midi_clock_enabled = true;
     engine_->update(0);
@@ -362,7 +388,78 @@ TEST_F(RhythmEngineTest, DisablingClockOutIsImmediate) {
 
     state_.config.midi_clock_enabled = false;
     engine_->update(3 * tick);
+    auto stopped = drain();
+    EXPECT_EQ(countClock(stopped), 0);
+    EXPECT_EQ(countSystem(stopped, midi::SYSTEM_STOP), 0);
+    EXPECT_EQ(countSystem(stopped, midi::SYSTEM_START), 0);
+}
+
+TEST_F(RhythmEngineTest, ReEnablingClockOutIsClockOnly) {
+    uint32_t tick = clockTickUs(120);
+    state_.config.midi_clock_enabled = true;
+    engine_->update(0);
+    drain();
+    engine_->update(3 * tick);  // stream a few ticks, then stop mid-beat
+    drain();
+
+    state_.config.midi_clock_enabled = false;
+    engine_->update(4 * tick);
+    drain();
+
+    state_.config.midi_clock_enabled = true;
+    engine_->update(5 * tick);   // pending until the next 24-tick boundary
     EXPECT_EQ(countClock(drain()), 0);
+
+    engine_->update(24 * tick);  // boundary: first clock only, no transport
+    auto resumed = drain();
+    ASSERT_FALSE(resumed.empty());
+    EXPECT_EQ(resumed[0].status, midi::SYSTEM_CLOCK);
+    EXPECT_EQ(countSystem(resumed, midi::SYSTEM_START), 0);
+    EXPECT_EQ(countSystem(resumed, midi::SYSTEM_STOP), 0);
+    EXPECT_EQ(countClock(resumed), 1);
+
+    engine_->update(25 * tick);
+    auto next = drain();
+    EXPECT_EQ(countSystem(next, midi::SYSTEM_START), 0);
+    EXPECT_EQ(countClock(next), 1);
+}
+
+TEST_F(RhythmEngineTest, ResyncClockSendsStartOnBeatBoundary) {
+    uint32_t tick = clockTickUs(120);
+    state_.config.midi_clock_enabled = true;
+    engine_->update(0);
+    drain();
+    engine_->update(3 * tick);
+    drain();
+
+    engine_->resyncClock();      // armed mid-beat
+    engine_->update(23 * tick);  // still before the boundary
+    auto before = drain();
+    EXPECT_EQ(countSystem(before, midi::SYSTEM_START), 0);
+
+    engine_->update(24 * tick);
+    auto resumed = drain();
+    ASSERT_FALSE(resumed.empty());
+    EXPECT_EQ(resumed[0].status, midi::SYSTEM_START);
+    EXPECT_EQ(countSystem(resumed, midi::SYSTEM_START), 1);
+    EXPECT_EQ(countClock(resumed), 1);
+
+    engine_->update(25 * tick);
+    auto next = drain();
+    EXPECT_EQ(countSystem(next, midi::SYSTEM_START), 0);
+    EXPECT_EQ(countClock(next), 1);
+}
+
+TEST_F(RhythmEngineTest, ResyncClockIgnoredWhenClockOutOff) {
+    uint32_t tick = clockTickUs(120);
+    engine_->update(0);
+    drain();
+
+    engine_->resyncClock();
+    engine_->update(24 * tick);
+    auto msgs = drain();
+    EXPECT_EQ(countSystem(msgs, midi::SYSTEM_START), 0);
+    EXPECT_EQ(countClock(msgs), 0);
 }
 
 TEST_F(RhythmEngineTest, RecordGuidePlaysQuarterHiHatsAndMutesPattern) {

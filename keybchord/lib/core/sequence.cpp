@@ -22,7 +22,9 @@ bool recordedEqualsDefaults(const ChordParams& p) {
            p.min_interval == d.min_interval &&
            p.inversion == d.inversion &&
            p.arp_mode == d.arp_mode &&
-           p.pattern == d.pattern;
+           p.pattern == d.pattern &&
+           p.play_mode == d.play_mode &&
+           p.arp_rate == d.arp_rate;
 }
 
 void writeRecorded(JsonObject obj, const ChordParams& p) {
@@ -38,6 +40,8 @@ void writeRecorded(JsonObject obj, const ChordParams& p) {
     arr.add(static_cast<int>(p.inversion));
     arr.add(static_cast<int>(p.arp_mode));
     arr.add(p.pattern);
+    arr.add(static_cast<int>(p.play_mode));
+    arr.add(static_cast<int>(p.arp_rate));
 }
 
 void readRecorded(JsonVariant v, ChordParams& p) {
@@ -99,6 +103,14 @@ void readRecorded(JsonVariant v, ChordParams& p) {
             case SequenceSetting::Pattern:
                 p.pattern = static_cast<uint8_t>(clamp<int>(
                     value, 0, MAX_CHORD_PATTERNS - 1));
+                break;
+            case SequenceSetting::PlayMode:
+                p.play_mode = static_cast<PlayMode>(clamp<int>(
+                    value, 0, static_cast<int>(PlayMode::COUNT) - 1));
+                break;
+            case SequenceSetting::ArpRate:
+                p.arp_rate = static_cast<ArpRate>(clamp<int>(
+                    value, 0, static_cast<int>(ArpRate::COUNT) - 1));
                 break;
             default:
                 break;
@@ -247,8 +259,11 @@ ChordParams Sequence::mergedParams(const ChordParams& live,
             out.arp_mode = recorded.arp_mode;
         if (useRecorded(SequenceSetting::Pattern))
             out.pattern = recorded.pattern;
+        if (useRecorded(SequenceSetting::PlayMode))
+            out.play_mode = recorded.play_mode;
+        if (useRecorded(SequenceSetting::ArpRate))
+            out.arp_rate = recorded.arp_rate;
     }
-    out.play_mode = PlayMode::Held;
     return out;
 }
 

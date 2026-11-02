@@ -5,10 +5,10 @@
 // sounding must not alter the currently-held notes; it applies on next trigger.
 
 TEST_F(ChordEngineTest, HeldChordSustainsAfterRelease) {
-    engine_->handleKeyEvent(key(0x17, true), 0);   // T = C major
+    press(0x17, 0);   // T = C major
     EXPECT_EQ(midi_.noteOnCount(), 3);
 
-    engine_->handleKeyEvent(key(0x17, false), 0);  // release T
+    release(0x17, 0);  // release T
     // Held mode: chord keeps sounding, no note-offs.
     EXPECT_EQ(midi_.noteOnCount(), 3);
     EXPECT_EQ(midi_.noteOffCount(), 0);
@@ -18,7 +18,7 @@ TEST_F(ChordEngineTest, HeldChordSustainsAfterRelease) {
 }
 
 TEST_F(ChordEngineTest, HeldChordLocksVelocity) {
-    engine_->handleKeyEvent(key(0x17, true), 0);   // T = C major, vel 100
+    press(0x17, 0);   // T = C major, vel 100
     EXPECT_EQ(midi_.noteOnCount(), 3);
     int msgCount = static_cast<int>(midi_.messages().size());
 
@@ -28,8 +28,8 @@ TEST_F(ChordEngineTest, HeldChordLocksVelocity) {
     EXPECT_TRUE(state_.isNoteActive(1, 60));
 
     // New chord press uses the edited velocity (release T first: Held sustains).
-    engine_->handleKeyEvent(key(0x17, false), 0);  // release T
-    engine_->handleKeyEvent(key(0x1C, true), 0);   // Y = G major
+    release(0x17, 0);  // release T
+    press(0x1C, 0);   // Y = G major
     // 3 note-offs (old C) + 3 note-ons (new G, vel 50).
     EXPECT_EQ(midi_.noteOffCount(), 3);
     EXPECT_EQ(midi_.noteOnCount(), 6);
@@ -43,7 +43,7 @@ TEST_F(ChordEngineTest, HeldChordLocksVelocity) {
 }
 
 TEST_F(ChordEngineTest, HeldChordLocksOctave) {
-    engine_->handleKeyEvent(key(0x17, true), 0);   // C major = {60,64,67}
+    press(0x17, 0);   // C major = {60,64,67}
     auto first = noteOnNotes();
     ASSERT_EQ(first, (std::vector<uint8_t>{60, 64, 67}));
 
@@ -54,8 +54,8 @@ TEST_F(ChordEngineTest, HeldChordLocksOctave) {
     EXPECT_EQ(midi_.noteOnCount(), 3);  // unchanged
 
     // Next chord is transposed by the new octave (release T first).
-    engine_->handleKeyEvent(key(0x17, false), 0);  // release T
-    engine_->handleKeyEvent(key(0x17, true), 0);   // C major at octave +1 = {72,76,79}
+    release(0x17, 0);  // release T
+    press(0x17, 0);   // C major at octave +1 = {72,76,79}
     EXPECT_EQ(state_.activeChord.octave, 1);
     bool has72 = false;
     for (const auto& m : midi_.messages()) {
@@ -66,7 +66,7 @@ TEST_F(ChordEngineTest, HeldChordLocksOctave) {
 }
 
 TEST_F(ChordEngineTest, HeldChordLocksInversion) {
-    engine_->handleKeyEvent(key(0x17, true), 0);   // C major = {60,64,67}
+    press(0x17, 0);   // C major = {60,64,67}
     EXPECT_EQ(noteOnNotes(), (std::vector<uint8_t>{60, 64, 67}));
 
     // Inversion edit (PrtSc) — pending only, sounding chord unchanged.

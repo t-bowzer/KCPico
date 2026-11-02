@@ -12,8 +12,9 @@ out a DIN-5 connector — no computer required.
   and voicing modes (root / smart / down / up).
 - **Play modes** — Held, Press-to-play, Arpeggio, **Arp-hold** (latched
   arpeggio), **Pattern**/**Pattern-hold** (user chord patterns, below), and
-  Silent, with 5 arpeggio patterns (up / down / up-down / alternating / random)
-  and chord roll.
+  Silent, with 5 arpeggio patterns (up / down / up-down / alternating / random),
+  selectable arp rates (whole through 32nd notes), a 30 ms early-start
+  quantization window, and chord roll.
 - **Strum plate** — top-row number keys + numpad, with follow-chord / scale /
   piano note pools. Per preset, the top row can instead become **macro keys**.
 - **Macros** — each preset can map the top-row keys `1`–`0` to named, ordered
@@ -22,8 +23,9 @@ out a DIN-5 connector — no computer required.
 - **Chord patterns** — 9 built-in polyphonic patterns (Block, Alberti, Pulse,
   …) played in lockstep with the rhythm, all editable as JSON (`/chordpatterns/`).
 - **Chord sequencer** — record and loop chord changes per preset: 10 sequence
-  slots, 1/2/4/8-bar loops, 64 events each, recorded/live chord settings, and a
-  full configurator editor (`/sequences/`).
+  slots, 1/2/4/8-bar loops, 64 events each, recorded/live chord settings
+  (including play mode and arp rate), and a full configurator editor
+  (`/sequences/`).
 - **Rhythm engine** — 12 built-in drum patterns (Rock, Waltz, Swing, Bossa Nova,
   …) plus user-loadable patterns, tempo, swing, mute, MIDI clock out, and a
   keyboard-LED beat indicator.
@@ -91,15 +93,17 @@ On first boot the firmware self-provisions its config, presets, and rhythms.
   plate. By default the top-row number keys also strum; a preset can switch them
   to macro keys instead.
 - `F1`–`F8` are quick settings; `F9`–`F12` open the Chord/Strum/Rhythm/Bass
-  menus. `Home`/`End` browse presets, `Insert`→`Enter` saves, `Space` is tap
+  menus. `F8` toggles MIDI clock out; double-tap it to resync the external
+  clock. `Home`/`End` browse presets, `Insert`→`Enter` saves, `Space` is tap
   tempo, `Super`+`Esc` is panic.
 - `Ctrl`+`Esc` shows the firmware version and current git commit (any key
   dismisses the debug screen).
 - `Ctrl`+`1`…`Ctrl`+`0` select one of the preset's 10 sequence slots;
   `Ctrl`+`F9` arms/stops recording, `Ctrl`+`F10` arms/stops playback, and
   `Ctrl`+`F11` clears the selected sequence. `Super`+`F12` opens the Seq Edit
-  menu (slot / bars / settings). Recording and playback require rhythm to be
-  enabled (it may be muted). Arming record mutes the normal pattern, stays
+  menu (slot / bars / settings). If rhythm is off, recording and playback enable
+  it automatically and mute the drums. Recording over an existing sequence
+  prompts for confirmation. Arming record mutes the normal pattern, stays
   silent until the next bar, then plays exactly one bar of quarter-note closed
   hi-hats before recording; the hi-hats continue through the take.
 - The keyboard's **Volume +/−** keys are fixed controls: on the main screen they

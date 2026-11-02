@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 from ..io.storage import ConfigTree
 from ..models.enums import (
     ArpMode,
+    ArpRate,
     InversionMode,
     PlayMode,
     ScaleType,
@@ -125,6 +126,8 @@ class PresetsEditor(QWidget):
         self.chord_inversion = enum_combo(PARAM_SPECS["chord_inversion"].values,
                                           InversionMode.ROOT)
         self.chord_arp = enum_combo(PARAM_SPECS["arp_mode"].values, ArpMode.UP)
+        self.chord_arp_rate = enum_combo(PARAM_SPECS["arp_rate"].values,
+                                         ArpRate.SIXTEENTH)
         self.chord_pattern = QComboBox()
         self.chord_channel = int_spin(1, 16, 1, 1)
         rows = [
@@ -135,6 +138,7 @@ class PresetsEditor(QWidget):
             ("Min notes", self.chord_min_notes),
             ("Min interval", self.chord_min_interval),
             ("Inversion", self.chord_inversion), ("Arp pattern", self.chord_arp),
+            ("Arp rate", self.chord_arp_rate),
             ("Pattern", self.chord_pattern), ("Channel", self.chord_channel),
         ]
         for label, widget in rows:
@@ -347,6 +351,7 @@ class PresetsEditor(QWidget):
             self.chord_min_interval.setValue(slot.chord.min_interval)
             self._set_combo_data(self.chord_inversion, int(slot.chord.inversion))
             self._set_combo_data(self.chord_arp, int(slot.chord.arp_mode))
+            self._set_combo_data(self.chord_arp_rate, int(slot.chord.arp_rate))
             self._set_combo_text(self.chord_pattern, slot.chord.pattern)
             self.chord_channel.setValue(slot.chord.channel)
 
@@ -411,6 +416,7 @@ class PresetsEditor(QWidget):
         slot.chord.min_interval = self.chord_min_interval.value()
         slot.chord.inversion = InversionMode(self.chord_inversion.currentData())
         slot.chord.arp_mode = ArpMode(self.chord_arp.currentData())
+        slot.chord.arp_rate = ArpRate(self.chord_arp_rate.currentData())
         slot.chord.pattern = self.chord_pattern.currentText()
         slot.chord.channel = self.chord_channel.value()
 

@@ -39,6 +39,19 @@ enum class ArpMode : uint8_t {
     COUNT
 };
 
+// Arpeggiator note subdivision. Whole = 4 beats, Half = 2, Quarter = 1,
+// Eighth = 1/2, Sixteenth = 1/4, ThirtySecond = 1/8. Default Sixteenth keeps
+// the original arp timing.
+enum class ArpRate : uint8_t {
+    Whole = 0,
+    Half,
+    Quarter,
+    Eighth,
+    Sixteenth,
+    ThirtySecond,
+    COUNT
+};
+
 // Strum note-pool source (Upgrade-Plan "Strum engine upgrades").
 enum class StrumMode : uint8_t {
     FollowChord = 0,   // default: active chord's pitch classes
@@ -96,6 +109,7 @@ enum class ParamId : uint8_t {
     ChordMinInterval,
     ChordInversion,
     ChordArpMode,
+    ChordArpRate,
     ChordPattern,
     // Strum
     StrumOctave,
@@ -167,6 +181,7 @@ struct ChordParams {
     uint8_t       min_interval     = 0;    // min semitones between adjacent notes (0 = off)
     InversionMode inversion        = InversionMode::Root;
     ArpMode       arp_mode         = ArpMode::Up;
+    ArpRate       arp_rate         = ArpRate::Sixteenth;
     uint8_t       pattern          = 0;    // index into the chord pattern list
     uint8_t       channel          = 1;
 

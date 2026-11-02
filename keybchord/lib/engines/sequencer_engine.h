@@ -47,9 +47,12 @@ public:
         onLiveChord(chord, now_us);
     }
 
-    // True while the clear confirmation prompt is active. The main loop gates
-    // other sequence controls while this is set.
-    bool clearPromptActive() const { return clearPrompt_; }
+    // Confirmation prompts. While either is active, sequence controls are
+    // routed to the prompt (Enter/Mute confirms, Backspace/Esc cancels).
+    bool clearPromptActive() const { return prompt_ == PromptKind::Clear; }
+    bool overwritePromptActive() const {
+        return prompt_ == PromptKind::Overwrite;
+    }
     bool armed() const { return armed_; }
     bool recording() const { return recording_; }
     bool playing() const { return playing_; }
@@ -68,7 +71,8 @@ private:
     KeymapResolver  keymap_;
 
     int bank_ = 0;
-    int seqSlot_ = 0;
+    int seqSlot_ = 0;   // user-selected slot (takes effect immediately)
+    int playSlot_ = 0;  // slot currently looping; switches at the loop boundary
     int presetSlot_ = 0;
     uint8_t bars_ = SEQUENCE_DEFAULT_BARS;
     SequencerLibrary lib_;
@@ -92,17 +96,22 @@ private:
     uint32_t playStartAbs_ = 0;
     uint32_t lastProcessedAbs_ = 0;
 
-    bool     clearPrompt_ = false;
-    uint64_t clearDeadlineUs_ = 0;
+    enum class PromptKind : uint8_t { None, Clear, Overwrite };
+    PromptKind prompt_ = PromptKind::None;
+    uint64_t   promptDeadlineUs_ = 0;
 
     Sequence& selected();
     const Sequence& selected() const;
+    Sequence& playingSequence();
+    const Sequence& playingSequence() const;
 
     void syncFromState(uint64_t now_us);
     void selectSlot(int slot, uint64_t now_us);
     void setBars(int bars, uint64_t now_us);
 
     void planCountIn(uint32_t stepAbs);
+    void enableRhythmMuted();
+    void startRecordArm(uint64_t now_us);
     void armRecord(uint64_t now_us);
     void armPlay(uint64_t now_us);
     void toggleRecord(uint64_t now_us);
@@ -117,8 +126,10 @@ private:
 
     void beginClearPrompt(uint64_t now_us);
     void confirmClear(uint64_t now_us);
-    void cancelClearPrompt();
-    bool handleClearPrompt(const KeyEvent& ev, uint64_t now_us);
+    void beginOverwritePrompt(uint64_t now_us);
+    void confirmOverwrite(uint64_t now_us);
+    void cancelPrompt();
+    bool handlePrompt(const KeyEvent& ev, uint64_t now_us);
 
     void showStatus(const std::string& line1, const std::string& line2,
                     uint64_t now_us);

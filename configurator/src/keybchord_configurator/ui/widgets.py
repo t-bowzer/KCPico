@@ -23,8 +23,10 @@ def enum_combo(labels: dict[str, int], current: int,
                placeholder: Optional[str] = None) -> QComboBox:
     combo = QComboBox()
     for label, value in labels.items():
-        combo.addItem(label, value)
-    idx = combo.findData(current)
+        # Coerce to plain int: PySide may otherwise keep an IntEnum in the
+        # QVariant, and findData(int(...)) then fails to match on reload.
+        combo.addItem(label, int(value))
+    idx = combo.findData(int(current))
     if idx >= 0:
         combo.setCurrentIndex(idx)
     if placeholder is not None:

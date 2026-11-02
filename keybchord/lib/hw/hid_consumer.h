@@ -210,6 +210,57 @@ public:
         return true;
     }
 
+    // Descriptor-independent fallback for Consumer reports when HID_INFO was
+    // missed or the report did not match the descriptor. Handles the common
+    // forms:
+    //   1 byte : bare 8-bit usage (no report ID)
+    //   2 bytes: report ID + 8-bit usage, or a no-ID 16-bit usage whose high
+    //            byte is zero (the usual media-key usages, 0x01..0x2A0)
+    //   3 bytes: report ID + 16-bit usage (QMK-style)
+    // Only Consumer-page-range usages are emitted.
+    bool applyConsumerFallback(const uint8_t* report, uint16_t length,
+                               uint64_t received_us, std::vector<KeyEvent>& out) {
+        if (!report || length == 0 || length > 3) return false;
+
+        uint8_t id = 0;
+        uint16_t usage = 0;
+        if (length == 1) {
+            usage = report[0];
+        } else if (length == 2) {
+            if (report[1] == 0 && report[0] > 0x1F) {
+                // Looks like a no-ID 16-bit usage: {usageL, 0x00}.
+                usage = report[0];
+            } else {
+                id = report[0];
+                usage = report[1];
+            }
+        } else {
+            id = report[0];
+            usage = static_cast<uint16_t>(report[1]) |
+                    (static_cast<uint16_t>(report[2]) << 8);
+        }
+        if (usage > 0x2A0) return false;
+
+        std::vector<uint16_t> current;
+        addUnique(current, usage);
+
+        std::vector<uint16_t>& prev = prevFor(prev_, id);
+        for (uint16_t u : current) {
+            if (!contains(prev, u)) {
+                out.push_back({u, true, 0, received_us,
+                               hid_usage::PAGE_CONSUMER});
+            }
+        }
+        for (uint16_t u : prev) {
+            if (!contains(current, u)) {
+                out.push_back({u, false, 0, received_us,
+                               hid_usage::PAGE_CONSUMER});
+            }
+        }
+        prev = current;
+        return true;
+    }
+
     bool apply(const uint8_t* report, uint16_t length, uint64_t received_us,
                std::vector<KeyEvent>& out) {
         if (!report || length == 0 || fields_.empty()) return false;

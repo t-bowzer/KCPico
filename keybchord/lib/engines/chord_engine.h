@@ -15,6 +15,15 @@ class MidiRouter;
 
 class ChordEngine {
 public:
+    // Chord-key press grouping window (microseconds). Exposed for tests and
+    // documentation; USB reports arrive every ~8-10 ms.
+    static constexpr uint64_t PRESS_GROUP_US = 15000;
+
+    // If an arpeggiated chord starts this close before the next arp step
+    // boundary, defer its first note to the boundary instead of playing it
+    // immediately and then again a few milliseconds later.
+    static constexpr uint64_t ARP_EARLY_QUANTIZE_US = 30000;
+
     ChordEngine(StateManager& state, MidiRouter& router);
 
     void handleKeyEvent(const KeyEvent& ev, uint64_t now_us);
@@ -58,9 +67,10 @@ public:
     // True while the chord currently sounding came from sequencer playback.
     bool sequenceChordSounding() const { return sequenceActive_ && sounding_; }
 
-    // Sequencer playback: sound `chord` with an explicit parameter snapshot
-    // (play mode is forced to Held) without changing the live pending params
-    // or the strum note pool. Stops any previous sequence chord first.
+    // Sequencer playback: sound `chord` with an explicit parameter snapshot,
+    // honoring its play mode (Held/Arp/Pattern/etc.), without changing the live
+    // pending params. The sequence chord becomes state.selectedChord so the
+    // strum plate follows playback. Stops any previous sequence chord first.
     void playSequenceChord(const ResolvedChord& chord, const ChordParams& params,
                            uint64_t now_us);
 
@@ -99,6 +109,15 @@ private:
     bool releaseBufferPending_ = false;
     uint64_t releaseBufferDeadlineUs_ = 0;
 
+    // Press grouping: all chord-key presses within a short window are treated
+    // as one chord event, so a combination played a few milliseconds apart (or
+    // split across USB reports) sounds once instead of latching the first key's
+    // chord and then the combination.
+    bool pressBufferPending_ = false;
+    uint64_t pressBufferDeadlineUs_ = 0;
+    ResolvedChord pressBufferedChord_;
+    bool pressBufferedValid_ = false;
+
     // Set when a key press lands on an invalid combination while a Held chord is
     // latched. The pending switch re-resolves once the stale key(s) are released,
     // so an overlapped chord change (new key pressed before the old is lifted)
@@ -109,8 +128,9 @@ private:
     bool arpActive_ = false;
     std::vector<int> arpSeq_;    // index sequence for Up/Down/UpDown/Alternating
     size_t arpPos_ = 0;
-    uint64_t arpNext_us_ = 0;
-    uint32_t lastRhythmStep_ = 0;
+    uint64_t lastArpTickBucket_ = 0;   // rate-quantised master-clock position
+    bool     arpStartPending_ = false; // first note waits for the next boundary
+    uint64_t arpStartDeadlineUs_ = 0;
     uint32_t rngState_ = 0x12345678u;   // seeded LCG for Random mode
 
     // Chord-pattern state (spec 6.10).
@@ -131,6 +151,7 @@ private:
 
     void onPress(uint64_t now_us);
     void onRelease(uint64_t now_us);
+    void flushPressBuffer(uint64_t now_us);
     void resolveAndTriggerIfChanged(uint64_t now_us, bool force);
     void triggerChord(const ResolvedChord& chord, uint64_t now_us);
     void computeVoicing(const ResolvedChord& chord,
@@ -142,6 +163,8 @@ private:
     void stopSound();
 
     void beginArp(uint64_t now_us);
+    void playFirstArpNote(uint64_t now_us);
+    uint64_t nextArpBoundaryUs(uint32_t ticksPerStep) const;
     void stepArpeggio(uint64_t now_us);
     void scheduleRoll(const std::vector<uint8_t>& notes, uint64_t now_us);
     bool followRhythmClock() const;

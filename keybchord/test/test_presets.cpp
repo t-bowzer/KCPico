@@ -46,6 +46,7 @@ TEST(Presets, SaveAndLoadRoundTrip) {
     orig.strum.limited_keys = true;
     orig.rhythm.tempo = 140;
     orig.rhythm.swing = 50;
+    orig.seq_use_recorded = false;
 
     EXPECT_TRUE(savePreset(storage, 0, 3, orig));
 
@@ -57,6 +58,7 @@ TEST(Presets, SaveAndLoadRoundTrip) {
     EXPECT_TRUE(loaded.strum.limited_keys);
     EXPECT_EQ(loaded.rhythm.tempo, 140);
     EXPECT_EQ(loaded.rhythm.swing, 50);
+    EXPECT_FALSE(loaded.seq_use_recorded);
 }
 
 TEST(Presets, InvalidBankSlotReturnsDefault) {
@@ -83,6 +85,11 @@ TEST(Presets, SameParamsIgnoresName) {
 
     b.chord.channel = 16;
     EXPECT_FALSE(a.sameParams(b));
+
+    PresetSlot c = PresetSlot::defaults();
+    PresetSlot d = PresetSlot::defaults();
+    d.seq_use_recorded = false;
+    EXPECT_FALSE(c.sameParams(d));
 }
 
 TEST(Presets, MakePresetCopiesParams) {
@@ -262,6 +269,7 @@ TEST(Presets, ChordUpgradesRoundTrip) {
     orig.chord.min_interval = 4;
     orig.chord.inversion = InversionMode::Second;
     orig.chord.arp_mode = ArpMode::Random;
+    orig.chord.arp_rate = ArpRate::Eighth;
     EXPECT_TRUE(savePreset(storage, 4, 0, orig));
 
     PresetSlot loaded = loadPreset(storage, 4, 0);
@@ -270,6 +278,7 @@ TEST(Presets, ChordUpgradesRoundTrip) {
     EXPECT_EQ(loaded.chord.min_interval, 4);
     EXPECT_EQ(loaded.chord.inversion, InversionMode::Second);
     EXPECT_EQ(loaded.chord.arp_mode, ArpMode::Random);
+    EXPECT_EQ(loaded.chord.arp_rate, ArpRate::Eighth);
 }
 
 TEST(Presets, StrumModeRoundTrip) {

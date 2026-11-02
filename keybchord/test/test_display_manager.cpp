@@ -200,6 +200,19 @@ TEST_F(DisplayManagerTest, ShowInfoPersistsUntilCancelled) {
     EXPECT_EQ(lcd_.frames()[0].l1, pad("--" + sp(8) + "B1:P1"));
 }
 
+TEST_F(DisplayManagerTest, ShowTwoLinePromptUsesBothLines) {
+    DisplayManager dm(state_, lcd_);
+    dm.update(0);
+    lcd_.reset();
+
+    dm.showPrompt("Overwrite Seq in", "slot 1? Ent/Bk", 1000);
+    dm.update(1000);
+
+    ASSERT_EQ(lcd_.frames().size(), 1u);
+    EXPECT_EQ(lcd_.frames()[0].l1, pad("Overwrite Seq in"));
+    EXPECT_EQ(lcd_.frames()[0].l2, pad("slot 1? Ent/Bk"));
+}
+
 TEST_F(DisplayManagerTest, ShowPromptAndAutoCancel) {
     DisplayManager dm(state_, lcd_);
     dm.update(0);

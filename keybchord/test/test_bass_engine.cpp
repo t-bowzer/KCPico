@@ -198,6 +198,7 @@ TEST_F(BassEngineTest, HoldPatternTracksChord) {
     bass_->setChordEngine(&chord);
 
     chord.handleKeyEvent(KeyEvent{0x17, true, 0}, 0);  // T = C major (Held)
+    chord.update(ChordEngine::PRESS_GROUP_US);
     EXPECT_TRUE(chord.isSounding());
 
     bass_->update(0);
@@ -251,11 +252,13 @@ TEST_F(BassEngineTest, HoldFollowsNewChordWithoutReleasing) {
     bass_->setChordEngine(&chord);
 
     chord.handleKeyEvent(KeyEvent{0x17, true, 0}, 0);  // C major
+    chord.update(ChordEngine::PRESS_GROUP_US);
     bass_->update(0);
     EXPECT_EQ(lastNoteOn(3), 48);
 
     chord.handleKeyEvent(KeyEvent{0x1C, true, 0}, 0);   // Y = G major (overlap)
     chord.handleKeyEvent(KeyEvent{0x17, false, 0}, 0);  // release C
+    chord.update(ChordEngine::PRESS_GROUP_US);
     bass_->update(0);
     EXPECT_EQ(lastNoteOn(3), 55);     // follows the new root
     EXPECT_EQ(noteOffCount(3), 1);    // old root released

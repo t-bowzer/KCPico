@@ -75,6 +75,7 @@ from ..models.bounds import (
 )
 from ..models.enums import (
     ARP_MODE_BY_JSON,
+    ARP_RATE_BY_JSON,
     EDIT_MENU_BY_JSON,
     EDIT_MENU_JSON,
     INVERSION_BY_JSON,
@@ -83,6 +84,8 @@ from ..models.enums import (
     SCALE_TYPE_BY_JSON,
     STRUM_MODE_BY_JSON,
     VOICING_MODE_BY_JSON,
+    ArpRate,
+    PlayMode,
 )
 from ..models.keymap import (
     ACTION_TYPES,
@@ -661,6 +664,16 @@ def _validate_preset_slot(result: ValidationResult, where: str, slot: dict,
     if name is not None and not _is_str(name):
         result.add_error(f"{where}: 'name' must be a string")
 
+    seq_settings = slot.get("seq_settings")
+    if seq_settings is not None:
+        valid = (isinstance(seq_settings, bool)
+                 or (_is_str(seq_settings)
+                     and seq_settings in ("recorded", "live"))
+                 or _is_int(seq_settings))
+        if not valid:
+            result.add_error(
+                f"{where}: 'seq_settings' must be 'recorded' or 'live'")
+
     chord = slot.get("chord")
     if isinstance(chord, dict):
         _check_enum(result, f"{where}.chord", chord, "play_mode", PLAY_MODE_BY_JSON)
@@ -680,6 +693,7 @@ def _validate_preset_slot(result: ValidationResult, where: str, slot: dict,
                    CHORD_MIN_INTERVAL_MIN, CHORD_MIN_INTERVAL_MAX)
         _check_enum(result, f"{where}.chord", chord, "inversion", INVERSION_BY_JSON)
         _check_enum(result, f"{where}.chord", chord, "arp_mode", ARP_MODE_BY_JSON)
+        _check_enum(result, f"{where}.chord", chord, "arp_rate", ARP_RATE_BY_JSON)
         pattern = chord.get("pattern")
         if _is_str(pattern) and pattern not in chord_pattern_names:
             result.add_error(f"{where}.chord: pattern '{pattern}' does not match a "
@@ -920,6 +934,8 @@ def validate_chord_pattern(data: Any, *, filename: str = "") -> ValidationResult
 _SEQUENCE_RECORDED_RULES: tuple[tuple[int, int], ...] = (
     (-3, 3), (50, 4000), (1, 127), (0, 127), (0, 3),
     (-2000, 2000), (2, 6), (0, 12), (0, 3), (0, 4),
+    (0, MAX_CHORD_PATTERNS - 1), (0, len(PlayMode) - 1),
+    (0, len(ArpRate) - 1),
 )
 
 
@@ -964,20 +980,16 @@ def validate_sequence_file(data: Any, *, filename: str = "") -> ValidationResult
 
         recorded = slot.get("recorded")
         if recorded is not None:
-            if not isinstance(recorded, list) or len(recorded) != SEQUENCE_SETTING_COUNT:
+            if (not isinstance(recorded, list)
+                    or not 11 <= len(recorded) <= SEQUENCE_SETTING_COUNT):
                 result.add_error(f"{label}: 'recorded' must be an array of "
-                                 f"{SEQUENCE_SETTING_COUNT} integers")
+                                 f"11..{SEQUENCE_SETTING_COUNT} integers")
             else:
                 for i, value in enumerate(recorded):
                     if not _is_int(value):
                         result.add_error(f"{label}: recorded[{i}] must be an integer")
                         continue
-                    if i < len(_SEQUENCE_RECORDED_RULES):
-                        lo, hi = _SEQUENCE_RECORDED_RULES[i]
-                    elif i == 10:
-                        lo, hi = 0, MAX_CHORD_PATTERNS - 1
-                    else:
-                        lo, hi = 0, 0
+                    lo, hi = _SEQUENCE_RECORDED_RULES[i]
                     if value < lo or value > hi:
                         result.add_warning(f"{label}: recorded[{i}] = {value} out "
                                            f"of range [{lo}..{hi}] (will be clamped)")

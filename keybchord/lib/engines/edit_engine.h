@@ -44,6 +44,11 @@ public:
     // Sends a macro MIDI byte stream. Wired to the MIDI router in main.cpp.
     void setMidiSendCallback(std::function<void(const std::vector<uint8_t>&)> cb);
 
+    // Clock Resync callback: fired by an F8 double-tap (or any key bound to the
+    // rhythm Clock Out toggle). The rhythm engine arms MIDI Start at the next
+    // beat boundary.
+    void setClockResyncCallback(std::function<void()> cb);
+
     // Returns true if the event was consumed (edit/menu key); false if it
     // should be forwarded to the chord/strum engines.
     bool handleKeyEvent(const KeyEvent& ev, uint64_t now_us);
@@ -65,6 +70,7 @@ private:
     std::function<void(uint8_t)> drumAudition_;
     std::function<const RhythmPattern*(int)> patternProvider_;
     std::function<void(const std::vector<uint8_t>&)> midiSend_;
+    std::function<void()> clockResync_;
 
     struct PendingMidi {
         uint64_t dueUs = 0;
@@ -84,6 +90,11 @@ private:
     uint64_t repeatDeadlineUs_ = 0;
 
     uint64_t menuDeadlineUs_ = 0;
+
+    // F8 (or whatever key is bound to Clock Out) double-tap -> Clock Resync.
+    static constexpr uint64_t CLOCK_RESYNC_DOUBLE_TAP_US = 350000;
+    uint64_t lastClockKeyUs_ = 0;
+    bool     clockDoubleTapArmed_ = false;
 
     // Two-phase menu selection. The original value is captured on selection so
     // Backspace/Esc can cancel live edits (Enter/Mute keeps them).

@@ -119,6 +119,7 @@ const ParamName kParamNames[] = {
     {"chord_min_interval", ParamId::ChordMinInterval},
     {"chord_inversion", ParamId::ChordInversion},
     {"arp_mode", ParamId::ChordArpMode},
+    {"arp_rate", ParamId::ChordArpRate},
     {"chord_pattern", ParamId::ChordPattern},
     {"strum_octave", ParamId::StrumOctave},
     {"strum_duration", ParamId::StrumDuration},
@@ -171,6 +172,12 @@ const ValueName kInversionNames[] = {
 };
 const ValueName kArpNames[] = {
     {"up", 0}, {"down", 1}, {"up_down", 2}, {"alternating", 3}, {"random", 4},
+};
+const ValueName kArpRateNames[] = {
+    {"whole", 0}, {"half", 1}, {"quarter", 2}, {"eighth", 3},
+    {"sixteenth", 4}, {"thirty_second", 5},
+    {"1/1", 0}, {"1/2", 1}, {"1/4", 2}, {"1/8", 3}, {"1/16", 4}, {"1/32", 5},
+    {"16th", 4}, {"32nd", 5},
 };
 const ValueName kStrumModeNames[] = {
     {"chord", 0}, {"scale", 1}, {"piano", 2},
@@ -241,6 +248,10 @@ bool parseValue(ParamId id, const std::string& s, int& out) {
             return lookupValue(kInversionNames, 4, s, out);
         case ParamId::ChordArpMode:
             return lookupValue(kArpNames, 5, s, out);
+        case ParamId::ChordArpRate:
+            return lookupValue(kArpRateNames,
+                               sizeof(kArpRateNames) / sizeof(kArpRateNames[0]),
+                               s, out);
         case ParamId::StrumMode:
             return lookupValue(kStrumModeNames, 3, s, out);
         case ParamId::StrumScale:

@@ -361,3 +361,18 @@ TEST_F(KeymapConfigTest, ConsumerMuteIsReserved) {
     KeymapLoadResult r = KeymapConfig::load(storage_);
     EXPECT_FALSE(r.ok);
 }
+
+TEST(KeymapParamNames, ArpRateNamesAndValues) {
+    ParamId id = ParamId::COUNT;
+    ASSERT_TRUE(keymapLookupParamName("arp_rate", id));
+    EXPECT_EQ(id, ParamId::ChordArpRate);
+    EXPECT_STREQ(keymapParamName(id), "arp_rate");
+
+    int value = -1;
+    ASSERT_TRUE(keymapParseParamValue(id, "quarter", value));
+    EXPECT_EQ(value, static_cast<int>(ArpRate::Quarter));
+    ASSERT_TRUE(keymapParseParamValue(id, "1/32", value));
+    EXPECT_EQ(value, static_cast<int>(ArpRate::ThirtySecond));
+    ASSERT_TRUE(keymapParseParamValue(id, "16th", value));
+    EXPECT_EQ(value, static_cast<int>(ArpRate::Sixteenth));
+}

@@ -14,7 +14,7 @@ TEST(ParamEdit, MenuTitles) {
 }
 
 TEST(ParamEdit, MenuParamLists) {
-    EXPECT_EQ(menuParamCount(EditMenu::Chord), 12);
+    EXPECT_EQ(menuParamCount(EditMenu::Chord), 13);
     EXPECT_EQ(menuParamCount(EditMenu::Strum), 7);
     EXPECT_EQ(menuParamCount(EditMenu::Rhythm), 7);
     EXPECT_EQ(menuParamCount(EditMenu::Bass), 6);
@@ -24,7 +24,8 @@ TEST(ParamEdit, MenuParamLists) {
     EXPECT_EQ(menuParamAt(EditMenu::Chord, 1), ParamId::ChordMode);
     EXPECT_EQ(menuParamAt(EditMenu::Chord, 6), ParamId::ChordRoll);
     EXPECT_EQ(menuParamAt(EditMenu::Chord, 10), ParamId::ChordArpMode);
-    EXPECT_EQ(menuParamAt(EditMenu::Chord, 11), ParamId::ChordPattern);
+    EXPECT_EQ(menuParamAt(EditMenu::Chord, 11), ParamId::ChordArpRate);
+    EXPECT_EQ(menuParamAt(EditMenu::Chord, 12), ParamId::ChordPattern);
 
     EXPECT_EQ(menuParamAt(EditMenu::Strum, 0), ParamId::StrumOctave);
     EXPECT_EQ(menuParamAt(EditMenu::Strum, 4), ParamId::StrumMode);
@@ -35,7 +36,7 @@ TEST(ParamEdit, MenuParamLists) {
     EXPECT_EQ(menuParamAt(EditMenu::Bass, 0), ParamId::BassEnable);
 
     // Out of range -> COUNT.
-    EXPECT_EQ(menuParamAt(EditMenu::Chord, 12), ParamId::COUNT);
+    EXPECT_EQ(menuParamAt(EditMenu::Chord, 13), ParamId::COUNT);
     EXPECT_EQ(menuParamAt(EditMenu::Strum, 7), ParamId::COUNT);
     EXPECT_EQ(menuParamAt(EditMenu::None, 0), ParamId::COUNT);
 }
@@ -65,6 +66,7 @@ TEST(ParamEdit, ValueStrings) {
     EXPECT_EQ(paramValueString(s, ParamId::ChordMinInterval), "Off");
     EXPECT_EQ(paramValueString(s, ParamId::ChordInversion), "Root");
     EXPECT_EQ(paramValueString(s, ParamId::ChordArpMode), "Up");
+    EXPECT_EQ(paramValueString(s, ParamId::ChordArpRate), "1/16");
     EXPECT_EQ(paramValueString(s, ParamId::StrumOctave), "+1");
     EXPECT_EQ(paramValueString(s, ParamId::StrumDuration), "300");
     EXPECT_EQ(paramValueString(s, ParamId::StrumLayout), "Full");
@@ -137,6 +139,8 @@ TEST(ParamEdit, StepEnumCyclesBySign) {
 
     paramStep(s, ParamId::ChordArpMode, +1);
     EXPECT_EQ(s.pendingChord.arp_mode, ArpMode::Down);
+    paramStep(s, ParamId::ChordArpRate, +1);
+    EXPECT_EQ(s.pendingChord.arp_rate, ArpRate::ThirtySecond);
     paramStep(s, ParamId::StrumMode, +1);
     EXPECT_EQ(s.pendingStrum.mode, StrumMode::Scale);
 }

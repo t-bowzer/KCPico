@@ -27,8 +27,9 @@ constexpr uint8_t SEQUENCE_DEFAULT_STEPS  = 16;
 
 // Recorded chord settings are stored in this fixed order as a compact JSON
 // array. `live_mask` bit i means "use the live value for setting i" during
-// playback; bit clear means "use the recorded snapshot". Play mode and MIDI
-// channel are never captured (playback always forces Held; channel stays live).
+// playback; bit clear means "use the recorded snapshot". MIDI channel is never
+// captured (it stays live). Play mode and arp rate are captured so sequence
+// playback can reproduce arpeggios and patterns.
 enum class SequenceSetting : uint8_t {
     Octave = 0,
     NoteDuration,
@@ -41,6 +42,8 @@ enum class SequenceSetting : uint8_t {
     Inversion,
     ArpMode,
     Pattern,
+    PlayMode,
+    ArpRate,
     COUNT
 };
 
@@ -83,7 +86,7 @@ struct Sequence {
     // Builds the chord parameters used for playback. Starts from `live` (the
     // current pending chord params) and, when `use_recorded` is true, replaces
     // every setting whose live bit is clear with the recorded snapshot.
-    // Play mode is forced to Held; the channel is always live.
+    // The MIDI channel is always live.
     ChordParams mergedParams(const ChordParams& live, bool use_recorded) const;
 };
 

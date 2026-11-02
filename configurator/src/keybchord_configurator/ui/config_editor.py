@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..models.config import AppConfig
-from ..models.enums import LedTarget, LED_TARGET_BY_JSON, LED_TARGET_JSON
+from ..models.enums import LedTarget
 from .widgets import bool_check, enum_combo, int_spin
 
 
@@ -62,9 +62,10 @@ class ConfigEditor(QWidget):
         led_form = QFormLayout(led_group)
         self.bpm_indicator = bool_check(True, "BPM indicator")
         self.led_target = enum_combo(
-            {"All": LedTarget.ALL, "Caps Lock": LedTarget.CAPS_LOCK,
-             "Num Lock": LedTarget.NUM_LOCK, "Scroll Lock": LedTarget.SCROLL_LOCK},
-            LedTarget.NUM_LOCK,
+            {"All": int(LedTarget.ALL), "Caps Lock": int(LedTarget.CAPS_LOCK),
+             "Num Lock": int(LedTarget.NUM_LOCK),
+             "Scroll Lock": int(LedTarget.SCROLL_LOCK)},
+            int(LedTarget.NUM_LOCK),
         )
         self.led_flash_ms = int_spin(5, 500, 5, 40)
         led_form.addRow(self.bpm_indicator)

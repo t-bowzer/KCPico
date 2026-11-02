@@ -14,7 +14,8 @@ const ParamId kChordParams[] = {
     ParamId::ChordOctave, ParamId::ChordMode, ParamId::ChordVoicing,
     ParamId::ChordDuration, ParamId::ChordVelocity, ParamId::ChordPan,
     ParamId::ChordRoll, ParamId::ChordMinNotes, ParamId::ChordMinInterval,
-    ParamId::ChordInversion, ParamId::ChordArpMode, ParamId::ChordPattern,
+    ParamId::ChordInversion, ParamId::ChordArpMode, ParamId::ChordArpRate,
+    ParamId::ChordPattern,
 };
 
 const ParamId kStrumParams[] = {
@@ -60,7 +61,8 @@ const char* const kTitles[] = {
 
 const char* const kShortName[] = {
     "Octave", "Mode", "Voicing", "Duration", "Velocity", "Pan",
-    "Roll", "Min Notes", "Min Interval", "Inversion", "Arp Mode", "Pattern",
+    "Roll", "Min Notes", "Min Interval", "Inversion", "Arp Mode", "Arp Rate",
+    "Pattern",
     "Octave", "Duration", "Velocity", "Layout", "Mode", "Root", "Scale",
     "Tempo", "Swing", "Pattern", "Mute", "Rhythm", "Clock", "Beat LED", "USB MIDI",
     "Enable", "Octave", "Duration", "Velocity", "Channel", "Pattern",
@@ -77,7 +79,7 @@ const char* const kShortName[] = {
 const char* const kFullName[] = {
     "Chord Octave", "Chord Mode", "Voicing", "Chord Duration", "Chord Velocity",
     "Chord Pan", "Chord Roll", "Min Notes", "Min Interval", "Inversion", "Arp Mode",
-    "Chord Pattern",
+    "Arp Rate", "Chord Pattern",
     "Strum Octave", "Strum Duration", "Strum Velocity", "Strum Layout",
     "Strum Mode", "Strum Root", "Strum Scale",
     "Rhythm Tempo", "Rhythm Swing", "Rhythm Pattern", "Rhythm Mute",
@@ -130,6 +132,17 @@ const char* arpModeShort(ArpMode m) {
         case ArpMode::Alternating: return "Alt";
         case ArpMode::Random:      return "Random";
         default:                   return "Up";
+    }
+}
+
+const char* arpRateShort(ArpRate r) {
+    switch (r) {
+        case ArpRate::Whole:        return "1/1";
+        case ArpRate::Half:         return "1/2";
+        case ArpRate::Quarter:      return "1/4";
+        case ArpRate::Eighth:       return "1/8";
+        case ArpRate::ThirtySecond: return "1/32";
+        default:                    return "1/16";
     }
 }
 
@@ -220,6 +233,7 @@ std::string paramValueString(const StateManager& state, ParamId id) {
                        ? "Off" : std::to_string(state.pendingChord.min_interval);
         case ParamId::ChordInversion: return inversionShort(state.pendingChord.inversion);
         case ParamId::ChordArpMode:   return arpModeShort(state.pendingChord.arp_mode);
+        case ParamId::ChordArpRate:   return arpRateShort(state.pendingChord.arp_rate);
         case ParamId::ChordPattern:   return chordPatternName(state.pendingChord.pattern);
 
         case ParamId::StrumOctave:   return signedInt(state.pendingStrum.octave);
@@ -342,6 +356,11 @@ void paramStep(StateManager& state, ParamId id, int delta) {
             state.pendingChord.arp_mode = static_cast<ArpMode>(
                 cycleEnum(static_cast<int>(state.pendingChord.arp_mode),
                           static_cast<int>(ArpMode::COUNT), dir));
+            break;
+        case ParamId::ChordArpRate:
+            state.pendingChord.arp_rate = static_cast<ArpRate>(
+                cycleEnum(static_cast<int>(state.pendingChord.arp_rate),
+                          static_cast<int>(ArpRate::COUNT), dir));
             break;
         case ParamId::ChordPattern:
             state.pendingChord.pattern = static_cast<uint8_t>(cycleEnum(
@@ -569,6 +588,11 @@ void paramCycle(StateManager& state, ParamId id) {
                 cycleEnum(static_cast<int>(state.pendingChord.arp_mode),
                           static_cast<int>(ArpMode::COUNT), 1));
             break;
+        case ParamId::ChordArpRate:
+            state.pendingChord.arp_rate = static_cast<ArpRate>(
+                cycleEnum(static_cast<int>(state.pendingChord.arp_rate),
+                          static_cast<int>(ArpRate::COUNT), 1));
+            break;
         case ParamId::StrumLayout: state.pendingStrum.limited_keys = !state.pendingStrum.limited_keys; break;
         case ParamId::StrumMode:
             state.pendingStrum.mode = static_cast<StrumMode>(
@@ -655,6 +679,7 @@ int paramValueInt(const StateManager& s, ParamId id) {
         case ParamId::ChordMinInterval: return s.pendingChord.min_interval;
         case ParamId::ChordInversion:   return static_cast<int>(s.pendingChord.inversion);
         case ParamId::ChordArpMode:     return static_cast<int>(s.pendingChord.arp_mode);
+        case ParamId::ChordArpRate:     return static_cast<int>(s.pendingChord.arp_rate);
         case ParamId::ChordPattern:     return static_cast<int>(s.pendingChord.pattern);
         case ParamId::StrumOctave:      return s.pendingStrum.octave;
         case ParamId::StrumDuration:    return s.pendingStrum.note_duration_ms;
@@ -755,6 +780,10 @@ void paramSet(StateManager& state, ParamId id, int value) {
         case ParamId::ChordArpMode:
             state.pendingChord.arp_mode = static_cast<ArpMode>(clamp<int>(
                 value, 0, static_cast<int>(ArpMode::COUNT) - 1));
+            break;
+        case ParamId::ChordArpRate:
+            state.pendingChord.arp_rate = static_cast<ArpRate>(clamp<int>(
+                value, 0, static_cast<int>(ArpRate::COUNT) - 1));
             break;
         case ParamId::ChordPattern:
             state.pendingChord.pattern = static_cast<uint8_t>(clamp<int>(

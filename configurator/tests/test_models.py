@@ -30,10 +30,29 @@ def test_appconfig_defaults_roundtrip():
     assert AppConfig.from_dict(data).to_dict() == data
 
 
+def test_appconfig_led_target_roundtrip():
+    from keybchord_configurator.models.enums import LedTarget
+
+    for target in LedTarget:
+        cfg = AppConfig.defaults()
+        cfg.led_indicator = target
+        assert AppConfig.from_dict(cfg.to_dict()).led_indicator == target
+
+
 def test_appconfig_inverted_note_range_is_swapped():
     cfg = AppConfig.from_dict({"chord": {"note_range": [84, 48]}})
     assert cfg.note_range_low == 48
     assert cfg.note_range_high == 84
+
+
+def test_preset_seq_settings_roundtrip():
+    slot = PresetSlot.defaults()
+    assert slot.seq_use_recorded is True
+    assert slot.to_dict()["seq_settings"] == "recorded"
+
+    slot.seq_use_recorded = False
+    loaded = PresetSlot.from_dict(slot.to_dict())
+    assert loaded.seq_use_recorded is False
 
 
 def test_preset_defaults_match_schema():
@@ -42,6 +61,7 @@ def test_preset_defaults_match_schema():
     assert data["name"] == "Default"
     assert data["chord"]["play_mode"] == "held"
     assert data["chord"]["voicing_mode"] == "root_position"
+    assert data["chord"]["arp_rate"] == "sixteenth"
     assert data["strum"]["mode"] == "follow_chord"
     assert data["bass"]["pattern"] == "Walking"
     assert data["rhythm"]["pattern"] == "Rock 1"
@@ -49,6 +69,15 @@ def test_preset_defaults_match_schema():
         *[k for k, _l, _d in DRUM_PIECES],
         *[k + "_vel" for k, _l, _d in DRUM_PIECES],
     }
+
+
+def test_preset_arp_rate_roundtrip():
+    from keybchord_configurator.models.enums import ArpRate
+
+    slot = PresetSlot.defaults()
+    slot.chord.arp_rate = ArpRate.EIGHTH
+    loaded = PresetSlot.from_dict(slot.to_dict())
+    assert loaded.chord.arp_rate == ArpRate.EIGHTH
 
 
 def test_preset_partial_falls_back_to_defaults():
@@ -296,6 +325,34 @@ def test_sequence_roundtrip_and_limits():
     for i in range(MAX_SEQUENCE_EVENTS):
         assert full.set_event(i, SequenceEvent(step=i))
     assert not full.set_event(64, SequenceEvent(step=64))
+
+
+def test_sequence_recorded_play_mode_and_arp_rate_roundtrip():
+    from keybchord_configurator.models.enums import ArpRate, PlayMode
+    from keybchord_configurator.models.sequence import (
+        RecordedSettings, Sequence,
+    )
+
+    seq = Sequence(recorded=RecordedSettings(
+        velocity=88,
+        play_mode=PlayMode.ARP_HOLD,
+        arp_rate=ArpRate.EIGHTH,
+    ))
+    data = seq.to_dict()
+    recorded = data["recorded"]
+    assert len(recorded) == 13
+    assert recorded[11] == int(PlayMode.ARP_HOLD)
+    assert recorded[12] == int(ArpRate.EIGHTH)
+
+    loaded = Sequence.from_dict(data)
+    assert loaded.recorded.velocity == 88
+    assert loaded.recorded.play_mode == PlayMode.ARP_HOLD
+    assert loaded.recorded.arp_rate == ArpRate.EIGHTH
+
+    legacy = RecordedSettings.from_list(
+        [0, 500, 100, 64, 0, 0, 3, 0, 0, 0, 0])
+    assert legacy.play_mode == PlayMode.HELD
+    assert legacy.arp_rate == ArpRate.SIXTEENTH
 
 
 def test_sequence_clamps_bars_and_steps():

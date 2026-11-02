@@ -14,6 +14,7 @@ ChordParams ChordParams::defaults() {
     p.min_interval     = 0;
     p.inversion        = InversionMode::Root;
     p.arp_mode         = ArpMode::Up;
+    p.arp_rate         = ArpRate::Sixteenth;
     p.channel          = 1;
     return p;
 }

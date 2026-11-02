@@ -338,6 +338,17 @@ def test_sequence_validation_accepts_valid_file():
     assert result.ok(), result.errors
 
 
+def test_sequence_validation_accepts_new_recorded_settings():
+    data = {"version": 1, "sequences": [{
+        "bars": 1, "steps_per_bar": 16,
+        "recorded": [0, 500, 100, 64, 0, 0, 3, 0, 0, 2, 0, 2, 3],
+        "live": 0x1800,
+        "events": [[0, 0]],
+    }]}
+    result = validate_sequence_file(data, filename="b1p1.json")
+    assert result.ok(), result.errors
+
+
 def test_sequence_validation_rejects_bad_events_and_caps():
     data = {"sequences": [{
         "bars": 1, "steps_per_bar": 16,

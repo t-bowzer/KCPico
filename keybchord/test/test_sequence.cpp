@@ -76,6 +76,7 @@ TEST(Sequence, MergedParamsUsesRecordedAndLiveBits) {
     s.recorded.velocity = 42;
     s.recorded.voicing_mode = VoicingMode::Smart;
     s.recorded.play_mode = PlayMode::Arpeggio;
+    s.recorded.arp_rate = ArpRate::Eighth;
     s.recorded.channel = 9;
     s.live_mask = static_cast<uint16_t>(1u <<
         static_cast<int>(SequenceSetting::Velocity));
@@ -84,20 +85,29 @@ TEST(Sequence, MergedParamsUsesRecordedAndLiveBits) {
     live.octave = -1;
     live.velocity = 111;
     live.play_mode = PlayMode::Pattern;
+    live.arp_rate = ArpRate::ThirtySecond;
     live.channel = 3;
 
     ChordParams out = s.mergedParams(live, true);
-    EXPECT_EQ(out.octave, 2);                 // recorded
-    EXPECT_EQ(out.velocity, 111);             // live bit set
+    EXPECT_EQ(out.octave, 2);                    // recorded
+    EXPECT_EQ(out.velocity, 111);                // live bit set
     EXPECT_EQ(out.voicing_mode, VoicingMode::Smart);
-    EXPECT_EQ(out.play_mode, PlayMode::Held); // forced
-    EXPECT_EQ(out.channel, 3);                // always live
+    EXPECT_EQ(out.play_mode, PlayMode::Arpeggio); // recorded
+    EXPECT_EQ(out.arp_rate, ArpRate::Eighth);     // recorded
+    EXPECT_EQ(out.channel, 3);                   // always live
+
+    s.live_mask |= static_cast<uint16_t>(
+        1u << static_cast<int>(SequenceSetting::PlayMode));
+    ChordParams liveMode = s.mergedParams(live, true);
+    EXPECT_EQ(liveMode.play_mode, PlayMode::Pattern);  // live bit set
+    EXPECT_EQ(liveMode.arp_rate, ArpRate::Eighth);     // still recorded
 
     ChordParams allLive = s.mergedParams(live, false);
     EXPECT_EQ(allLive.octave, -1);
     EXPECT_EQ(allLive.velocity, 111);
     EXPECT_EQ(allLive.voicing_mode, live.voicing_mode);
-    EXPECT_EQ(allLive.play_mode, PlayMode::Held);
+    EXPECT_EQ(allLive.play_mode, PlayMode::Pattern);
+    EXPECT_EQ(allLive.arp_rate, ArpRate::ThirtySecond);
 }
 
 TEST(Sequence, ParseSerializeRoundTrip) {
@@ -107,9 +117,12 @@ TEST(Sequence, ParseSerializeRoundTrip) {
     lib.slots[1].recorded.octave = -2;
     lib.slots[1].recorded.velocity = 90;
     lib.slots[1].recorded.pattern = 3;
+    lib.slots[1].recorded.play_mode = PlayMode::ArpHold;
+    lib.slots[1].recorded.arp_rate = ArpRate::Eighth;
     lib.slots[1].live_mask = static_cast<uint16_t>(
         (1u << static_cast<int>(SequenceSetting::Pan)) |
-        (1u << static_cast<int>(SequenceSetting::Pattern)));
+        (1u << static_cast<int>(SequenceSetting::Pattern)) |
+        (1u << static_cast<int>(SequenceSetting::PlayMode)));
     lib.slots[1].setEvent(0, chord(0, ChordType::Major));
     lib.slots[1].setEvent(5, chord(9, ChordType::Min7, true, false, true));
 
@@ -125,12 +138,30 @@ TEST(Sequence, ParseSerializeRoundTrip) {
     EXPECT_EQ(out.slots[1].recorded.octave, -2);
     EXPECT_EQ(out.slots[1].recorded.velocity, 90);
     EXPECT_EQ(out.slots[1].recorded.pattern, 3);
+    EXPECT_EQ(out.slots[1].recorded.play_mode, PlayMode::ArpHold);
+    EXPECT_EQ(out.slots[1].recorded.arp_rate, ArpRate::Eighth);
     EXPECT_EQ(out.slots[1].live_mask, lib.slots[1].live_mask);
     EXPECT_EQ(out.slots[1].events[0].chord.type, ChordType::Major);
     EXPECT_EQ(out.slots[1].events[1].chord.rootPc, 9);
     EXPECT_TRUE(out.slots[1].events[1].chord.add9);
     EXPECT_TRUE(out.slots[1].events[1].chord.add13);
     EXPECT_TRUE(out.slots[0].isDefault());
+}
+
+TEST(Sequence, ParseLegacyRecordedArrayDefaultsNewSettings) {
+    std::string json = R"({
+      "sequences": [
+        {"bars":1,"steps_per_bar":16,
+         "recorded":[0,500,100,64,0,0,3,0,0,0,0],
+         "events":[[0,0]]}
+      ]
+    })";
+
+    SequencerLibrary lib;
+    ASSERT_TRUE(parseSequenceFile(json, lib));
+    EXPECT_EQ(lib.slots[0].recorded.play_mode, PlayMode::Held);
+    EXPECT_EQ(lib.slots[0].recorded.arp_rate, ArpRate::Sixteenth);
+    ASSERT_EQ(lib.slots[0].events.size(), 1u);
 }
 
 TEST(Sequence, ParseSkipsMalformedAndOutOfRangeEvents) {

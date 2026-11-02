@@ -5,24 +5,42 @@
 // behavior for combinations (release debounce).
 
 TEST_F(ChordEngineTest, HeldNewChordReplacesPrevious) {
-    engine_->handleKeyEvent(key(0x17, true), 0);    // T = C major
+    press(0x17, 0);    // T = C major
     EXPECT_EQ(midi_.noteOnCount(), 3);
     EXPECT_TRUE(state_.isNoteActive(1, 60));
 
-    engine_->handleKeyEvent(key(0x17, false), 0);   // release: Held sustains
+    release(0x17, 0);   // release: Held sustains
     EXPECT_EQ(midi_.noteOffCount(), 0);
 
-    engine_->handleKeyEvent(key(0x1C, true), 0);    // Y = G major (replaces C)
+    press(0x1C, 0);    // Y = G major (replaces C)
     EXPECT_EQ(midi_.noteOffCount(), 3);
     EXPECT_EQ(midi_.noteOnCount(), 6);
     EXPECT_FALSE(state_.isNoteActive(1, 60));
     EXPECT_TRUE(state_.isNoteActive(1, 67));
 }
 
+TEST_F(ChordEngineTest, NearSimultaneousCombinationTriggersOnlyFinalChord) {
+    // T then B 1 ms apart: the first chord must not sound on its own.
+    engine_->handleKeyEvent(key(0x17, true), 0);      // T = C major
+    engine_->handleKeyEvent(key(0x05, true), 1000);   // B = seventh
+    engine_->update(1000 + ChordEngine::PRESS_GROUP_US);
+
+    EXPECT_EQ(noteOnNotes(), (std::vector<uint8_t>{60, 64, 67, 71}));
+}
+
+TEST_F(ChordEngineTest, QuickCombinationTapTriggersOneChord) {
+    engine_->handleKeyEvent(key(0x17, true), 0);
+    engine_->handleKeyEvent(key(0x05, true), 2000);
+    engine_->handleKeyEvent(key(0x17, false), 6000);
+    engine_->handleKeyEvent(key(0x05, false), 8000);
+
+    EXPECT_EQ(noteOnNotes(), (std::vector<uint8_t>{60, 64, 67, 71}));
+}
+
 TEST_F(ChordEngineTest, HeldCombinationProducesMaj7) {
-    engine_->handleKeyEvent(key(0x17, true), 0);   // T = Major col 5 (C)
+    press(0x17, 0);   // T = Major col 5 (C)
     midi_.clear();
-    engine_->handleKeyEvent(key(0x05, true), 0);   // B = Seventh col 5 -> Cmaj7
+    press(0x05, 0);   // B = Seventh col 5 -> Cmaj7
 
     auto notes = noteOnNotes();
     EXPECT_EQ(notes, (std::vector<uint8_t>{60, 64, 67, 71}));
@@ -31,12 +49,12 @@ TEST_F(ChordEngineTest, HeldCombinationProducesMaj7) {
 TEST_F(ChordEngineTest, PressToPlayNoteLifecycle) {
     state_.pendingChord.play_mode = PlayMode::PressToPlay;
 
-    engine_->handleKeyEvent(key(0x17, true), 0);   // press: note-on
+    press(0x17, 0);   // press: note-on
     EXPECT_EQ(midi_.noteOnCount(), 3);
     EXPECT_EQ(midi_.noteOffCount(), 0);
     EXPECT_TRUE(state_.isNoteActive(1, 60));
 
-    engine_->handleKeyEvent(key(0x17, false), 0);  // release: debounced
+    release(0x17, 0);  // release: debounced
     engine_->update(25000);                        // buffer expires -> note-off
     EXPECT_EQ(midi_.noteOffCount(), 3);
     EXPECT_FALSE(state_.isNoteActive(1, 60));
@@ -47,41 +65,45 @@ TEST_F(ChordEngineTest, PressToPlayNoteLifecycle) {
 TEST_F(ChordEngineTest, ArpeggioStepsAndLoops) {
     state_.pendingChord.play_mode = PlayMode::Arpeggio;
 
-    engine_->handleKeyEvent(key(0x17, true), 0);   // C major {60,64,67}
+    press(0x17, 0);   // C major {60,64,67}
     EXPECT_EQ(midi_.noteOnCount(), 1);
     EXPECT_TRUE(state_.isNoteActive(1, 60));
 
-    engine_->update(500000);   // well past a step (stepUs(120) = 125000)
+    state_.rhythmClock.tickAbs = 6;    // 16th boundary
+    engine_->update(0);
     EXPECT_TRUE(state_.isNoteActive(1, 64));
     EXPECT_FALSE(state_.isNoteActive(1, 60));
 
-    engine_->update(1000000);
+    state_.rhythmClock.tickAbs = 12;
+    engine_->update(0);
     EXPECT_TRUE(state_.isNoteActive(1, 67));
 
-    engine_->update(1500000);  // loop back to 60
+    state_.rhythmClock.tickAbs = 18;   // loop back to 60
+    engine_->update(0);
     EXPECT_TRUE(state_.isNoteActive(1, 60));
 
-    engine_->handleKeyEvent(key(0x17, false), 2000000);  // release
+    release(0x17, 2000000);  // release
     engine_->update(2100000);                            // buffer expires -> stop
     EXPECT_FALSE(state_.isNoteActive(1, 60));
     EXPECT_FALSE(state_.isNoteActive(1, 64));
     EXPECT_FALSE(state_.isNoteActive(1, 67));
 }
 
-// Arpeggio advances at the stored rhythm tempo (stepUs(tempo)) even when the
-// rhythm and clock are both off — not the chord note_duration_ms.
-TEST_F(ChordEngineTest, ArpeggioUsesStoredTempo) {
+// The arp follows the free-running master clock even with the rhythm stopped,
+// so its notes stay locked to the beat LED.
+TEST_F(ChordEngineTest, ArpeggioUsesMasterClockWhenRhythmStopped) {
     state_.pendingChord.play_mode = PlayMode::Arpeggio;
     state_.pendingRhythm.enabled = false;
-    state_.pendingRhythm.tempo = 60;  // stepUs(60) = 250000 us
 
-    engine_->handleKeyEvent(key(0x17, true), 0);  // C major {60,64,67}
+    press(0x17, 0);  // C major {60,64,67}
     EXPECT_TRUE(state_.isNoteActive(1, 60));
 
-    engine_->update(200000);  // before one step elapses
+    state_.rhythmClock.tickAbs = 5;   // just before the 16th boundary
+    engine_->update(0);
     EXPECT_TRUE(state_.isNoteActive(1, 60));
 
-    engine_->update(250000);  // one step later -> 64
+    state_.rhythmClock.tickAbs = 6;
+    engine_->update(0);
     EXPECT_TRUE(state_.isNoteActive(1, 64));
     EXPECT_FALSE(state_.isNoteActive(1, 60));
 }
@@ -89,13 +111,13 @@ TEST_F(ChordEngineTest, ArpeggioUsesStoredTempo) {
 TEST_F(ChordEngineTest, SilentModeEmitsNoNotes) {
     state_.pendingChord.play_mode = PlayMode::Silent;
 
-    engine_->handleKeyEvent(key(0x17, true), 0);
+    press(0x17, 0);
     EXPECT_EQ(midi_.noteOnCount(), 0);
     EXPECT_EQ(midi_.noteOffCount(), 0);
 }
 
 TEST_F(ChordEngineTest, AllNotesOffClearsState) {
-    engine_->handleKeyEvent(key(0x17, true), 0);
+    press(0x17, 0);
     EXPECT_EQ(midi_.noteOnCount(), 3);
 
     engine_->allNotesOff();
@@ -108,20 +130,20 @@ TEST_F(ChordEngineTest, AllNotesOffClearsState) {
 TEST_F(ChordEngineTest, HeldReleaseDoesNotChangeChord) {
     // T+B = Cmaj7. Releasing a key keeps the chord latched; notes are released
     // only when another chord is played (FR-C10 held semantics).
-    engine_->handleKeyEvent(key(0x17, true), 0);   // T = C major
-    engine_->handleKeyEvent(key(0x05, true), 0);   // B = Cmaj7
+    press(0x17, 0);   // T = C major
+    press(0x05, 0);   // B = Cmaj7
     midi_.clear();
 
-    engine_->handleKeyEvent(key(0x17, false), 0);  // release T, B still held
+    release(0x17, 0);  // release T, B still held
     EXPECT_EQ(midi_.noteOnCount(), 0);
     EXPECT_EQ(midi_.noteOffCount(), 0);
     EXPECT_TRUE(state_.isNoteActive(1, 71));       // Cmaj7 still sounding
 
-    engine_->handleKeyEvent(key(0x05, false), 0);  // release B
+    release(0x05, 0);  // release B
     EXPECT_EQ(midi_.noteOffCount(), 0);            // still latched
 
     // Playing a new chord releases the old notes and sounds the new chord.
-    engine_->handleKeyEvent(key(0x1C, true), 0);   // Y = G major
+    press(0x1C, 0);   // Y = G major
     EXPECT_EQ(midi_.noteOffCount(), 4);            // Cmaj7 released
     EXPECT_FALSE(state_.isNoteActive(1, 60));      // C (in Cmaj7, not G major)
     EXPECT_TRUE(state_.isNoteActive(1, 67));
@@ -131,27 +153,27 @@ TEST_F(ChordEngineTest, InvalidComboKeepsChordUntilNewPress) {
     // T (C major) + Y (G major) is an invalid combination. While both are held
     // nothing happens; releasing the new key keeps C major until a fresh chord
     // is played.
-    engine_->handleKeyEvent(key(0x17, true), 0);   // T = C major
-    engine_->handleKeyEvent(key(0x1C, true), 0);   // Y = invalid combo
+    press(0x17, 0);   // T = C major
+    press(0x1C, 0);   // Y = invalid combo
     EXPECT_TRUE(state_.isNoteActive(1, 60));       // C major still sounding
     midi_.clear();
 
-    engine_->handleKeyEvent(key(0x1C, false), 0);  // release Y first
+    release(0x1C, 0);  // release Y first
     EXPECT_EQ(midi_.noteOnCount(), 0);             // C major kept
     EXPECT_TRUE(state_.isNoteActive(1, 60));
     EXPECT_FALSE(state_.isNoteActive(1, 71));
 
     // Releasing the old key then pressing Y fresh takes effect.
-    engine_->handleKeyEvent(key(0x17, false), 0);  // release T
-    engine_->handleKeyEvent(key(0x1C, true), 0);   // press Y = G major
+    release(0x17, 0);  // release T
+    press(0x1C, 0);   // press Y = G major
     EXPECT_EQ(noteOnNotes(), (std::vector<uint8_t>{67, 71, 74}));
     EXPECT_FALSE(state_.isNoteActive(1, 60));
     EXPECT_TRUE(state_.isNoteActive(1, 67));
 }
 
 TEST_F(ChordEngineTest, ModeChangeReleasesLatchedChord) {
-    engine_->handleKeyEvent(key(0x17, true), 0);   // T = C major (Held)
-    engine_->handleKeyEvent(key(0x17, false), 0);  // release: Held sustains
+    press(0x17, 0);   // T = C major (Held)
+    release(0x17, 0);  // release: Held sustains
     EXPECT_TRUE(state_.isNoteActive(1, 60));
     EXPECT_EQ(midi_.noteOffCount(), 0);
 
@@ -165,7 +187,7 @@ TEST_F(ChordEngineTest, ModeChangeReleasesLatchedChord) {
 }
 
 TEST_F(ChordEngineTest, ModeChangeWithKeyHeldKeepsChord) {
-    engine_->handleKeyEvent(key(0x17, true), 0);   // T = C major, held
+    press(0x17, 0);   // T = C major, held
     EXPECT_TRUE(state_.isNoteActive(1, 60));
 
     // Change to PressToPlay while T is still held -> chord kept.
@@ -178,8 +200,8 @@ TEST_F(ChordEngineTest, ModeChangeWithKeyHeldKeepsChord) {
 TEST_F(ChordEngineTest, NoStuckNotesAfterFullCycle) {
     // Press-to-play full cycle must leave zero sounding notes (fixes the M2 stuck C4).
     state_.pendingChord.play_mode = PlayMode::PressToPlay;
-    engine_->handleKeyEvent(key(0x17, true), 0);
-    engine_->handleKeyEvent(key(0x17, false), 0);
+    press(0x17, 0);
+    release(0x17, 0);
     engine_->update(25000);
     EXPECT_EQ(midi_.noteOnCount(), 3);
     EXPECT_EQ(midi_.noteOffCount(), 3);
@@ -192,17 +214,17 @@ TEST_F(ChordEngineTest, ArpeggioFollowsRhythmClock) {
     state_.pendingChord.play_mode = PlayMode::Arpeggio;
     state_.pendingRhythm.enabled = true;
 
-    engine_->handleKeyEvent(key(0x17, true), 0);  // C major {60,64,67}
+    press(0x17, 0);  // C major {60,64,67}
     EXPECT_TRUE(state_.isNoteActive(1, 60));
 
-    // Simulate the Core 1 scheduler firing a step.
+    // Simulate the Core 1 scheduler firing a step (6 clock ticks per 16th).
     state_.rhythmClock.running = true;
-    state_.rhythmClock.stepAbs = 1;
+    state_.rhythmClock.tickAbs = 6;
     engine_->update(0);  // no time passes, but a rhythm step edge fires
     EXPECT_TRUE(state_.isNoteActive(1, 64));
     EXPECT_FALSE(state_.isNoteActive(1, 60));
 
-    state_.rhythmClock.stepAbs = 2;
+    state_.rhythmClock.tickAbs = 12;
     engine_->update(0);
     EXPECT_TRUE(state_.isNoteActive(1, 67));
     EXPECT_FALSE(state_.isNoteActive(1, 64));
@@ -213,12 +235,12 @@ TEST_F(ChordEngineTest, ArpeggioFollowsRhythmClock) {
 // released — but only the extension note changes, the base chord is not
 // re-attacked.
 TEST_F(ChordEngineTest, HeldExtensionAddsToSoundingChord) {
-    engine_->handleKeyEvent(key(0x17, true), 0);   // T = C major {60,64,67}
+    press(0x17, 0);   // T = C major {60,64,67}
     EXPECT_EQ(noteOnNotes(), (std::vector<uint8_t>{60, 64, 67}));
-    engine_->handleKeyEvent(key(0x17, false), 0);  // release: Held sustains
+    release(0x17, 0);  // release: Held sustains
     midi_.clear();
 
-    engine_->handleKeyEvent(key(0x50, true), 0);   // Left arrow held -> add9
+    press(0x50, 0);   // Left arrow held -> add9
     EXPECT_EQ(noteOnNotes(), (std::vector<uint8_t>{74}));  // only the 9th added
     EXPECT_EQ(midi_.noteOffCount(), 0);            // base chord untouched
     EXPECT_TRUE(state_.isNoteActive(1, 60));
@@ -228,7 +250,7 @@ TEST_F(ChordEngineTest, HeldExtensionAddsToSoundingChord) {
 
     // Releasing Left removes only the 9th.
     midi_.clear();
-    engine_->handleKeyEvent(key(0x50, false), 0);
+    release(0x50, 0);
     EXPECT_TRUE(noteOnNotes().empty());
     EXPECT_EQ(midi_.noteOffCount(), 1);
     EXPECT_FALSE(state_.isNoteActive(1, 74));
@@ -239,7 +261,7 @@ TEST_F(ChordEngineTest, HeldExtensionAddsToSoundingChord) {
 // lowest note.
 TEST_F(ChordEngineTest, ManualInversionFirst) {
     state_.pendingChord.inversion = InversionMode::First;
-    engine_->handleKeyEvent(key(0x17, true), 0);   // C major, 1st inversion
+    press(0x17, 0);   // C major, 1st inversion
     // Root-position {60,64,67}; 1st inversion rotates the root up an octave.
     EXPECT_EQ(noteOnNotes(), (std::vector<uint8_t>{64, 67, 72}));
 }
@@ -247,15 +269,15 @@ TEST_F(ChordEngineTest, ManualInversionFirst) {
 // An overlapped chord switch in Held mode (new key pressed before the old key is
 // lifted) must land on the new chord once the stale key is released.
 TEST_F(ChordEngineTest, HeldOverlappedSwitchLandsOnNewChord) {
-    engine_->handleKeyEvent(key(0x17, true), 0);    // T = C major
+    press(0x17, 0);    // T = C major
     EXPECT_TRUE(state_.isNoteActive(1, 60));
 
-    engine_->handleKeyEvent(key(0x1C, true), 0);    // Y = G major (overlap)
+    press(0x1C, 0);    // Y = G major (overlap)
     EXPECT_TRUE(state_.isNoteActive(1, 60));        // still C (invalid combo)
     EXPECT_FALSE(state_.isNoteActive(1, 71));       // B (3rd of G) not present
 
     midi_.clear();
-    engine_->handleKeyEvent(key(0x17, false), 0);   // release T -> G major
+    release(0x17, 0);   // release T -> G major
     EXPECT_FALSE(state_.isNoteActive(1, 60));
     EXPECT_TRUE(state_.isNoteActive(1, 71));
     EXPECT_TRUE(state_.isNoteActive(1, 74));
@@ -265,14 +287,14 @@ TEST_F(ChordEngineTest, HeldOverlappedSwitchLandsOnNewChord) {
 // release-buffer delay).
 TEST_F(ChordEngineTest, PressToPlayOverlappedSwitchIsImmediate) {
     state_.pendingChord.play_mode = PlayMode::PressToPlay;
-    engine_->handleKeyEvent(key(0x17, true), 0);    // T = C major
+    press(0x17, 0);    // T = C major
     EXPECT_TRUE(state_.isNoteActive(1, 60));
 
-    engine_->handleKeyEvent(key(0x1C, true), 0);    // Y = G major (overlap)
+    press(0x1C, 0);    // Y = G major (overlap)
     EXPECT_TRUE(state_.isNoteActive(1, 60));        // still C
 
     midi_.clear();
-    engine_->handleKeyEvent(key(0x17, false), 0);   // release T -> G immediately
+    release(0x17, 0);   // release T -> G immediately
     EXPECT_FALSE(state_.isNoteActive(1, 60));
     EXPECT_TRUE(state_.isNoteActive(1, 67));
     EXPECT_TRUE(state_.isNoteActive(1, 71));
@@ -284,14 +306,14 @@ TEST_F(ChordEngineTest, PressToPlayOverlappedSwitchIsImmediate) {
 // the release buffer or a trailing old-chord arp step).
 TEST_F(ChordEngineTest, ArpOverlappedSwitchIsImmediate) {
     state_.pendingChord.play_mode = PlayMode::Arpeggio;
-    engine_->handleKeyEvent(key(0x17, true), 0);    // C major arp, starts on 60
+    press(0x17, 0);    // C major arp, starts on 60
     EXPECT_TRUE(state_.isNoteActive(1, 60));
 
-    engine_->handleKeyEvent(key(0x1C, true), 0);    // Y = G major (overlap)
+    press(0x1C, 0);    // Y = G major (overlap)
     EXPECT_TRUE(state_.isNoteActive(1, 60));        // still C
 
     midi_.clear();
-    engine_->handleKeyEvent(key(0x17, false), 0);   // release T -> G arp restarts
+    release(0x17, 0);   // release T -> G arp restarts
     EXPECT_FALSE(state_.isNoteActive(1, 60));
     EXPECT_TRUE(state_.isNoteActive(1, 67));        // G major root
 }
@@ -300,21 +322,21 @@ TEST_F(ChordEngineTest, ArpOverlappedSwitchIsImmediate) {
 // must wait a full second between notes.
 TEST_F(ChordEngineTest, ChordRollStaggersByMilliseconds) {
     state_.pendingChord.chord_roll_ms = 1000;  // 1 s per note
-    engine_->handleKeyEvent(key(0x17, true), 0);   // C major {60,64,67}
+    press(0x17, 0);   // C major {60,64,67}
     EXPECT_EQ(midi_.noteOnCount(), 0);             // all notes scheduled, none fired
 
-    engine_->update(0);                            // first note (deadline 0) fires
+    engine_->update(ChordEngine::PRESS_GROUP_US);  // first note fires
     EXPECT_EQ(midi_.noteOnCount(), 1);
     EXPECT_TRUE(state_.isNoteActive(1, 60));
 
-    engine_->update(500000);                       // 500 ms later
+    engine_->update(515000);                       // 500 ms later
     EXPECT_EQ(midi_.noteOnCount(), 1);             // still one note
 
-    engine_->update(1000000);                      // 1 s later
+    engine_->update(1015000);                      // 1 s later
     EXPECT_EQ(midi_.noteOnCount(), 2);
     EXPECT_TRUE(state_.isNoteActive(1, 64));
 
-    engine_->update(2000000);                      // 2 s later
+    engine_->update(2015000);                      // 2 s later
     EXPECT_EQ(midi_.noteOnCount(), 3);
     EXPECT_TRUE(state_.isNoteActive(1, 67));
 }
@@ -323,11 +345,11 @@ TEST_F(ChordEngineTest, ChordRollStaggersByMilliseconds) {
 // only the extension note is added, the base notes are never re-attacked.
 TEST_F(ChordEngineTest, MinIntervalExtensionDoesNotRestructureBase) {
     state_.pendingChord.min_interval = 5;
-    engine_->handleKeyEvent(key(0x17, true), 0);   // C major spread {60,67,76}
+    press(0x17, 0);   // C major spread {60,67,76}
     EXPECT_EQ(noteOnNotes(), (std::vector<uint8_t>{60, 67, 76}));
     midi_.clear();
 
-    engine_->handleKeyEvent(key(0x50, true), 0);   // Left -> add9
+    press(0x50, 0);   // Left -> add9
     EXPECT_EQ(noteOnNotes(), (std::vector<uint8_t>{74}));  // only the 9th added
     EXPECT_EQ(midi_.noteOffCount(), 0);
     EXPECT_TRUE(state_.isNoteActive(1, 60));
@@ -337,7 +359,7 @@ TEST_F(ChordEngineTest, MinIntervalExtensionDoesNotRestructureBase) {
 
     // Releasing the extension removes only the 9th, base notes unchanged.
     midi_.clear();
-    engine_->handleKeyEvent(key(0x50, false), 0);
+    release(0x50, 0);
     EXPECT_TRUE(noteOnNotes().empty());
     EXPECT_EQ(midi_.noteOffCount(), 1);
     EXPECT_TRUE(state_.isNoteActive(1, 60));
@@ -350,21 +372,25 @@ TEST_F(ChordEngineTest, MinIntervalExtensionDoesNotRestructureBase) {
 // re-attacking the currently-sounding arp note.
 TEST_F(ChordEngineTest, ArpExtensionDoesNotRetrigger) {
     state_.pendingChord.play_mode = PlayMode::Arpeggio;
-    engine_->handleKeyEvent(key(0x17, true), 0);   // C major, arp starts on 60
+    press(0x17, 0);   // C major, arp starts on 60
     EXPECT_EQ(midi_.noteOnCount(), 1);
     EXPECT_TRUE(state_.isNoteActive(1, 60));
 
-    engine_->handleKeyEvent(key(0x50, true), 0);   // Left -> add9
+    press(0x50, 0);   // Left -> add9
     EXPECT_EQ(midi_.noteOffCount(), 0);            // current note not released
     EXPECT_EQ(midi_.noteOnCount(), 1);             // no re-attack
     EXPECT_TRUE(state_.isNoteActive(1, 60));
 
-    // The arp now cycles four notes (root-position + the 9th). stepUs(120)=125000.
-    engine_->update(125000);
+    // The arp now cycles four notes (root-position + the 9th), stepping on the
+    // master-clock 16th boundaries.
+    state_.rhythmClock.tickAbs = 6;
+    engine_->update(0);
     EXPECT_TRUE(state_.isNoteActive(1, 64));
-    engine_->update(250000);
+    state_.rhythmClock.tickAbs = 12;
+    engine_->update(0);
     EXPECT_TRUE(state_.isNoteActive(1, 67));
-    engine_->update(375000);
+    state_.rhythmClock.tickAbs = 18;
+    engine_->update(0);
     EXPECT_TRUE(state_.isNoteActive(1, 74));       // the added 9th
 }
 
@@ -373,15 +399,17 @@ TEST_F(ChordEngineTest, ArpExtensionDoesNotRetrigger) {
 TEST_F(ChordEngineTest, ArpModeChangeOutOfRandomRebuildsSequence) {
     state_.pendingChord.play_mode = PlayMode::Arpeggio;
     state_.pendingChord.arp_mode  = ArpMode::Random;
-    engine_->handleKeyEvent(key(0x17, true), 0);   // C major; Random starts on some note
+    press(0x17, 0);   // C major; Random starts on some note
     EXPECT_EQ(midi_.noteOnCount(), 1);
 
     state_.pendingChord.arp_mode = ArpMode::Up;    // simulate an edit-engine change
     engine_->onArpModeChanged();
 
-    engine_->update(500000);                       // step -> next note (64)
+    state_.rhythmClock.tickAbs = 6;                // step -> next note (64)
+    engine_->update(0);
     EXPECT_TRUE(state_.isNoteActive(1, 64));
-    engine_->update(1000000);                      // -> 67
+    state_.rhythmClock.tickAbs = 12;               // -> 67
+    engine_->update(0);
     EXPECT_TRUE(state_.isNoteActive(1, 67));
 }
 
@@ -390,22 +418,22 @@ TEST_F(ChordEngineTest, ArpModeChangeOutOfRandomRebuildsSequence) {
 TEST_F(ChordEngineTest, ResetVoicingReturnsToRootPosition) {
     state_.pendingChord.voicing_mode = VoicingMode::Smart;
 
-    engine_->handleKeyEvent(key(0x17, true), 0);   // C major -> root {60,64,67}
+    press(0x17, 0);   // C major -> root {60,64,67}
     EXPECT_TRUE(state_.isNoteActive(1, 60));
     EXPECT_TRUE(state_.isNoteActive(1, 64));
     EXPECT_TRUE(state_.isNoteActive(1, 67));
 
-    engine_->handleKeyEvent(key(0x17, false), 0);  // release (Held latches)
+    release(0x17, 0);  // release (Held latches)
 
-    engine_->handleKeyEvent(key(0x15, true), 0);   // F major -> smart {60,65,69}
+    press(0x15, 0);   // F major -> smart {60,65,69}
     EXPECT_TRUE(state_.isNoteActive(1, 60));
     EXPECT_TRUE(state_.isNoteActive(1, 65));
     EXPECT_TRUE(state_.isNoteActive(1, 69));
 
     engine_->resetVoicing();
-    engine_->handleKeyEvent(key(0x15, false), 0);
+    release(0x15, 0);
 
-    engine_->handleKeyEvent(key(0x17, true), 0);   // C major -> root again
+    press(0x17, 0);   // C major -> root again
     EXPECT_TRUE(state_.isNoteActive(1, 60));
     EXPECT_TRUE(state_.isNoteActive(1, 64));
     EXPECT_TRUE(state_.isNoteActive(1, 67));
@@ -446,7 +474,7 @@ TEST_F(ChordEngineTest, PatternAlbertiPlaysRootFifthThirdFifth) {
     state_.rhythmClock.stepsPerBar = 16;
     state_.rhythmClock.stepAbs = 0;
 
-    engine_->handleKeyEvent(key(0x17, true), 0);   // C major -> step 0 = root 60
+    press(0x17, 0);   // C major -> step 0 = root 60
     EXPECT_TRUE(state_.isNoteActive(1, 60));
 
     // Advance one 16th step at a time to beat 2 (step 4 = 5th 67).
@@ -484,7 +512,7 @@ TEST_F(ChordEngineTest, PatternMultiNoteStepFiresChord) {
     state_.pendingChord.play_mode = PlayMode::Pattern;
     state_.pendingChord.pattern = 0;
 
-    engine_->handleKeyEvent(key(0x17, true), 0);  // C major
+    press(0x17, 0);  // C major
     EXPECT_TRUE(state_.isNoteActive(1, 60));
     EXPECT_TRUE(state_.isNoteActive(1, 64));
     EXPECT_TRUE(state_.isNoteActive(1, 67));
@@ -500,11 +528,11 @@ TEST_F(ChordEngineTest, PatternDegreeThreeWrapsOnTriad) {
     state_.pendingChord.play_mode = PlayMode::Pattern;
     state_.pendingChord.pattern = 0;
 
-    engine_->handleKeyEvent(key(0x17, true), 0);   // C major -> octave root 72
+    press(0x17, 0);   // C major -> octave root 72
     EXPECT_TRUE(state_.isNoteActive(1, 72));
     engine_->allNotesOff();
 
-    engine_->handleKeyEvent(key(0x05, true), 0);   // Cmaj7 (T+B) -> 7th = 71
+    press(0x05, 0);   // Cmaj7 (T+B) -> 7th = 71
     EXPECT_TRUE(state_.isNoteActive(1, 71));
 }
 
@@ -515,13 +543,13 @@ TEST_F(ChordEngineTest, PatternFreeRunsAtStoredTempo) {
     state_.pendingChord.pattern = 0;
     state_.pendingRhythm.tempo = 60;  // stepUs(60) = 250000 us
 
-    engine_->handleKeyEvent(key(0x17, true), 0);  // step 0 = root 60
+    press(0x17, 0);  // step 0 = root 60
     EXPECT_TRUE(state_.isNoteActive(1, 60));
 
-    engine_->update(250000);   // step 1 = rest
-    engine_->update(500000);   // step 2 = rest
-    engine_->update(750000);   // step 3 = rest
-    engine_->update(1000000);  // step 4 = 5th 67
+    engine_->update(265000);   // step 1 = rest
+    engine_->update(515000);   // step 2 = rest
+    engine_->update(765000);   // step 3 = rest
+    engine_->update(1015000);  // step 4 = 5th 67
     EXPECT_TRUE(state_.isNoteActive(1, 67));
 }
 
@@ -534,14 +562,14 @@ TEST_F(ChordEngineTest, PatternHoldLatchesPatternIsMomentary) {
     state_.rhythmClock.stepsPerBar = 16;
     state_.rhythmClock.stepAbs = 0;
 
-    engine_->handleKeyEvent(key(0x17, true), 0);
-    engine_->handleKeyEvent(key(0x17, false), 0);   // release: momentary stops
+    press(0x17, 0);
+    release(0x17, 0);   // release: momentary stops
     engine_->update(30000);                          // release buffer expires
     EXPECT_FALSE(state_.isNoteActive(1, 60));
 
     state_.pendingChord.play_mode = PlayMode::PatternHold;
-    engine_->handleKeyEvent(key(0x17, true), 0);
-    engine_->handleKeyEvent(key(0x17, false), 0);   // release: latches
+    press(0x17, 0);
+    release(0x17, 0);   // release: latches
     engine_->update(30000);
     EXPECT_TRUE(state_.isNoteActive(1, 60));
 }
@@ -555,7 +583,7 @@ TEST_F(ChordEngineTest, PatternBlockSustainsBar) {
     state_.rhythmClock.stepsPerBar = 16;
     state_.rhythmClock.stepAbs = 0;
 
-    engine_->handleKeyEvent(key(0x17, true), 0);  // full chord on step 0
+    press(0x17, 0);  // full chord on step 0
     EXPECT_TRUE(state_.isNoteActive(1, 60));
     EXPECT_TRUE(state_.isNoteActive(1, 64));
     EXPECT_TRUE(state_.isNoteActive(1, 67));

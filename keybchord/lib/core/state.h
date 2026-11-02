@@ -22,6 +22,8 @@ struct ActiveNote {
 struct RhythmClock {
     std::atomic<bool>     running{false};
     std::atomic<uint32_t> stepAbs{0};        // monotonic step counter
+    std::atomic<uint64_t> tickAbs{0};        // most recently emitted 24-PPQN tick
+    std::atomic<uint64_t> nextTickUs{0};     // absolute deadline of next tick
     std::atomic<uint32_t> step{0};           // step index within the bar
     std::atomic<int32_t>  stepsPerBar{16};
     std::atomic<uint32_t> beat{0};           // beat index within the bar

@@ -32,7 +32,10 @@ public:
                    bool inMenu, uint64_t now_us);
 
     // Prompt (FR-D3), auto-cancelling after display_prompt_ms (FR-P10).
+    // The single-line form keeps the standard "Enter=Yes Bk=No" hint.
     void showPrompt(const std::string& text, uint64_t now_us);
+    void showPrompt(const std::string& line1, const std::string& line2,
+                    uint64_t now_us);
 
     // Persistent status screen (e.g. an in-progress sequence recording). It
     // stays until another screen replaces it or cancel() is called. It does not
@@ -72,7 +75,8 @@ private:
     bool        menuParamSelected_ = false;
     std::string editFullName_;
     std::string editValue_;
-    std::string promptText_;
+    std::string promptLine1_;
+    std::string promptLine2_;
     std::string nameEditText_;
     std::string errorLine1_;
     std::string errorLine2_;

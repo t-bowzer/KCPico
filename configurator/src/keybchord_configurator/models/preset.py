@@ -43,18 +43,21 @@ from .bounds import (
 )
 from .enums import (
     ArpMode,
+    ArpRate,
     InversionMode,
     PlayMode,
     ScaleType,
     StrumMode,
     VoicingMode,
     ARP_MODE_JSON,
+    ARP_RATE_JSON,
     INVERSION_JSON,
     PLAY_MODE_JSON,
     SCALE_TYPE_JSON,
     STRUM_MODE_JSON,
     VOICING_MODE_JSON,
     parse_arp_mode,
+    parse_arp_rate,
     parse_inversion,
     parse_play_mode,
     parse_scale_type,
@@ -150,6 +153,7 @@ class ChordParams:
     min_interval: int = 0
     inversion: InversionMode = InversionMode.ROOT
     arp_mode: ArpMode = ArpMode.UP
+    arp_rate: ArpRate = ArpRate.SIXTEENTH
     pattern: str = "Block"
     channel: int = 1
 
@@ -183,6 +187,7 @@ class ChordParams:
         )
         p.inversion = parse_inversion(data.get("inversion"))
         p.arp_mode = parse_arp_mode(data.get("arp_mode"))
+        p.arp_rate = parse_arp_rate(data.get("arp_rate"))
         pattern = data.get("pattern")
         if isinstance(pattern, str):
             p.pattern = pattern
@@ -202,6 +207,7 @@ class ChordParams:
             "min_interval": self.min_interval,
             "inversion": INVERSION_JSON[self.inversion],
             "arp_mode": ARP_MODE_JSON[self.arp_mode],
+            "arp_rate": ARP_RATE_JSON[self.arp_rate],
             "pattern": self.pattern,
             "channel": self.channel,
         }
@@ -345,6 +351,8 @@ class PresetSlot:
     bass: BassParams = field(default_factory=BassParams.defaults)
     rhythm: RhythmParams = field(default_factory=RhythmParams.defaults)
     macros: MacroConfig = field(default_factory=MacroConfig.defaults)
+    # Global Recorded/Live sequence-settings switch (Seq Edit > Settings).
+    seq_use_recorded: bool = True
 
     @classmethod
     def defaults(cls) -> "PresetSlot":
@@ -363,11 +371,19 @@ class PresetSlot:
         p.bass = BassParams.from_dict(data.get("bass"))
         p.rhythm = RhythmParams.from_dict(data.get("rhythm"))
         p.macros = MacroConfig.from_dict(data)
+        seq = data.get("seq_settings")
+        if isinstance(seq, bool):
+            p.seq_use_recorded = seq
+        elif isinstance(seq, str):
+            p.seq_use_recorded = seq != "live"
+        elif isinstance(seq, int):
+            p.seq_use_recorded = seq != 0
         return p
 
     def to_dict(self) -> dict:
         out = {
             "name": self.name,
+            "seq_settings": "recorded" if self.seq_use_recorded else "live",
             "chord": self.chord.to_dict(),
             "strum": self.strum.to_dict(),
             "bass": self.bass.to_dict(),

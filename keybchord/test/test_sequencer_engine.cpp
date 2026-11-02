@@ -7,6 +7,7 @@
 #include "recording_midi_out.h"
 #include "sequencer_engine.h"
 #include "state.h"
+#include "strum_engine.h"
 #include "storage_stub.h"
 
 
@@ -38,6 +39,7 @@ protected:
         midi_.begin();
         router_ = new MidiRouter(midi_, state_);
         chord_ = new ChordEngine(state_, *router_);
+        strum_ = new StrumEngine(state_, *router_);
         display_ = new DisplayManager(state_, lcd_);
         seq_ = new SequencerEngine(state_, storage_, *chord_, *display_);
         chord_->setChordTriggeredCallback(
@@ -50,6 +52,7 @@ protected:
     void TearDown() override {
         delete seq_;
         delete display_;
+        delete strum_;
         delete chord_;
         delete router_;
     }
@@ -77,6 +80,18 @@ protected:
 
     void playChord(uint8_t usage, uint32_t abs) {
         chord_->handleKeyEvent(key(usage, true), atStep(abs));
+        chord_->update(atStep(abs) + ChordEngine::PRESS_GROUP_US);
+    }
+
+    int lastNoteOnOnChannel(uint8_t channel) const {
+        int note = -1;
+        for (const auto& m : midi_.messages()) {
+            if ((m.status & 0xF0) == midi::STATUS_NOTE_ON && m.data2 > 0
+                && (m.status & 0x0F) == (channel - 1)) {
+                note = m.data1;
+            }
+        }
+        return note;
     }
 
     StateManager state_;
@@ -85,6 +100,7 @@ protected:
     RecordingMidiOutAdapter midi_;
     MidiRouter* router_ = nullptr;
     ChordEngine* chord_ = nullptr;
+    StrumEngine* strum_ = nullptr;
     DisplayManager* display_ = nullptr;
     SequencerEngine* seq_ = nullptr;
 };
@@ -199,26 +215,52 @@ TEST_F(SequencerEngineTest, LiveChordSuppressesPlaybackThenResumes) {
     EXPECT_EQ(midi_.noteOnCount(), 3);
 }
 
-TEST_F(SequencerEngineTest, RefusesPlayAndRecordWithoutRhythm) {
+TEST_F(SequencerEngineTest, PlayWithoutRhythmEnablesMutedRhythmThenPlays) {
     state_.pendingRhythm.enabled = false;
+    state_.pendingRhythm.muted = false;
 
     SequencerLibrary lib;
     lib.slots[0].setEvent(0, ResolvedChord{});
     ASSERT_TRUE(saveSequenceFile(storage_, 0, 0, lib));
     seq_->loadForPreset(0, 0);
     ASSERT_EQ(seq_->library().slots[0].events.size(), 1u);
-    KeyAction playAction = state_.keymap.find(
-        KMOD_CTRL, hid_usage::PAGE_KEYBOARD, HID_F10)->cmd == KeyCmd::SequencePlay ? KeyAction{} : KeyAction{};
-    (void)playAction;
 
     ASSERT_TRUE(seq_->handleKeyEvent(key(HID_F10, true, CTRL), atStep(0)));
-    advanceTo(16);
-    EXPECT_FALSE(state_.sequencer.playing);
-    EXPECT_EQ(midi_.noteOnCount(), 0);
+    EXPECT_TRUE(state_.pendingRhythm.enabled);
+    EXPECT_TRUE(state_.pendingRhythm.muted);
+    EXPECT_TRUE(seq_->armed());
 
-    ASSERT_TRUE(seq_->handleKeyEvent(key(HID_F9, true, CTRL), atStep(16)));
-    advanceTo(32);
-    EXPECT_FALSE(state_.sequencer.recording);
+    advanceTo(16);
+    EXPECT_TRUE(state_.sequencer.playing);
+    advanceTo(17);
+    EXPECT_EQ(midi_.noteOnCount(), 3);
+}
+
+TEST_F(SequencerEngineTest, RecordWithoutRhythmEnablesMutedRhythmThenRecords) {
+    state_.pendingRhythm.enabled = false;
+    state_.pendingRhythm.muted = false;
+
+    ASSERT_TRUE(seq_->handleKeyEvent(key(HID_F9, true, CTRL), atStep(0)));
+    EXPECT_TRUE(state_.pendingRhythm.enabled);
+    EXPECT_TRUE(state_.pendingRhythm.muted);
+    EXPECT_TRUE(seq_->armed());
+    EXPECT_TRUE(state_.recordGuideActive.load());
+
+    advanceTo(16);
+    EXPECT_TRUE(state_.sequencer.recording);
+}
+
+TEST_F(SequencerEngineTest, RecordingCapturesPlayModeAndArpRate) {
+    state_.pendingChord.play_mode = PlayMode::Arpeggio;
+    state_.pendingChord.arp_rate = ArpRate::Eighth;
+
+    ASSERT_TRUE(seq_->handleKeyEvent(key(HID_F9, true, CTRL), atStep(0)));
+    advanceTo(16);
+    ASSERT_TRUE(state_.sequencer.recording);
+
+    const Sequence& s = seq_->library().slots[0];
+    EXPECT_EQ(s.recorded.play_mode, PlayMode::Arpeggio);
+    EXPECT_EQ(s.recorded.arp_rate, ArpRate::Eighth);
 }
 
 TEST_F(SequencerEngineTest, CtrlNumberSelectsSlotAndBarsAreSaved) {
@@ -229,6 +271,63 @@ TEST_F(SequencerEngineTest, CtrlNumberSelectsSlotAndBarsAreSaved) {
     seq_->update(atStep(1));
     EXPECT_EQ(seq_->library().slots[1].bars, 8);
     EXPECT_TRUE(storage_.exists("/sequences/b1p1.json"));
+}
+
+TEST_F(SequencerEngineTest, RecordOnExistingSlotPromptsAndCancelKeepsSequence) {
+    SequencerLibrary lib;
+    ResolvedChord c;
+    c.rootPc = 0;
+    c.type = ChordType::Major;
+    lib.slots[0].setEvent(0, c);
+    ASSERT_TRUE(saveSequenceFile(storage_, 0, 0, lib));
+    seq_->loadForPreset(0, 0);
+
+    ASSERT_TRUE(seq_->handleKeyEvent(key(HID_F9, true, CTRL), atStep(0)));
+    EXPECT_TRUE(seq_->overwritePromptActive());
+    EXPECT_FALSE(seq_->armed());
+    EXPECT_FALSE(state_.recordGuideActive.load());
+
+    ASSERT_TRUE(seq_->handleKeyEvent(key(0x2A, true), atStep(0)));  // Backspace
+    EXPECT_FALSE(seq_->overwritePromptActive());
+    EXPECT_FALSE(seq_->armed());
+    EXPECT_FALSE(state_.sequencer.recording);
+    EXPECT_EQ(seq_->library().slots[0].events.size(), 1u);
+
+    // Mute confirms the prompt just like Enter.
+    ASSERT_TRUE(seq_->handleKeyEvent(key(HID_F9, true, CTRL), atStep(0)));
+    EXPECT_TRUE(seq_->overwritePromptActive());
+    ASSERT_TRUE(seq_->handleKeyEvent(key(hid_usage::KEYBOARD_MUTE, true),
+                                     atStep(0)));
+    EXPECT_FALSE(seq_->overwritePromptActive());
+    EXPECT_TRUE(seq_->armed());
+}
+
+TEST_F(SequencerEngineTest, OverwritePromptConfirmStartsRecording) {
+    state_.pendingRhythm.enabled = false;
+    state_.pendingRhythm.muted = false;
+
+    SequencerLibrary lib;
+    ResolvedChord c;
+    c.rootPc = 0;
+    c.type = ChordType::Major;
+    lib.slots[0].setEvent(0, c);
+    ASSERT_TRUE(saveSequenceFile(storage_, 0, 0, lib));
+    seq_->loadForPreset(0, 0);
+
+    ASSERT_TRUE(seq_->handleKeyEvent(key(HID_F9, true, CTRL), atStep(0)));
+    ASSERT_TRUE(seq_->overwritePromptActive());
+    EXPECT_FALSE(state_.pendingRhythm.enabled);  // not enabled until confirmed
+
+    ASSERT_TRUE(seq_->handleKeyEvent(key(HID_ENTER, true), atStep(0)));
+    EXPECT_FALSE(seq_->overwritePromptActive());
+    EXPECT_TRUE(state_.pendingRhythm.enabled);
+    EXPECT_TRUE(state_.pendingRhythm.muted);
+    EXPECT_TRUE(seq_->armed());
+    EXPECT_TRUE(state_.recordGuideActive.load());
+
+    advanceTo(16);
+    EXPECT_TRUE(state_.sequencer.recording);
+    EXPECT_TRUE(seq_->library().slots[0].empty());  // old take replaced
 }
 
 TEST_F(SequencerEngineTest, ClearPromptRemovesSequence) {
@@ -281,4 +380,202 @@ TEST_F(SequencerEngineTest, CountInIsExactlyOneBarWithNoEarlyHats) {
     advanceTo(32);  // count-in bar complete -> recording
     EXPECT_TRUE(state_.sequencer.recording);
     EXPECT_TRUE(state_.recordGuideHatsActive.load());
+}
+
+TEST_F(SequencerEngineTest, StrumFollowsSequencerChordDuringPlayback) {
+    SequencerLibrary lib;
+    lib.slots[0].bars = 1;
+    lib.slots[0].steps_per_bar = 16;
+    ResolvedChord c;
+    c.rootPc = 0;  // C major
+    c.type = ChordType::Major;
+    lib.slots[0].setEvent(0, c);
+    ASSERT_TRUE(saveSequenceFile(storage_, 0, 0, lib));
+    seq_->loadForPreset(0, 0);
+
+    // Select a different live chord, then clear it: selectedChord is left on G.
+    playChord(HID_Y, 0);
+    chord_->handleKeyEvent(key(HID_Y, false), atStep(1));
+    chord_->allNotesOff();
+    EXPECT_EQ(state_.selectedChord.rootPc, 7);
+
+    ASSERT_TRUE(seq_->handleKeyEvent(key(HID_F10, true, CTRL), atStep(0)));
+    advanceTo(16);
+    advanceTo(17);  // sequence step 0 (C major) fires
+    ASSERT_TRUE(state_.sequencer.playing);
+    EXPECT_EQ(state_.selectedChord.rootPc, 0);
+
+    // FollowChord strum now derives its pool from the sequence chord, not the
+    // stale physically-selected G chord.
+    strum_->handleKeyEvent(key(0x62, true), atStep(17));  // Keypad 0 -> pool[0]
+    EXPECT_EQ(lastNoteOnOnChannel(2), 72);                 // C at octave 1
+}
+
+TEST_F(SequencerEngineTest, SlotSelectedDuringPlaybackSwitchesAtLoopEnd) {
+    SequencerLibrary lib;
+    lib.slots[0].bars = 1;
+    lib.slots[0].steps_per_bar = 16;
+    ResolvedChord c;
+    c.rootPc = 0;  // C major at step 0
+    c.type = ChordType::Major;
+    lib.slots[0].setEvent(0, c);
+    c.rootPc = 4;  // E major at step 8
+    lib.slots[0].setEvent(8, c);
+
+    lib.slots[1].bars = 1;
+    lib.slots[1].steps_per_bar = 16;
+    c.rootPc = 7;  // G major at step 0
+    c.type = ChordType::Major;
+    lib.slots[1].setEvent(0, c);
+
+    ASSERT_TRUE(saveSequenceFile(storage_, 0, 0, lib));
+    seq_->loadForPreset(0, 0);
+
+    ASSERT_TRUE(seq_->handleKeyEvent(key(HID_F10, true, CTRL), atStep(0)));
+    advanceTo(16);
+    advanceTo(17);  // slot 0 step 0 fires (C)
+    EXPECT_EQ(state_.selectedChord.rootPc, 0);
+
+    // Select slot 1 mid-loop. Playback must not stop and slot 0 must finish.
+    ASSERT_TRUE(seq_->handleKeyEvent(key(HID_2, true, CTRL), atStep(20)));
+    EXPECT_EQ(seq_->currentSlot(), 1);
+    EXPECT_TRUE(state_.sequencer.playing);
+
+    advanceTo(25);  // slot 0 step 8 fires (E)
+    EXPECT_TRUE(state_.sequencer.playing);
+    EXPECT_EQ(state_.selectedChord.rootPc, 4);
+
+    advanceTo(33);  // loop boundary -> slot 1 step 0 fires (G)
+    EXPECT_TRUE(state_.sequencer.playing);
+    EXPECT_EQ(state_.selectedChord.rootPc, 7);
+
+    advanceTo(49);  // new sequence loops (G again)
+    EXPECT_TRUE(state_.sequencer.playing);
+    EXPECT_EQ(state_.selectedChord.rootPc, 7);
+}
+
+TEST_F(SequencerEngineTest, EmptySlotQueuedDuringPlaybackStopsAtLoopEnd) {
+    SequencerLibrary lib;
+    lib.slots[0].bars = 1;
+    lib.slots[0].steps_per_bar = 16;
+    ResolvedChord c;
+    c.rootPc = 0;
+    c.type = ChordType::Major;
+    lib.slots[0].setEvent(0, c);
+    ASSERT_TRUE(saveSequenceFile(storage_, 0, 0, lib));
+    seq_->loadForPreset(0, 0);
+
+    ASSERT_TRUE(seq_->handleKeyEvent(key(HID_F10, true, CTRL), atStep(0)));
+    advanceTo(16);
+    advanceTo(17);
+    ASSERT_TRUE(state_.sequencer.playing);
+
+    ASSERT_TRUE(seq_->handleKeyEvent(key(HID_2, true, CTRL), atStep(20)));
+    EXPECT_EQ(seq_->currentSlot(), 1);
+    EXPECT_TRUE(state_.sequencer.playing);  // the old loop keeps playing
+
+    advanceTo(33);  // loop boundary -> queued slot is empty
+    EXPECT_FALSE(state_.sequencer.playing);
+    EXPECT_EQ(seq_->currentSlot(), 1);
+}
+
+TEST_F(SequencerEngineTest, StopStillWorksWhileEmptySlotIsQueued) {
+    SequencerLibrary lib;
+    lib.slots[0].bars = 1;
+    lib.slots[0].steps_per_bar = 16;
+    ResolvedChord c;
+    c.rootPc = 0;
+    c.type = ChordType::Major;
+    lib.slots[0].setEvent(0, c);
+    ASSERT_TRUE(saveSequenceFile(storage_, 0, 0, lib));
+    seq_->loadForPreset(0, 0);
+
+    ASSERT_TRUE(seq_->handleKeyEvent(key(HID_F10, true, CTRL), atStep(0)));
+    advanceTo(16);
+    advanceTo(17);
+    ASSERT_TRUE(state_.sequencer.playing);
+
+    ASSERT_TRUE(seq_->handleKeyEvent(key(HID_2, true, CTRL), atStep(20)));
+    ASSERT_TRUE(state_.sequencer.playing);
+
+    // Ctrl+F10 must stop playback even though the selected slot is empty.
+    ASSERT_TRUE(seq_->handleKeyEvent(key(HID_F10, true, CTRL), atStep(20)));
+    EXPECT_FALSE(state_.sequencer.playing);
+}
+
+
+TEST_F(SequencerEngineTest, PlaybackUsesRecordedArpeggioMode) {
+    SequencerLibrary lib;
+    lib.slots[0].bars = 1;
+    lib.slots[0].steps_per_bar = 16;
+    lib.slots[0].recorded.play_mode = PlayMode::Arpeggio;
+    lib.slots[0].recorded.arp_rate = ArpRate::Sixteenth;
+    ResolvedChord c;
+    c.rootPc = 0;
+    c.type = ChordType::Major;
+    lib.slots[0].setEvent(0, c);
+    ASSERT_TRUE(saveSequenceFile(storage_, 0, 0, lib));
+    seq_->loadForPreset(0, 0);
+
+    ASSERT_TRUE(seq_->handleKeyEvent(key(HID_F10, true, CTRL), atStep(0)));
+    advanceTo(16);
+    advanceTo(17);  // sequence event starts the arpeggio (one note at a time)
+    EXPECT_EQ(midi_.noteOnCount(), 1);
+
+    state_.rhythmClock.tickAbs.store(6);  // next 16th at 24 PPQN
+    chord_->update(atStep(17) + 1000);
+    EXPECT_EQ(midi_.noteOnCount(), 2);
+    EXPECT_EQ(midi_.noteOffCount(), 1);
+}
+
+TEST_F(SequencerEngineTest, PlaybackUsesRecordedPatternMode) {
+    ChordPattern rest;
+    rest.name = "Rest";
+    rest.steps_per_bar = 16;
+    rest.steps.assign(16, 0);
+    ChordPattern triad;
+    triad.name = "Triad";
+    triad.steps_per_bar = 16;
+    triad.steps.assign(16, 0);
+    triad.steps[0] = CHORD_MASK_TRIAD;
+    chord_->setPatterns({rest, triad});
+
+    SequencerLibrary lib;
+    lib.slots[0].bars = 1;
+    lib.slots[0].steps_per_bar = 16;
+    lib.slots[0].recorded.play_mode = PlayMode::Pattern;
+    lib.slots[0].recorded.pattern = 1;
+    state_.pendingChord.pattern = 0;  // live pattern differs from recorded
+    ResolvedChord c;
+    c.rootPc = 0;
+    c.type = ChordType::Major;
+    lib.slots[0].setEvent(0, c);
+    ASSERT_TRUE(saveSequenceFile(storage_, 0, 0, lib));
+    seq_->loadForPreset(0, 0);
+
+    ASSERT_TRUE(seq_->handleKeyEvent(key(HID_F10, true, CTRL), atStep(0)));
+    advanceTo(16);
+    advanceTo(17);
+    EXPECT_EQ(midi_.noteOnCount(), 3);  // recorded Triad, not live Rest
+}
+
+TEST_F(SequencerEngineTest, PlaybackLiveSettingsUseCurrentPlayMode) {
+    SequencerLibrary lib;
+    lib.slots[0].bars = 1;
+    lib.slots[0].steps_per_bar = 16;
+    lib.slots[0].recorded.play_mode = PlayMode::Held;
+    ResolvedChord c;
+    c.rootPc = 0;
+    c.type = ChordType::Major;
+    lib.slots[0].setEvent(0, c);
+    ASSERT_TRUE(saveSequenceFile(storage_, 0, 0, lib));
+    seq_->loadForPreset(0, 0);
+
+    state_.sequencer.useRecorded = false;
+    state_.pendingChord.play_mode = PlayMode::Arpeggio;
+
+    ASSERT_TRUE(seq_->handleKeyEvent(key(HID_F10, true, CTRL), atStep(0)));
+    advanceTo(16);
+    advanceTo(17);
+    EXPECT_EQ(midi_.noteOnCount(), 1);  // live Arpeggio, not recorded Held
 }

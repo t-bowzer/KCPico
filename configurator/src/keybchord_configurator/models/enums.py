@@ -51,6 +51,17 @@ class ArpMode(IntEnum):
     RANDOM = 4
 
 
+class ArpRate(IntEnum):
+    """Arpeggiator note subdivision (``chord.arp_rate``)."""
+
+    WHOLE = 0
+    HALF = 1
+    QUARTER = 2
+    EIGHTH = 3
+    SIXTEENTH = 4
+    THIRTY_SECOND = 5
+
+
 class StrumMode(IntEnum):
     """Strum note-pool source (``strum.mode``)."""
 
@@ -161,6 +172,15 @@ ARP_MODE_JSON: dict[ArpMode, str] = {
     ArpMode.RANDOM: "random",
 }
 
+ARP_RATE_JSON: dict[ArpRate, str] = {
+    ArpRate.WHOLE: "whole",
+    ArpRate.HALF: "half",
+    ArpRate.QUARTER: "quarter",
+    ArpRate.EIGHTH: "eighth",
+    ArpRate.SIXTEENTH: "sixteenth",
+    ArpRate.THIRTY_SECOND: "thirty_second",
+}
+
 STRUM_MODE_JSON: dict[StrumMode, str] = {
     StrumMode.FOLLOW_CHORD: "follow_chord",
     StrumMode.SCALE: "scale",
@@ -226,6 +246,7 @@ PLAY_MODE_BY_JSON: dict[str, PlayMode] = _reverse(PLAY_MODE_JSON)
 VOICING_MODE_BY_JSON: dict[str, VoicingMode] = _reverse(VOICING_MODE_JSON)
 INVERSION_BY_JSON: dict[str, InversionMode] = _reverse(INVERSION_JSON)
 ARP_MODE_BY_JSON: dict[str, ArpMode] = _reverse(ARP_MODE_JSON)
+ARP_RATE_BY_JSON: dict[str, ArpRate] = _reverse(ARP_RATE_JSON)
 STRUM_MODE_BY_JSON: dict[str, StrumMode] = _reverse(STRUM_MODE_JSON)
 SCALE_TYPE_BY_JSON: dict[str, ScaleType] = _reverse(SCALE_TYPE_JSON)
 LED_TARGET_BY_JSON: dict[str, LedTarget] = _reverse(LED_TARGET_JSON)
@@ -260,6 +281,10 @@ def parse_inversion(value) -> InversionMode:
 
 def parse_arp_mode(value) -> ArpMode:
     return parse_enum(ARP_MODE_BY_JSON, value, ArpMode.UP)
+
+
+def parse_arp_rate(value) -> ArpRate:
+    return parse_enum(ARP_RATE_BY_JSON, value, ArpRate.SIXTEENTH)
 
 
 def parse_strum_mode(value) -> StrumMode:

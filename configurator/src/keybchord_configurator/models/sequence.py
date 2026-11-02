@@ -6,7 +6,7 @@ notes; events are chord changes encoded compactly as ``[step, chord_id]``.
 
 ``chord_id = root_pc * 128 + type * 8 + extension_mask`` where the extension
 mask bits are add9=1, add11=2, add13=4. Recorded chord settings use a fixed
-11-value array (see :data:`LIVE_SETTING_KEYS`); ``live_mask`` bit *i* means
+13-value array (see :data:`LIVE_SETTING_KEYS`); ``live_mask`` bit *i* means
 "use the live value for setting *i*" during playback.
 """
 
@@ -43,8 +43,10 @@ from .bounds import (
 )
 from .enums import (
     ArpMode,
+    ArpRate,
     ChordType,
     InversionMode,
+    PlayMode,
     VoicingMode,
 )
 
@@ -61,6 +63,8 @@ LIVE_SETTING_KEYS: tuple[str, ...] = (
     "inversion",
     "arp_mode",
     "pattern",
+    "play_mode",
+    "arp_rate",
 )
 
 LIVE_SETTING_LABELS: tuple[str, ...] = (
@@ -75,6 +79,8 @@ LIVE_SETTING_LABELS: tuple[str, ...] = (
     "Inversion",
     "Arp mode",
     "Chord pattern",
+    "Play mode",
+    "Arp rate",
 )
 
 ROOT_NAMES: tuple[str, ...] = (
@@ -179,6 +185,8 @@ class RecordedSettings:
     inversion: InversionMode = InversionMode.ROOT
     arp_mode: ArpMode = ArpMode.UP
     pattern: int = 0
+    play_mode: PlayMode = PlayMode.HELD
+    arp_rate: ArpRate = ArpRate.SIXTEENTH
 
     @classmethod
     def defaults(cls) -> "RecordedSettings":
@@ -206,6 +214,8 @@ class RecordedSettings:
         out.inversion = _enum_int(values[8], InversionMode, out.inversion)
         out.arp_mode = _enum_int(values[9], ArpMode, out.arp_mode)
         out.pattern = _int(values[10], 0, MAX_CHORD_PATTERNS - 1, out.pattern)
+        out.play_mode = _enum_int(values[11], PlayMode, out.play_mode)
+        out.arp_rate = _enum_int(values[12], ArpRate, out.arp_rate)
         return out
 
     def to_list(self) -> list[int]:
@@ -221,6 +231,8 @@ class RecordedSettings:
             int(self.inversion),
             int(self.arp_mode),
             self.pattern,
+            int(self.play_mode),
+            int(self.arp_rate),
         ]
 
 

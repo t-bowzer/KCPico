@@ -39,8 +39,10 @@ protected:
         edit_ = new EditEngine(state_, *display_);
         modeChanged_ = 0;
         patternChanged_ = 0;
+        clockResync_ = 0;
         edit_->setModeChangedCallback([this]() { modeChanged_++; });
         edit_->setPatternChangedCallback([this]() { patternChanged_++; });
+        edit_->setClockResyncCallback([this]() { clockResync_++; });
     }
 
     void TearDown() override {
@@ -74,6 +76,7 @@ protected:
     EditEngine* edit_ = nullptr;
     int modeChanged_ = 0;
     int patternChanged_ = 0;
+    int clockResync_ = 0;
 };
 
 
@@ -158,8 +161,43 @@ TEST_F(EditEngineTest, F8TogglesClockOut) {
     EXPECT_FALSE(state_.config.midi_clock_enabled);
     edit_->handleKeyEvent(key(0x41, true), 0);   // F8
     EXPECT_TRUE(state_.config.midi_clock_enabled);
-    edit_->handleKeyEvent(key(0x41, true), 0);
+    edit_->handleKeyEvent(key(0x41, true), 400000); // outside double-tap window
     EXPECT_FALSE(state_.config.midi_clock_enabled);
+}
+
+TEST_F(EditEngineTest, F8DoubleTapResyncsClockAndLeavesItOn) {
+    EXPECT_FALSE(state_.config.midi_clock_enabled);
+    edit_->handleKeyEvent(key(0x41, true), 0);        // first tap: off -> on
+    EXPECT_TRUE(state_.config.midi_clock_enabled);
+    edit_->handleKeyEvent(key(0x41, true), 200000);   // second tap: resync
+    EXPECT_EQ(clockResync_, 1);
+    EXPECT_TRUE(state_.config.midi_clock_enabled);
+
+    // Repeated double-tap while already on must not leave clock off.
+    edit_->handleKeyEvent(key(0x41, true), 1000000);
+    edit_->handleKeyEvent(key(0x41, true), 1100000);
+    EXPECT_EQ(clockResync_, 2);
+    EXPECT_TRUE(state_.config.midi_clock_enabled);
+}
+
+TEST_F(EditEngineTest, F8TapsOutsideWindowToggleNormally) {
+    edit_->handleKeyEvent(key(0x41, true), 0);
+    EXPECT_TRUE(state_.config.midi_clock_enabled);
+    edit_->handleKeyEvent(key(0x41, true), 400000);   // > 350 ms window
+    EXPECT_FALSE(state_.config.midi_clock_enabled);
+    EXPECT_EQ(clockResync_, 0);
+}
+
+TEST_F(EditEngineTest, F8DoubleTapWorksInsideMenu) {
+    edit_->handleKeyEvent(key(0x44, true), 0);        // F11 -> Rhythm menu
+    EXPECT_EQ(state_.editMenu, EditMenu::Rhythm);
+
+    edit_->handleKeyEvent(key(0x41, true), 1000000);  // single tap inert
+    EXPECT_FALSE(state_.config.midi_clock_enabled);
+    edit_->handleKeyEvent(key(0x41, true), 1200000);  // double tap -> resync
+    EXPECT_EQ(clockResync_, 1);
+    EXPECT_TRUE(state_.config.midi_clock_enabled);
+    EXPECT_EQ(state_.editMenu, EditMenu::Rhythm);
 }
 
 TEST_F(EditEngineTest, InversionKeysSetDirectly) {
@@ -300,7 +338,7 @@ TEST_F(EditEngineTest, UpDownNavigateParamsInMenu) {
     edit_->handleKeyEvent(key(0x52, true), 0);   // Up -> Octave
     EXPECT_EQ(state_.editParam, 0);
     edit_->handleKeyEvent(key(0x52, true), 0);   // Up wraps to ChordPattern (last)
-    EXPECT_EQ(state_.editParam, 11);
+    EXPECT_EQ(state_.editParam, 12);
 }
 
 TEST_F(EditEngineTest, LeftRightStepSelectedValueInMenu) {
@@ -503,7 +541,7 @@ TEST_F(EditEngineTest, BrowsingAllDirectionsScrollWithoutChangingValue) {
     edit_->handleKeyEvent(key(0x50, true), 0);   // Left -> Octave
     EXPECT_EQ(state_.editParam, 0);
     edit_->handleKeyEvent(key(0x52, true), 0);   // Up wraps to last
-    EXPECT_EQ(state_.editParam, 11);
+    EXPECT_EQ(state_.editParam, 12);
     edit_->handleKeyEvent(key(0x51, true), 0);   // Down wraps to first
     EXPECT_EQ(state_.editParam, 0);
     edit_->handleKeyEvent(key(hid_usage::CONSUMER_VOLUME_UP, true, 0,

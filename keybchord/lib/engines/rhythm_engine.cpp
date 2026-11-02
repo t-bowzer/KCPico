@@ -92,8 +92,11 @@ void RhythmEngine::advanceClock(uint64_t now_us) {
             clockOutPending_ = true;
             clockOutActive_ = false;
         } else {
+            // Clock Out is clock-only: stop the 0xF8 stream immediately and do
+            // not send MIDI Stop. Transport stays under the user's control.
             clockOutPending_ = false;
             clockOutActive_ = false;
+            clockResyncPending_ = false;
         }
     }
 
@@ -109,6 +112,13 @@ void RhythmEngine::advanceClock(uint64_t now_us) {
                 clockOutActive_ = true;
                 clockOutPending_ = false;
             }
+            if (clockOutActive_ && clockResyncPending_ &&
+                clockTickIndex_ % 24 == 0) {
+                // Explicit resync: reset the slave's beat counter exactly on
+                // the LED's beat boundary, then continue the clock stream.
+                out_.push(midi::makeSystem(midi::SYSTEM_START));
+                clockResyncPending_ = false;
+            }
             if (clockOutActive_) {
                 out_.push(midi::makeSystem(midi::SYSTEM_CLOCK));
             }
@@ -120,6 +130,15 @@ void RhythmEngine::advanceClock(uint64_t now_us) {
         clockTickIndex_++;
         nextClockUs_ += tick;
     }
+
+    // Publish the free-running 24-PPQN clock to Core 0 even when the rhythm is
+    // stopped: the beat LED and the arpeggiator both use it as their timebase.
+    // tickAbs is the most recently *emitted* tick (clockTickIndex_ is the next
+    // one), so a consumer that acts on a new multiple of its subdivision fires
+    // on the same tick boundary as the rhythm steps.
+    state_.rhythmClock.tickAbs =
+        clockTickIndex_ > 0 ? clockTickIndex_ - 1 : 0;
+    state_.rhythmClock.nextTickUs = nextClockUs_;
 }
 
 void RhythmEngine::update(uint64_t now_us) {
@@ -239,6 +258,11 @@ void RhythmEngine::allNotesOff() {
 void RhythmEngine::jitterStats(PerfStats& out, bool reset) {
     out = jitter_;
     if (reset) jitter_.reset();
+}
+
+void RhythmEngine::resyncClock() {
+    if (!state_.config.midi_clock_enabled) return;
+    clockResyncPending_ = true;
 }
 
 RhythmLibrary loadRhythmPatterns(StorageAdapter& storage) {

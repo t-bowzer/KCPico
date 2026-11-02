@@ -42,6 +42,11 @@ public:
     // logging; a best-effort read is safe since fields are 32-bit aligned.
     void jitterStats(PerfStats& out, bool reset);
 
+    // Arm a MIDI Start (0xFA) at the next 24-tick beat boundary. Used by the
+    // explicit Clock Resync action (F8 double-tap); Clock Out itself is a plain
+    // continuous clock and never sends transport automatically.
+    void resyncClock();
+
 private:
     StateManager& state_;
     MidiEventQueue& out_;
@@ -60,12 +65,14 @@ private:
     bool     clockArmed_ = false; // phase initialized (once, at first update)
     uint64_t clockTickIndex_ = 0; // total ticks emitted (monotonic)
 
-    // MIDI clock output is armed at the next 24-tick beat boundary when it is
-    // switched on, so external devices start their beat division in phase with
-    // the beat LED. Switching it off is immediate.
+    // Clock Out is clock-only: enabling waits for the next 24-tick beat
+    // boundary so the slave's beat division starts on the LED's boundary;
+    // disabling simply stops the 0xF8 stream (no MIDI Stop). An explicit
+    // resync request sends MIDI Start at a later beat boundary.
     bool     clockOutWasEnabled_ = false;
     bool     clockOutPending_ = false;
     bool     clockOutActive_ = false;
+    bool     clockResyncPending_ = false;
 
     uint16_t lastTempo_ = 0;
 

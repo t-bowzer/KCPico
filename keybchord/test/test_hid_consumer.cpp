@@ -182,3 +182,54 @@ TEST(HidConsumer, QmkFallbackWithoutDescriptor) {
     ASSERT_EQ(events.size(), 1u);
     EXPECT_EQ(events[0].hid_usage, hid_usage::CONSUMER_MUTE);
 }
+
+TEST(HidConsumer, FallbackHandlesReportIdPlusByteWithoutDescriptor) {
+    hid_consumer::ReportParser parser;
+    std::vector<KeyEvent> events;
+
+    const uint8_t press[2] = {0x04, 0xE9};  // report ID 4 + Volume Up
+    EXPECT_TRUE(parser.applyConsumerFallback(press, sizeof(press), 1000, events));
+    ASSERT_EQ(events.size(), 1u);
+    EXPECT_EQ(events[0].hid_usage, hid_usage::CONSUMER_VOLUME_UP);
+    EXPECT_TRUE(events[0].pressed);
+
+    events.clear();
+    const uint8_t release[2] = {0x04, 0x00};
+    EXPECT_TRUE(parser.applyConsumerFallback(release, sizeof(release), 2000, events));
+    ASSERT_EQ(events.size(), 1u);
+    EXPECT_FALSE(events[0].pressed);
+}
+
+TEST(HidConsumer, FallbackHandlesNoReportId16BitWithoutDescriptor) {
+    hid_consumer::ReportParser parser;
+    std::vector<KeyEvent> events;
+
+    const uint8_t press[2] = {0xE9, 0x00};  // little-endian Volume Up, no ID
+    EXPECT_TRUE(parser.applyConsumerFallback(press, sizeof(press), 1000, events));
+    ASSERT_EQ(events.size(), 1u);
+    EXPECT_EQ(events[0].hid_usage, hid_usage::CONSUMER_VOLUME_UP);
+    EXPECT_TRUE(events[0].pressed);
+
+    events.clear();
+    const uint8_t release[2] = {0x00, 0x00};
+    EXPECT_TRUE(parser.applyConsumerFallback(release, sizeof(release), 2000, events));
+    ASSERT_EQ(events.size(), 1u);
+    EXPECT_FALSE(events[0].pressed);
+}
+
+TEST(HidConsumer, FallbackHandlesBareByteWithoutDescriptor) {
+    hid_consumer::ReportParser parser;
+    std::vector<KeyEvent> events;
+
+    const uint8_t press[1] = {0xE2};
+    EXPECT_TRUE(parser.applyConsumerFallback(press, sizeof(press), 1000, events));
+    ASSERT_EQ(events.size(), 1u);
+    EXPECT_EQ(events[0].hid_usage, hid_usage::CONSUMER_MUTE);
+    EXPECT_TRUE(events[0].pressed);
+
+    events.clear();
+    const uint8_t release[1] = {0x00};
+    EXPECT_TRUE(parser.applyConsumerFallback(release, sizeof(release), 2000, events));
+    ASSERT_EQ(events.size(), 1u);
+    EXPECT_FALSE(events[0].pressed);
+}

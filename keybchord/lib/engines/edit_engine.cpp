@@ -93,6 +93,10 @@ void EditEngine::setMidiSendCallback(
     midiSend_ = std::move(cb);
 }
 
+void EditEngine::setClockResyncCallback(std::function<void()> cb) {
+    clockResync_ = std::move(cb);
+}
+
 void EditEngine::sendOrScheduleMidi(const std::vector<uint8_t>& bytes,
                                     uint64_t dueUs) {
     if (!midiSend_ || bytes.empty()) return;
@@ -162,7 +166,8 @@ void EditEngine::restoreParamValue(ParamId id, int value, uint64_t now_us) {
     paramSet(state_, id, value);
 
     if (id == ParamId::ChordMode && modeChanged_) modeChanged_();
-    if (id == ParamId::ChordArpMode && arpModeChanged_) arpModeChanged_();
+    if ((id == ParamId::ChordArpMode || id == ParamId::ChordArpRate) &&
+        arpModeChanged_) arpModeChanged_();
     if (id == ParamId::RhythmPattern && patternChanged_) patternChanged_();
     if (isDrumNoteParam(id) && drumAudition_) {
         drumAudition_(drumNoteValue(state_, id));
@@ -196,7 +201,8 @@ void EditEngine::applyParamStep(ParamId id, int delta, bool inMenu, uint64_t now
     if (id == ParamId::COUNT) return;
     paramStep(state_, id, delta);
     if (id == ParamId::ChordMode && modeChanged_) modeChanged_();
-    if (id == ParamId::ChordArpMode && arpModeChanged_) arpModeChanged_();
+    if ((id == ParamId::ChordArpMode || id == ParamId::ChordArpRate) &&
+        arpModeChanged_) arpModeChanged_();
     if (id == ParamId::RhythmPattern && patternChanged_) patternChanged_();
     if (isDrumNoteParam(id) && drumAudition_) {
         drumAudition_(drumNoteValue(state_, id));
@@ -220,7 +226,8 @@ void EditEngine::applyParamAction(const KeyAction& a, uint16_t usage, uint8_t us
     }
 
     if (id == ParamId::ChordMode && modeChanged_) modeChanged_();
-    if (id == ParamId::ChordArpMode && arpModeChanged_) arpModeChanged_();
+    if ((id == ParamId::ChordArpMode || id == ParamId::ChordArpRate) &&
+        arpModeChanged_) arpModeChanged_();
     if (id == ParamId::RhythmPattern && patternChanged_) patternChanged_();
     if (anyEdit_) anyEdit_();
     display_.showValue(paramFullName(id), paramValueString(state_, id), inMenu, now_us);
@@ -268,7 +275,8 @@ void EditEngine::triggerMacro(uint8_t keyIndex, uint64_t now_us) {
 
         edited = true;
         if (cmd.param == ParamId::ChordMode) modeChanged = true;
-        if (cmd.param == ParamId::ChordArpMode) arpChanged = true;
+        if (cmd.param == ParamId::ChordArpMode ||
+            cmd.param == ParamId::ChordArpRate) arpChanged = true;
         if (cmd.param == ParamId::RhythmPattern) patternChanged = true;
     }
 
@@ -416,6 +424,23 @@ bool EditEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
          ev.hid_usage == HID_USAGE_ENTER);
     bool backspaceKey = ev.usage_page == hid_usage::PAGE_KEYBOARD &&
                         ev.hid_usage == HID_USAGE_BACKSPACE;
+
+    // The Clock Out toggle key doubles as Clock Resync when tapped twice.
+    // In menus a single tap stays inert; only the double-tap is consumed.
+    if (a.cmd == KeyCmd::ToggleParam && a.param == ParamId::RhythmClock) {
+        if (clockDoubleTapArmed_ &&
+            now_us - lastClockKeyUs_ <= CLOCK_RESYNC_DOUBLE_TAP_US) {
+            clockDoubleTapArmed_ = false;
+            paramSet(state_, ParamId::RhythmClock, 1);
+            if (clockResync_) clockResync_();
+            if (anyEdit_) anyEdit_();
+            display_.showValue("Clock Out", "Resync", false, now_us);
+            return true;
+        }
+        lastClockKeyUs_ = now_us;
+        clockDoubleTapArmed_ = true;
+        if (inMenu) return true;   // single tap remains inert inside menus
+    }
 
     if (inMenu && !paramSelected_) {
         menuDeadlineUs_ = now_us +

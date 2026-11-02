@@ -39,6 +39,19 @@ const Sequence& SequencerEngine::selected() const {
     return lib_.slots[s];
 }
 
+Sequence& SequencerEngine::playingSequence() {
+    if (playSlot_ < 0) playSlot_ = 0;
+    if (playSlot_ >= SEQUENCE_SLOTS) playSlot_ = SEQUENCE_SLOTS - 1;
+    return lib_.slots[playSlot_];
+}
+
+const Sequence& SequencerEngine::playingSequence() const {
+    int s = playSlot_;
+    if (s < 0) s = 0;
+    if (s >= SEQUENCE_SLOTS) s = SEQUENCE_SLOTS - 1;
+    return lib_.slots[s];
+}
+
 void SequencerEngine::syncStateFromSequence() {
     const Sequence& seq = selected();
     state_.sequencer.slot = static_cast<uint8_t>(seqSlot_);
@@ -56,12 +69,13 @@ void SequencerEngine::syncActivityFlags() {
 
 void SequencerEngine::loadForPreset(int bank, int slot) {
     stopAll(true);
-    clearPrompt_ = false;
+    prompt_ = PromptKind::None;
     bank_ = bank;
     presetSlot_ = slot;
     lib_ = loadSequenceFile(storage_, bank_, presetSlot_);
     state_.sequencer.slot = 0;
     seqSlot_ = 0;
+    playSlot_ = 0;
     syncStateFromSequence();
 }
 
@@ -71,6 +85,7 @@ void SequencerEngine::onPresetCleared(int bank, int slot) {
     if (bank_ == bank && presetSlot_ == slot) {
         lib_ = SequencerLibrary();
         seqSlot_ = 0;
+        playSlot_ = 0;
         state_.sequencer.slot = 0;
         syncStateFromSequence();
     }
@@ -83,9 +98,11 @@ void SequencerEngine::selectSlot(int slot, uint64_t now_us) {
         syncStateFromSequence();
         return;
     }
-    stopAll(true);
+    if (!playing_) stopAll(true);
     seqSlot_ = slot;
     syncStateFromSequence();
+    // During playback the slot above takes effect when the current sequence
+    // reaches its loop boundary; playback itself continues uninterrupted.
     showStatus("Seq " + std::to_string(seqSlot_ + 1), "", now_us);
 }
 
@@ -133,26 +150,14 @@ void SequencerEngine::planCountIn(uint32_t stepAbs) {
     countInPlanned_ = true;
 }
 
-void SequencerEngine::armRecord(uint64_t now_us) {
-    if (!state_.pendingRhythm.enabled) {
-        showStatus("Enable rhythm", "", now_us);
-        return;
-    }
-    if (recording_) {
-        stopRecording(true, now_us, "Seq saved");
-        return;
-    }
-    if (playing_) stopPlayback();
-    if (armed_ && armIsRecord_) {
-        armed_ = false;
-        countInPlanned_ = false;
-        state_.recordGuideActive.store(false);
-        state_.recordGuideHatsActive.store(false);
-        state_.recordGuideHatsStartAbs.store(0);
-        syncActivityFlags();
-        showStatus("Rec cancel", "", now_us);
-        return;
-    }
+void SequencerEngine::enableRhythmMuted() {
+    if (state_.pendingRhythm.enabled) return;
+    state_.pendingRhythm.enabled = true;
+    state_.pendingRhythm.muted = true;
+}
+
+void SequencerEngine::startRecordArm(uint64_t now_us) {
+    enableRhythmMuted();
 
     // Allow switching from a play-arm to record-arm.
     armed_ = true;
@@ -174,23 +179,51 @@ void SequencerEngine::armRecord(uint64_t now_us) {
     showPersistentStatus("Rec arm", "Wait bar", now_us);
 }
 
-void SequencerEngine::armPlay(uint64_t now_us) {
-    if (!state_.pendingRhythm.enabled) {
-        showStatus("Enable rhythm", "", now_us);
+void SequencerEngine::armRecord(uint64_t now_us) {
+    if (recording_) {
+        stopRecording(true, now_us, "Seq saved");
         return;
     }
+    if (playing_) stopPlayback();
+    if (armed_ && armIsRecord_) {
+        armed_ = false;
+        countInPlanned_ = false;
+        state_.recordGuideActive.store(false);
+        state_.recordGuideHatsActive.store(false);
+        state_.recordGuideHatsStartAbs.store(0);
+        syncActivityFlags();
+        showStatus("Rec cancel", "", now_us);
+        return;
+    }
+
+    if (!selected().empty()) {
+        // Replacing an existing take is destructive: confirm first. Cancel a
+        // pending play-arm so it cannot fire while the prompt is showing.
+        if (armed_) {
+            armed_ = false;
+            armIsRecord_ = false;
+            syncActivityFlags();
+        }
+        beginOverwritePrompt(now_us);
+        return;
+    }
+
+    startRecordArm(now_us);
+}
+
+void SequencerEngine::armPlay(uint64_t now_us) {
     if (recording_) {
         // The persistent recording screen is already showing; don't replace it
         // with a transient message.
         return;
     }
-    if (selected().empty()) {
-        showStatus("Seq empty", "", now_us);
-        return;
-    }
     if (playing_) {
         stopPlayback();
         showStatus("Seq stop", "", now_us);
+        return;
+    }
+    if (selected().empty()) {
+        showStatus("Seq empty", "", now_us);
         return;
     }
     if (armed_ && !armIsRecord_) {
@@ -199,6 +232,7 @@ void SequencerEngine::armPlay(uint64_t now_us) {
         showStatus("Play cancel", "", now_us);
         return;
     }
+    enableRhythmMuted();
     // Switching from a record count-in to playback cancels the guide.
     state_.recordGuideActive.store(false);
     state_.recordGuideHatsActive.store(false);
@@ -256,6 +290,7 @@ void SequencerEngine::startPlayback(uint64_t now_us) {
     armed_ = false;
     recording_ = false;
     playing_ = true;
+    playSlot_ = seqSlot_;
     state_.recordGuideActive.store(false);
     // stepAbs is the *next* step index. The step we want (0) has not fired yet;
     // process it when the snapshot advances past playStartAbs_.
@@ -307,7 +342,7 @@ void SequencerEngine::stopAll(bool saveRecording) {
     if (recording_) stopRecording(saveRecording, 0, nullptr);
     armed_ = false;
     stopPlayback();
-    clearPrompt_ = false;
+    prompt_ = PromptKind::None;
     syncActivityFlags();
     if (hadGuide && state_.editMenu == EditMenu::None) {
         display_.cancel();
@@ -317,7 +352,7 @@ void SequencerEngine::stopAll(bool saveRecording) {
 void SequencerEngine::processStep(uint32_t step, uint64_t now_us) {
     if (chord_.liveChordActive()) return;
 
-    const Sequence& seq = selected();
+    const Sequence& seq = playingSequence();
     const SequenceEvent* ev = seq.eventAt(static_cast<uint16_t>(step));
     if (!ev) return;
 
@@ -327,7 +362,7 @@ void SequencerEngine::processStep(uint32_t step, uint64_t now_us) {
 }
 
 void SequencerEngine::onLiveChord(const ResolvedChord& chord, uint64_t now_us) {
-    if (!recording_ || clearPrompt_) return;
+    if (!recording_ || prompt_ != PromptKind::None) return;
     if (!state_.rhythmClock.running.load()) return;
 
     uint32_t nextAbs = state_.rhythmClock.stepAbs.load();
@@ -357,14 +392,14 @@ void SequencerEngine::onLiveChord(const ResolvedChord& chord, uint64_t now_us) {
 
 void SequencerEngine::beginClearPrompt(uint64_t now_us) {
     if (recording_ || playing_ || armed_) stopAll(true);
-    clearPrompt_ = true;
-    clearDeadlineUs_ = now_us +
+    prompt_ = PromptKind::Clear;
+    promptDeadlineUs_ = now_us +
         static_cast<uint64_t>(state_.config.display_prompt_ms) * 1000ULL;
     display_.showPrompt("Clear Seq " + std::to_string(seqSlot_ + 1) + "?", now_us);
 }
 
 void SequencerEngine::confirmClear(uint64_t now_us) {
-    clearPrompt_ = false;
+    prompt_ = PromptKind::None;
     selected() = Sequence();
     // Keep the other slots in this preset's file; saveSequenceFile removes the
     // file only when every slot is empty/default.
@@ -373,31 +408,50 @@ void SequencerEngine::confirmClear(uint64_t now_us) {
     showStatus(ok ? "Seq cleared" : "Seq save fail", "", now_us);
 }
 
-void SequencerEngine::cancelClearPrompt() {
-    clearPrompt_ = false;
+void SequencerEngine::beginOverwritePrompt(uint64_t now_us) {
+    prompt_ = PromptKind::Overwrite;
+    promptDeadlineUs_ = now_us +
+        static_cast<uint64_t>(state_.config.display_prompt_ms) * 1000ULL;
+    display_.showPrompt("Overwrite Seq in",
+                        "slot " + std::to_string(seqSlot_ + 1) + "? Ent/Bk",
+                        now_us);
+}
+
+void SequencerEngine::confirmOverwrite(uint64_t now_us) {
+    prompt_ = PromptKind::None;
+    display_.cancel();
+    startRecordArm(now_us);
+}
+
+void SequencerEngine::cancelPrompt() {
+    prompt_ = PromptKind::None;
     display_.cancel();
 }
 
-bool SequencerEngine::handleClearPrompt(const KeyEvent& ev, uint64_t now_us) {
+bool SequencerEngine::handlePrompt(const KeyEvent& ev, uint64_t now_us) {
     if (!ev.pressed) return true;
     KeyAction a = keymap_.resolve(ev.hid_usage, ev.modifiers, ev.usage_page);
     if (isEnterKey(a, ev)) {
-        confirmClear(now_us);
+        if (prompt_ == PromptKind::Clear) {
+            confirmClear(now_us);
+        } else if (prompt_ == PromptKind::Overwrite) {
+            confirmOverwrite(now_us);
+        }
         return true;
     }
     if (ev.usage_page == hid_usage::PAGE_KEYBOARD &&
         (ev.hid_usage == HID_USAGE_ESC ||
          ev.hid_usage == HID_USAGE_BACKSPACE)) {
-        cancelClearPrompt();
+        cancelPrompt();
         return true;
     }
     // Any other key cancels the prompt and is consumed.
-    cancelClearPrompt();
+    cancelPrompt();
     return true;
 }
 
 bool SequencerEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
-    if (clearPrompt_) return handleClearPrompt(ev, now_us);
+    if (prompt_ != PromptKind::None) return handlePrompt(ev, now_us);
 
     KeyAction a = keymap_.resolve(ev.hid_usage, ev.modifiers, ev.usage_page);
     if (!ev.pressed) {
@@ -427,9 +481,8 @@ bool SequencerEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
 void SequencerEngine::update(uint64_t now_us) {
     syncFromState(now_us);
 
-    if (clearPrompt_ && now_us >= clearDeadlineUs_) {
-        clearPrompt_ = false;
-        display_.cancel();
+    if (prompt_ != PromptKind::None && now_us >= promptDeadlineUs_) {
+        cancelPrompt();
     }
 
     if (!state_.pendingRhythm.enabled) {
@@ -506,7 +559,7 @@ void SequencerEngine::update(uint64_t now_us) {
 
     if (!playing_) return;
 
-    int loop = selected().loopSteps();
+    int loop = playingSequence().loopSteps();
     if (loop <= 0) {
         stopPlayback();
         return;
@@ -535,7 +588,36 @@ void SequencerEngine::update(uint64_t now_us) {
     }
     for (uint32_t i = 1; i <= delta; i++) {
         uint32_t abs = lastProcessedAbs_ + i;
+        loop = playingSequence().loopSteps();
+        if (loop <= 0) {
+            stopPlayback();
+            return;
+        }
         uint32_t step = (abs - playStartAbs_) % static_cast<uint32_t>(loop);
+
+        // A slot selected during playback takes over when the current loop
+        // wraps to step 0. Selection itself is immediate, but the old sequence
+        // always finishes its current pass.
+        if (step == 0 && abs != playStartAbs_ && playSlot_ != seqSlot_) {
+            Sequence& next = selected();
+            if (next.empty()) {
+                stopPlayback();
+                showStatus("Seq empty", "", now_us);
+                return;
+            }
+            playSlot_ = seqSlot_;
+            playStartAbs_ = abs;
+            // Do not let the old sequence's held chord bleed into the new one
+            // when the new sequence has no event on its downbeat.
+            if (!next.eventAt(0)) chord_.releaseSequenceChord();
+            loop = next.loopSteps();
+            if (loop <= 0) {
+                stopPlayback();
+                return;
+            }
+            step = 0;
+            showStatus("Seq " + std::to_string(playSlot_ + 1), "play", now_us);
+        }
         processStep(step, now_us);
     }
     lastProcessedAbs_ = firedAbs;

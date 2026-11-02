@@ -27,6 +27,17 @@ protected:
         return {usage, pressed, mods};
     }
 
+    // Press a key, then advance past the chord press-group window so the
+    // buffered chord triggers before the test inspects the result.
+    void press(uint8_t usage, uint64_t now_us, uint8_t mods = 0) {
+        engine_->handleKeyEvent({usage, true, mods}, now_us);
+        engine_->update(now_us + ChordEngine::PRESS_GROUP_US);
+    }
+
+    void release(uint8_t usage, uint64_t now_us, uint8_t mods = 0) {
+        engine_->handleKeyEvent({usage, false, mods}, now_us);
+    }
+
     // Note-on values (notes with velocity > 0), in emission order.
     std::vector<uint8_t> noteOnNotes() const {
         std::vector<uint8_t> out;

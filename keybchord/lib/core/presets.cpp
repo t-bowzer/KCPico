@@ -40,6 +40,7 @@ bool PresetSlot::sameParams(const PresetSlot& other) const {
         && chord.min_interval     == other.chord.min_interval
         && chord.inversion        == other.chord.inversion
         && chord.arp_mode         == other.chord.arp_mode
+        && chord.arp_rate         == other.chord.arp_rate
         && chord.pattern          == other.chord.pattern
         && chord.channel          == other.chord.channel
         && strum.octave           == other.strum.octave
@@ -63,12 +64,14 @@ bool PresetSlot::sameParams(const PresetSlot& other) const {
         && rhythm.channel == other.rhythm.channel
         && rhythm.pattern == other.rhythm.pattern
         && rhythm.drums   == other.rhythm.drums
+        && seq_use_recorded == other.seq_use_recorded
         && macros         == other.macros;
 }
 
 PresetSlot makePreset(const ChordParams& chord, const StrumParams& strum,
                       const BassParams& bass, const RhythmParams& rhythm,
-                      const std::string& name, const MacroConfig& macros) {
+                      const std::string& name, const MacroConfig& macros,
+                      bool seq_use_recorded) {
     PresetSlot p;
     p.name   = name;
     p.chord  = chord;
@@ -76,6 +79,7 @@ PresetSlot makePreset(const ChordParams& chord, const StrumParams& strum,
     p.bass   = bass;
     p.rhythm = rhythm;
     p.macros = macros;
+    p.seq_use_recorded = seq_use_recorded;
     return p;
 }
 
@@ -413,6 +417,26 @@ const char* arpModeName(ArpMode m) {
     }
 }
 
+ArpRate parseArpRate(const std::string& s) {
+    if (s == "whole" || s == "1/1" || s == "1")          return ArpRate::Whole;
+    if (s == "half" || s == "1/2" || s == "2")           return ArpRate::Half;
+    if (s == "quarter" || s == "1/4" || s == "4")        return ArpRate::Quarter;
+    if (s == "eighth" || s == "1/8" || s == "8")         return ArpRate::Eighth;
+    if (s == "thirty_second" || s == "1/32" || s == "32") return ArpRate::ThirtySecond;
+    return ArpRate::Sixteenth;
+}
+
+const char* arpRateName(ArpRate r) {
+    switch (r) {
+        case ArpRate::Whole:        return "whole";
+        case ArpRate::Half:         return "half";
+        case ArpRate::Quarter:      return "quarter";
+        case ArpRate::Eighth:       return "eighth";
+        case ArpRate::ThirtySecond: return "thirty_second";
+        default:                    return "sixteenth";
+    }
+}
+
 StrumMode parseStrumMode(const std::string& s) {
     if (s == "scale") return StrumMode::Scale;
     if (s == "piano") return StrumMode::Piano;
@@ -480,6 +504,17 @@ PresetSlot loadPreset(StorageAdapter& storage, int bank, int slot) {
         p.name = obj["name"].as<std::string>();
     }
 
+    if (obj.containsKey("seq_settings")) {
+        auto v = obj["seq_settings"];
+        if (v.is<const char*>()) {
+            p.seq_use_recorded = std::string(v.as<const char*>()) != "live";
+        } else if (v.is<bool>()) {
+            p.seq_use_recorded = v.as<bool>();
+        } else if (v.is<int>()) {
+            p.seq_use_recorded = v.as<int>() != 0;
+        }
+    }
+
     if (obj.containsKey("chord")) {
         auto c = obj["chord"];
         if (c.containsKey("channel") && c["channel"].is<int>())
@@ -505,6 +540,8 @@ PresetSlot loadPreset(StorageAdapter& storage, int bank, int slot) {
             p.chord.inversion = parseInversion(c["inversion"].as<std::string>());
         if (c.containsKey("arp_mode") && c["arp_mode"].is<const char*>())
             p.chord.arp_mode = parseArpMode(c["arp_mode"].as<std::string>());
+        if (c.containsKey("arp_rate") && c["arp_rate"].is<const char*>())
+            p.chord.arp_rate = parseArpRate(c["arp_rate"].as<std::string>());
         if (c.containsKey("pattern") && c["pattern"].is<const char*>()) {
             int idx = chordPatternIndex(c["pattern"].as<std::string>());
             if (idx >= 0) p.chord.pattern = static_cast<uint8_t>(idx);
@@ -672,6 +709,7 @@ bool savePreset(StorageAdapter& storage, int bank, int slot, const PresetSlot& p
 
     auto obj = arr[slot];
     obj["name"] = preset.name;
+    obj["seq_settings"] = preset.seq_use_recorded ? "recorded" : "live";
     writeMacroConfig(obj, preset.macros);
 
     auto chord = obj["chord"].to<JsonObject>();
@@ -686,6 +724,7 @@ bool savePreset(StorageAdapter& storage, int bank, int slot, const PresetSlot& p
     chord["min_interval"]     = preset.chord.min_interval;
     chord["inversion"]        = inversionName(preset.chord.inversion);
     chord["arp_mode"]         = arpModeName(preset.chord.arp_mode);
+    chord["arp_rate"]         = arpRateName(preset.chord.arp_rate);
     chord["play_mode"]        = playModeName(preset.chord.play_mode);
     chord["pattern"]          = chordPatternName(preset.chord.pattern);
 

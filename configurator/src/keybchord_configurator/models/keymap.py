@@ -47,7 +47,7 @@ RESERVED_NAMED_KEYS: frozenset[str] = frozenset(
 KEYMAP_PARAM_NAMES: tuple[str, ...] = (
     "chord_octave", "chord_mode", "chord_voicing", "chord_duration",
     "chord_velocity", "chord_pan", "chord_roll", "chord_min_notes",
-    "chord_min_interval", "chord_inversion", "arp_mode",
+    "chord_min_interval", "chord_inversion", "arp_mode", "arp_rate",
     "chord_pattern",
     "strum_octave", "strum_duration", "strum_velocity", "strum_layout",
     "strum_mode", "strum_root", "strum_scale",
@@ -76,6 +76,12 @@ INVERSION_SHORT: dict[str, int] = {"root": 0, "first": 1, "second": 2, "third": 
 ARP_SHORT: dict[str, int] = {
     "up": 0, "down": 1, "up_down": 2, "alternating": 3, "random": 4,
 }
+ARP_RATE_SHORT: dict[str, int] = {
+    "whole": 0, "half": 1, "quarter": 2, "eighth": 3,
+    "sixteenth": 4, "thirty_second": 5,
+    "1/1": 0, "1/2": 1, "1/4": 2, "1/8": 3, "1/16": 4, "1/32": 5,
+    "16th": 4, "32nd": 5,
+}
 STRUM_MODE_SHORT: dict[str, int] = {"chord": 0, "scale": 1, "piano": 2}
 SCALE_SHORT: dict[str, int] = {
     "ionian": 0, "dorian": 1, "phrygian": 2, "lydian": 3,
@@ -90,6 +96,7 @@ PARAM_VALUE_TABLE: dict[str, dict[str, int]] = {
     "chord_voicing": VOICING_SHORT,
     "chord_inversion": INVERSION_SHORT,
     "arp_mode": ARP_SHORT,
+    "arp_rate": ARP_RATE_SHORT,
     "strum_mode": STRUM_MODE_SHORT,
     "strum_scale": SCALE_SHORT,
 }

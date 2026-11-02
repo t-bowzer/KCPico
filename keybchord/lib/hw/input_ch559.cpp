@@ -67,11 +67,11 @@ std::vector<KeyEvent> InputCh559::poll() {
                         consumer = true;
                     } else if ((msg.hid_usage == ch559::HID_USAGE_KEYBOARD ||
                                 msg.hid_usage == ch559::HID_USAGE_CONSUMER) &&
-                               cp.applyQmkConsumer(msg.payload.data(), len,
-                                                   time_us_64(), eventQueue_)) {
-                        // Descriptor unavailable (e.g. the Pico was reflashed
-                        // without resetting the CH559, so HID_INFO was not
-                        // resent). Decode QMK's standard 3-byte Consumer report.
+                               cp.applyConsumerFallback(msg.payload.data(), len,
+                                                       time_us_64(),
+                                                       eventQueue_)) {
+                        // Descriptor unavailable or not matched. Decode common
+                        // 1/2/3-byte Consumer report forms.
                         consumer = true;
                     }
                 }

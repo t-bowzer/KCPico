@@ -315,6 +315,9 @@ void setup() {
     g_editEngine->setMidiSendCallback([](const std::vector<uint8_t>& bytes) {
         if (g_router) g_router->sendBytes(bytes.data(), bytes.size());
     });
+    g_editEngine->setClockResyncCallback([]() {
+        if (g_rhythmEngine) g_rhythmEngine->resyncClock();
+    });
     g_editEngine->setDrumAuditionCallback([](uint8_t note) {
         uint8_t ch = g_state.pendingRhythm.channel;
         g_router->noteOn(ch, note, 100);

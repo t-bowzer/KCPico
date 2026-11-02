@@ -16,6 +16,21 @@ namespace {
 // key's chord takes over. Tunable; 50ms is imperceptible for chord changes.
 constexpr uint64_t RELEASE_BUFFER_US = 25000;
 
+
+// Master-clock ticks between arpeggiator notes (24 PPQN). Whole = 4 beats,
+// Half = 2, Quarter = 1, Eighth = 1/2, Sixteenth = 1/4, ThirtySecond = 1/8.
+uint32_t arpTicksPerStep(ArpRate rate) {
+    switch (rate) {
+        case ArpRate::Whole:        return 24 * 4;
+        case ArpRate::Half:         return 24 * 2;
+        case ArpRate::Quarter:      return 24;
+        case ArpRate::Eighth:       return 12;
+        case ArpRate::ThirtySecond: return 3;
+        case ArpRate::Sixteenth:
+        default:                    return 6;
+    }
+}
+
 } // namespace
 
 
@@ -200,12 +215,18 @@ void ChordEngine::onModeChanged() {
 }
 
 void ChordEngine::onArpModeChanged() {
-    // Adopt the newly-edited mode onto the running arpeggio (the active chord is
-    // a snapshot taken at trigger time, so its arp_mode is otherwise stale).
+    // Adopt the newly-edited mode/rate onto the running arpeggio (the active
+    // chord is a snapshot taken at trigger time, so its arp params are stale).
     state_.activeChord.arp_mode = state_.pendingChord.arp_mode;
+    state_.activeChord.arp_rate = state_.pendingChord.arp_rate;
     if (!arpActive_ || voicing_.empty()) return;
     arpSeq_ = arpSequence(state_.activeChord.arp_mode, voicing_.size());
     arpPos_ = 0;
+    // Re-arm to the next rate boundary so a rate change takes effect on the
+    // next note instead of after the old (possibly longer) interval.
+    lastArpTickBucket_ =
+        state_.rhythmClock.tickAbs.load() /
+        arpTicksPerStep(state_.activeChord.arp_rate);
 }
 
 void ChordEngine::resetVoicing() {
@@ -234,7 +255,10 @@ const ChordPattern* ChordEngine::patternAt(int index) const {
 }
 
 const ChordPattern* ChordEngine::currentPattern() const {
-    int idx = state_.pendingChord.pattern;
+    // Sequence playback uses the pattern captured in its parameter snapshot;
+    // live chords keep following the pending (live-edited) pattern index.
+    int idx = sequenceActive_ ? state_.activeChord.pattern
+                              : state_.pendingChord.pattern;
     if (idx < 0 || idx >= static_cast<int>(patterns_.size())) return nullptr;
     return &patterns_[idx];
 }
@@ -307,14 +331,33 @@ void ChordEngine::update(uint64_t now_us) {
     }
 
     if (arpActive_) {
-        if (followRhythmClock()) {
-            uint32_t stepAbs = state_.rhythmClock.stepAbs;
-            if (stepAbs != lastRhythmStep_) {
-                lastRhythmStep_ = stepAbs;
+        bool startedThisUpdate = false;
+        if (arpStartPending_) {
+            if (now_us >= arpStartDeadlineUs_) {
+                arpStartPending_ = false;
+                uint64_t bucket =
+                    state_.rhythmClock.tickAbs.load() /
+                    arpTicksPerStep(state_.activeChord.arp_rate);
+                // The Core 1 tick may not have been published yet at the exact
+                // deadline. Keep the expected boundary bucket so the first note
+                // is not followed by a second one on the same clock edge.
+                if (bucket > lastArpTickBucket_) lastArpTickBucket_ = bucket;
+                playFirstArpNote(now_us);
+                startedThisUpdate = true;
+            }
+        }
+
+        // The arpeggiator always runs from the free-running master clock, even
+        // when the rhythm engine is stopped, so its notes stay phase-locked to
+        // the beat LED instead of drifting from the chord-press instant.
+        if (!arpStartPending_ && !startedThisUpdate) {
+            uint64_t bucket =
+                state_.rhythmClock.tickAbs.load() /
+                arpTicksPerStep(state_.activeChord.arp_rate);
+            if (bucket > lastArpTickBucket_) {
+                lastArpTickBucket_ = bucket;
                 stepArpeggio(now_us);
             }
-        } else if (now_us >= arpNext_us_) {
-            stepArpeggio(now_us);
         }
     }
 
@@ -346,6 +389,10 @@ void ChordEngine::update(uint64_t now_us) {
         }
     }
 
+    if (pressBufferPending_ && now_us >= pressBufferDeadlineUs_) {
+        flushPressBuffer(now_us);
+    }
+
     if (releaseBufferPending_ && now_us >= releaseBufferDeadlineUs_) {
         releaseBufferPending_ = false;
         resolveAndTriggerIfChanged(now_us, false);
@@ -367,6 +414,8 @@ void ChordEngine::allNotesOff() {
     currentChordValid_ = false;
     baseChordValid_ = false;
     releaseBufferPending_ = false;
+    pressBufferPending_ = false;
+    pressBufferedValid_ = false;
     pendingSwitch_ = false;
 }
 
@@ -388,10 +437,64 @@ void ChordEngine::removeCell(const GridCell& cell) {
 
 void ChordEngine::onPress(uint64_t now_us) {
     releaseBufferPending_ = false;
-    resolveAndTriggerIfChanged(now_us, true);
+
+    ResolvedChord chord;
+    if (resolveChord(heldCells_, backtickHeld_, chord)) {
+        pendingSwitch_ = false;
+        baseChord_ = chord;
+        baseChordValid_ = true;
+
+        ResolvedChord merged = chord;
+        merged.add9  = merged.add9  || ext9Held_;
+        merged.add11 = merged.add11 || ext11Held_;
+        merged.add13 = merged.add13 || ext13Held_;
+
+        state_.selectedChord = merged;
+        state_.selectedChordValid = true;
+
+        // Defer the trigger so a second key arriving in the same/next USB
+        // report can join this chord before anything sounds.
+        pressBufferedChord_ = merged;
+        pressBufferedValid_ = true;
+        pressBufferPending_ = true;
+        pressBufferDeadlineUs_ = now_us + PRESS_GROUP_US;
+        return;
+    }
+
+    // Keys still held but no valid combination: keep the current chord and
+    // remember to switch once the stale key is released.
+    if (currentChordValid_) pendingSwitch_ = true;
+}
+
+void ChordEngine::flushPressBuffer(uint64_t now_us) {
+    if (!pressBufferPending_) return;
+    pressBufferPending_ = false;
+    bool valid = pressBufferedValid_;
+    ResolvedChord chord = pressBufferedChord_;
+    pressBufferedValid_ = false;
+    if (valid) {
+        // A fresh press group always re-attacks, matching the old force-on-press
+        // behavior for repeat presses of the same chord.
+        triggerChord(chord, now_us);
+    }
 }
 
 void ChordEngine::onRelease(uint64_t now_us) {
+    // Keep the buffered press group alive while other chord keys are still
+    // held. Once every key is up, flush immediately so a quick tap still sounds
+    // (and Held/ArpHold still latch it).
+    if (pressBufferPending_) {
+        // Keep the candidate captured by the press group. Re-resolving on each
+        // release would downgrade a quick T+B tap to B alone before the group
+        // window expires.
+        if (heldCells_.empty() && !backtickHeld_) {
+            flushPressBuffer(now_us);
+            // Fall through to the normal release handling for momentary modes.
+        } else {
+            return;
+        }
+    }
+
     // A pending switch (an overlapped new-chord press that formed an invalid
     // combination) re-resolves immediately once the stale key is lifted, in
     // every play mode, so the new chord lands without the release-buffer delay.
@@ -517,10 +620,12 @@ void ChordEngine::playSequenceChord(const ResolvedChord& chord,
     stopSound();
     sequenceActive_ = true;
 
-    // The sequence's mixed parameter snapshot becomes the active voice. It does
-    // not touch pending params, selectedChord, or the strum note pool.
+    // The sequence's mixed parameter snapshot becomes the active voice. Pending
+    // params are untouched, but the sequence chord is now the selected chord so
+    // the strum plate (and LCD chord name / walking bass) follows playback.
     state_.activeChord = params;
-    state_.activeChord.play_mode = PlayMode::Held;
+    state_.selectedChord = chord;
+    state_.selectedChordValid = true;
     const ChordParams& p = state_.activeChord;
     activeChannel_ = p.channel;
 
@@ -539,16 +644,40 @@ void ChordEngine::playSequenceChord(const ResolvedChord& chord,
         return;
     }
 
-    sounding_ = true;
-    router_.cc(p.channel, midi::CC_PAN, p.pan);
-    if (p.chord_roll_ms == 0) {
-        activeNotes_ = notes;
-        for (uint8_t n : notes) {
-            router_.noteOn(p.channel, n, p.velocity);
-        }
-    } else {
-        activeNotes_.clear();
-        scheduleRoll(notes, now_us);
+    switch (p.play_mode) {
+        case PlayMode::Silent:
+            sounding_ = false;
+            break;
+
+        case PlayMode::Arpeggio:
+        case PlayMode::ArpHold:
+            sounding_ = true;
+            router_.cc(p.channel, midi::CC_PAN, p.pan);
+            beginArp(now_us);
+            break;
+
+        case PlayMode::Pattern:
+        case PlayMode::PatternHold:
+            sounding_ = true;
+            router_.cc(p.channel, midi::CC_PAN, p.pan);
+            beginPattern(now_us);
+            break;
+
+        case PlayMode::Held:
+        case PlayMode::PressToPlay:
+        default:
+            sounding_ = true;
+            router_.cc(p.channel, midi::CC_PAN, p.pan);
+            if (p.chord_roll_ms == 0) {
+                activeNotes_ = notes;
+                for (uint8_t n : notes) {
+                    router_.noteOn(p.channel, n, p.velocity);
+                }
+            } else {
+                activeNotes_.clear();
+                scheduleRoll(notes, now_us);
+            }
+            break;
     }
 }
 
@@ -606,25 +735,75 @@ std::vector<int> ChordEngine::arpSequence(ArpMode mode, size_t n) {
     return seq;
 }
 
-void ChordEngine::beginArp(uint64_t now_us) {
+uint64_t ChordEngine::nextArpBoundaryUs(uint32_t ticksPerStep) const {
+    if (ticksPerStep == 0) return 0;
+
+    uint64_t nextTickUs = state_.rhythmClock.nextTickUs.load();
+    if (nextTickUs == 0) return 0;
+
+    uint32_t tickUs = clockTickUs(state_.pendingRhythm.tempo);
+    if (tickUs == 0) return 0;
+
+    uint64_t tickAbs = state_.rhythmClock.tickAbs.load();
+    uint32_t ticksUntilBoundary = static_cast<uint32_t>(
+        ticksPerStep - (tickAbs % ticksPerStep));
+    // tickAbs is the most recently emitted tick and nextTickUs is the one after
+    // it; the next bucket starts when the counter reaches the next multiple of
+    // ticksPerStep.
+    return nextTickUs +
+        static_cast<uint64_t>(ticksUntilBoundary - 1) * tickUs;
+}
+
+void ChordEngine::playFirstArpNote(uint64_t now_us) {
+    (void)now_us;
     const ChordParams& p = state_.activeChord;
-    arpSeq_ = arpSequence(p.arp_mode, voicing_.size());
-    arpPos_ = 0;
-    arpActive_ = true;
-    lastRhythmStep_ = state_.rhythmClock.stepAbs;
+    if (voicing_.empty()) {
+        arpActive_ = false;
+        return;
+    }
 
     size_t idx;
     if (p.arp_mode == ArpMode::Random) {
         rngState_ = rngState_ * 1103515245u + 12345u;
         idx = rngState_ % voicing_.size();
     } else {
+        if (arpSeq_.empty()) {
+            arpSeq_ = arpSequence(p.arp_mode, voicing_.size());
+            arpPos_ = 0;
+            if (arpSeq_.empty()) { arpActive_ = false; return; }
+        }
         idx = static_cast<size_t>(arpSeq_[0]);
     }
 
     uint8_t note = voicing_[idx];
     router_.noteOn(p.channel, note, p.velocity);
     activeNotes_.push_back(note);
-    arpNext_us_ = now_us + stepUs(state_.pendingRhythm.tempo);
+}
+
+void ChordEngine::beginArp(uint64_t now_us) {
+    const ChordParams& p = state_.activeChord;
+    arpSeq_ = arpSequence(p.arp_mode, voicing_.size());
+    arpPos_ = 0;
+    arpActive_ = true;
+    arpStartPending_ = false;
+
+    uint32_t ticksPerStep = arpTicksPerStep(p.arp_rate);
+    uint64_t tickAbs = state_.rhythmClock.tickAbs.load();
+    uint64_t currentBucket = tickAbs / ticksPerStep;
+    uint64_t boundaryUs = nextArpBoundaryUs(ticksPerStep);
+
+    // Quantize only starts that land just before the next arp boundary. A
+    // press at/after the boundary (or earlier than the window) plays at once.
+    if (boundaryUs > now_us &&
+        boundaryUs - now_us <= ARP_EARLY_QUANTIZE_US) {
+        arpStartPending_ = true;
+        arpStartDeadlineUs_ = boundaryUs;
+        lastArpTickBucket_ = currentBucket + 1;
+        return;
+    }
+
+    lastArpTickBucket_ = currentBucket;
+    playFirstArpNote(now_us);
 }
 
 void ChordEngine::stepArpeggio(uint64_t now_us) {
@@ -659,7 +838,6 @@ void ChordEngine::stepArpeggio(uint64_t now_us) {
     uint8_t note = voicing_[idx];
     router_.noteOn(p.channel, note, p.velocity);
     activeNotes_.push_back(note);
-    arpNext_us_ = now_us + stepUs(state_.pendingRhythm.tempo);
 }
 
 void ChordEngine::releaseChord() {
@@ -667,6 +845,8 @@ void ChordEngine::releaseChord() {
     sequenceActive_ = false;
     currentChordValid_ = false;
     baseChordValid_ = false;
+    pressBufferPending_ = false;
+    pressBufferedValid_ = false;
     pendingSwitch_ = false;
 }
 
@@ -678,6 +858,8 @@ void ChordEngine::stopSound() {
     rollPending_.clear();
     sounding_ = false;
     arpActive_ = false;
+    arpStartPending_ = false;
+    arpStartDeadlineUs_ = 0;
     patternActive_ = false;
 }
 

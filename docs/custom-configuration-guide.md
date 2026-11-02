@@ -74,7 +74,7 @@ A single object. Any omitted key uses its default.
 |-----|------|-------|---------|-------|
 | `midi.din_enabled` | bool | — | `true` | Reserved; parsed but not currently used (DIN MIDI out is always active). |
 | `midi.usb_enabled` | bool | — | `true` | USB MIDI device output on/off (v0.2). The interface always enumerates; this only gates whether bytes are sent. Toggle = `Ctrl+F8`. |
-| `midi.clock_enabled` | bool | — | `false` | Transmit MIDI clock (`0xF8`) on DIN and USB. Toggle = `F8`. Switching it on starts at the next 24-tick beat boundary so external devices stay in phase with the beat LED; switching off is immediate. |
+| `midi.clock_enabled` | bool | — | `false` | Transmit MIDI clock (`0xF8`) on DIN and USB. Toggle = `F8`. Clock Out is clock-only: enabling waits for the next 24-tick beat boundary so the external beat division starts on the LED boundary; disabling simply stops clocks (no MIDI Stop). **Double-tap `F8`** to send MIDI Start (`0xFA`) at the next beat boundary and re-align a slave after it was stopped or restarted locally. |
 | `chord.base_root_midi` | int | 0–127 | `60` | Anchor MIDI note for chord root position (60 = C4). |
 | `chord.note_range` | [int,int] | 0–127 each | `[48, 84]` | Voicing note window. An inverted pair is auto-swapped. |
 | `display.revert_timeout_ms` | int | 250–5000 | `1500` | How long a parameter value stays on the LCD before reverting. |
@@ -102,6 +102,7 @@ firmware deletes those files on first boot to reclaim flash).
 ```json
 {
   "name": "Ballad Pad",
+  "seq_settings": "recorded",
   "number_keys": "strum",
   "macros": {},
   "chord": {
@@ -116,6 +117,7 @@ firmware deletes those files on first boot to reclaim flash).
     "min_interval": 0,
     "inversion": "root",
     "arp_mode": "up",
+    "arp_rate": "sixteenth",
     "channel": 1
   },
   "strum": {
@@ -162,6 +164,10 @@ firmware deletes those files on first boot to reclaim flash).
 }
 ```
 
+`seq_settings` (`"recorded"` or `"live"`) is the preset's global Recorded/Live
+sequence-settings override, saved with the preset. Omitted values default to
+`"recorded"`; boolean and integer spellings are also accepted when loading.
+
 ### 3.2 `chord` parameters
 
 | Key | Type | Range | Default | Notes |
@@ -177,10 +183,14 @@ firmware deletes those files on first boot to reclaim flash).
 | `min_interval` | int | 0–12 | `0` | Min semitones between adjacent notes; 0 = off. |
 | `inversion` | enum | — | `root` | `root` / `first` / `second` / `third` |
 | `arp_mode` | enum | — | `up` | `up` / `down` / `up_down` / `alternating` / `random` |
+| `arp_rate` | enum | — | `sixteenth` | `whole` / `half` / `quarter` / `eighth` / `sixteenth` / `thirty_second` |
 | `channel` | int | 1–16 | `1` | MIDI channel. |
 
 > `arp_hold` is an arpeggio that **latches**: it keeps stepping until the next
 > chord is pressed or `Esc` is pressed (a combination of `arpeggio` and `held`).
+> Chord-grid keys pressed within ~15 ms are grouped as one chord, so combination
+> shapes do not briefly sound the first key's chord when the keys are not
+> perfectly simultaneous.
 
 ### 3.3 `strum` parameters
 
@@ -311,7 +321,7 @@ filesystem.
     {
       "bars": 4,
       "steps_per_bar": 16,
-      "recorded": [0, 500, 100, 64, 0, 0, 3, 0, 0, 0, 0],
+      "recorded": [0, 500, 100, 64, 0, 0, 3, 0, 0, 0, 0, 0, 4],
       "live": 0,
       "events": [[0, 0], [16, 640]]
     }
@@ -323,8 +333,8 @@ filesystem.
 |-------|------|-------|
 | `bars` | int | `1`, `2`, `4`, or `8`. |
 | `steps_per_bar` | int | Recorded meter, 4–64 (usually `16`, or `12` for 3/4). |
-| `recorded` | int[11] | Settings snapshot, in this order: `octave`, `note_duration_ms`, `velocity`, `pan`, `voicing_mode` (0–3), `chord_roll_ms`, `min_notes`, `min_interval`, `inversion` (0–3), `arp_mode` (0–4), `pattern` index. |
-| `live` | int | Bitmask; bit *i* set = use the **live** value for `recorded[i]` during playback. Play mode is always forced to `held`; channel stays live. |
+| `recorded` | int[13] | Settings snapshot, in this order: `octave`, `note_duration_ms`, `velocity`, `pan`, `voicing_mode` (0–3), `chord_roll_ms`, `min_notes`, `min_interval`, `inversion` (0–3), `arp_mode` (0–4), `pattern` index, `play_mode` (0–6), `arp_rate` (0–5). Legacy 11-value arrays load with play mode `held` and arp rate `16th`. |
+| `live` | int | Bitmask; bit *i* set = use the **live** value for `recorded[i]` during playback. Channel stays live. |
 | `events` | `[step, chord_id]` array | Max **64** events. `step` is a 16th-note index in `0 .. bars*steps_per_bar-1`. The last event at a duplicate step wins. |
 
 **Chord ID encoding:** `chord_id = root_pc * 128 + type * 8 + extension_mask`.
@@ -345,8 +355,7 @@ Fm7 with add9+add13 = `5*128 + 4*8 + 5 = 677`.
   persistent (`Rec arm`/`Wait bar` → `Count-in`/`1 bar` → `Recording N/N`), so
   it does not flash back to idle between bars.
 - `Ctrl+F10` arms playback; it loops from the next rhythm bar until stopped.
-- Rhythm must be **enabled** (it may be muted). If it is off, the LCD shows
-  `Enable rhythm`.
+- If rhythm is off, record/play enable it automatically and mute the drums.
 - While a live chord is held or latched, sequence events are skipped; the
   sequence resumes at the next event after the live chord ends.
 - Recording, bar changes, and clearing save immediately. The preset dirty `*`
@@ -354,12 +363,14 @@ Fm7 with add9+add13 = `5*128 + 4*8 + 5 = 677`.
 - `Ctrl+F11` clears the selected sequence (confirm with `Enter`). Clearing a
   preset also removes its sequence file.
 - `Super+F12` opens **Seq Edit** (`Slot`, `Bars`, `Settings`). `Settings`
-  chooses the global Recorded/Live override; per-setting Live bits are edited in
-  the configurator's **Sequences** tab.
+  chooses the global Recorded/Live override and is saved with the preset
+  (`seq_settings`: `"recorded"` or `"live"`); per-setting Live bits are edited
+  in the configurator's **Sequences** tab.
 
 **Quick start (on the device):**
 
-1. Press `F5` to enable rhythm; press `F6` to mute drums if you want a
+1. Optionally press `F5` to enable rhythm; record/play enables it automatically
+   and mutes the drums when it is off. Press `F6` to mute drums if you want a
    chord-only recording.
 2. Press `Ctrl+1` to select sequence slot 1 (use `Ctrl+1`…`Ctrl+9`, `Ctrl+0`
    for slots 1–10).
@@ -470,7 +481,7 @@ fixed keys `Mute`, `VolumeUp`, and `VolumeDown`. `Super`+`Esc` (panic) and
 
 `chord_octave`, `chord_mode`, `chord_voicing`, `chord_duration`,
 `chord_velocity`, `chord_pan`, `chord_roll`, `chord_min_notes`,
-`chord_min_interval`, `chord_inversion`, `arp_mode`,
+`chord_min_interval`, `chord_inversion`, `arp_mode`, `arp_rate`,
 `strum_octave`, `strum_duration`, `strum_velocity`, `strum_layout`,
 `strum_mode`, `strum_root`, `strum_scale`,
 `tempo`, `swing`, `rhythm_pattern`, `rhythm_mute`, `rhythm_enable`,
@@ -493,6 +504,7 @@ these **short** names (which differ slightly from the preset JSON names):
 | `chord_voicing` | `root`, `smart`, `down`, `up` (or 0–3) |
 | `chord_inversion` | `root`, `first`, `second`, `third` (or 0–3) |
 | `arp_mode` | `up`, `down`, `up_down`, `alternating`, `random` (or 0–4) |
+| `arp_rate` | `whole`, `half`, `quarter`, `eighth`, `sixteenth`, `thirty_second` (or `1/1`…`1/32`, `16th`, `32nd`, or 0–5) |
 | `strum_mode` | `chord`, `scale`, `piano` (or 0–2) |
 | `strum_scale` | `ionian`, `dorian`, `phrygian`, `lydian`, `mixolydian`, `aeolian`, `locrian`, `harmonic_minor`, `melodic_minor`, `major_pentatonic`, `minor_pentatonic`, `blues` |
 | `bass_pattern` | `Walking`, `Whole`, `Half`, `Quarter`, `Half Alt`, `Quarter Alt`, `3/4 Alt`, `Hold`, `No 6th` (or 0–8, or any user pattern's `name`) |

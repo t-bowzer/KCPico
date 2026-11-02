@@ -53,7 +53,14 @@ from ..models.bounds import (
     VELOCITY_MAX,
     VELOCITY_MIN,
 )
-from ..models.enums import ArpMode, ChordType, InversionMode, VoicingMode
+from ..models.enums import (
+    ArpMode,
+    ArpRate,
+    ChordType,
+    InversionMode,
+    PlayMode,
+    VoicingMode,
+)
 from ..models.sequence import (
     LIVE_SETTING_KEYS,
     LIVE_SETTING_LABELS,
@@ -99,6 +106,23 @@ ARP_LABELS = {
     "Up-Down": int(ArpMode.UP_DOWN),
     "Alternating": int(ArpMode.ALTERNATING),
     "Random": int(ArpMode.RANDOM),
+}
+PLAY_MODE_LABELS = {
+    "Held": int(PlayMode.HELD),
+    "Press-to-play": int(PlayMode.PRESS_TO_PLAY),
+    "Arpeggio": int(PlayMode.ARPEGGIO),
+    "Arp-hold": int(PlayMode.ARP_HOLD),
+    "Silent": int(PlayMode.SILENT),
+    "Pattern": int(PlayMode.PATTERN),
+    "Pattern-hold": int(PlayMode.PATTERN_HOLD),
+}
+ARP_RATE_LABELS = {
+    "Whole": int(ArpRate.WHOLE),
+    "Half": int(ArpRate.HALF),
+    "Quarter": int(ArpRate.QUARTER),
+    "Eighth": int(ArpRate.EIGHTH),
+    "16th": int(ArpRate.SIXTEENTH),
+    "32nd": int(ArpRate.THIRTY_SECOND),
 }
 
 
@@ -226,7 +250,7 @@ class SequenceEditor(QWidget):
 
         hint = QLabel(
             "Left-click a step to pick a chord; right-click clears it. "
-            "Playback uses held chords; Live = use the preset's current value.")
+            "Playback uses the recorded play mode; Live = use the preset's current value.")
         hint.setWordWrap(True)
         right.addWidget(hint)
 
@@ -270,6 +294,8 @@ class SequenceEditor(QWidget):
             INVERSION_LABELS, int(InversionMode.ROOT))
         widgets["arp_mode"] = enum_combo(ARP_LABELS, int(ArpMode.UP))
         widgets["pattern"] = QComboBox()
+        widgets["play_mode"] = enum_combo(PLAY_MODE_LABELS, int(PlayMode.HELD))
+        widgets["arp_rate"] = enum_combo(ARP_RATE_LABELS, int(ArpRate.SIXTEENTH))
 
         for row, key in enumerate(LIVE_SETTING_KEYS, start=1):
             label = LIVE_SETTING_LABELS[row - 1]
@@ -393,6 +419,8 @@ class SequenceEditor(QWidget):
         self._set_combo("inversion", int(rec.inversion))
         self._set_combo("arp_mode", int(rec.arp_mode))
         self._set_combo("pattern", rec.pattern)
+        self._set_combo("play_mode", int(rec.play_mode))
+        self._set_combo("arp_rate", int(rec.arp_rate))
         for i, check in enumerate(self._live_checks):
             check.blockSignals(True)
             check.setChecked(seq.is_live(i))
@@ -475,6 +503,8 @@ class SequenceEditor(QWidget):
         rec.voicing_mode = VoicingMode(int(rec.voicing_mode))
         rec.inversion = InversionMode(int(rec.inversion))
         rec.arp_mode = ArpMode(int(rec.arp_mode))
+        rec.play_mode = PlayMode(int(rec.play_mode))
+        rec.arp_rate = ArpRate(int(rec.arp_rate))
         return rec
 
     def _after_change(self, seq: Sequence) -> None:
@@ -535,6 +565,8 @@ class SequenceEditor(QWidget):
             inversion=chord.inversion,
             arp_mode=chord.arp_mode,
             pattern=pattern,
+            play_mode=chord.play_mode,
+            arp_rate=chord.arp_rate,
         )
         self._load_settings(seq)
         self.changed.emit()

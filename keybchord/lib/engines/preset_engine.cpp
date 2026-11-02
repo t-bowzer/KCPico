@@ -41,7 +41,8 @@ void PresetEngine::recomputeDirty() {
                                             state_.currentSlot);
     PresetSlot cur = makePreset(state_.pendingChord, state_.pendingStrum,
                                 state_.pendingBass, state_.pendingRhythm, stored.name,
-                                state_.pendingMacros);
+                                state_.pendingMacros,
+                                state_.sequencer.useRecorded);
     state_.dirty = !cur.sameParams(stored);
 }
 
@@ -94,6 +95,7 @@ void PresetEngine::loadCursor(uint64_t now_us) {
     state_.pendingBass   = stored.bass;
     state_.pendingRhythm = stored.rhythm;
     state_.pendingMacros = stored.macros;
+    state_.sequencer.useRecorded = stored.seq_use_recorded;
 
     state_.currentBank  = bank;
     state_.currentSlot  = slot;
@@ -142,7 +144,8 @@ void PresetEngine::confirmPrompt(uint64_t now_us) {
         PresetSlot existing = loadPresetOrDefault(storage_, bank, slot);
         PresetSlot out = makePreset(state_.pendingChord, state_.pendingStrum,
                                     state_.pendingBass, state_.pendingRhythm,
-                                    existing.name, state_.pendingMacros);
+                                    existing.name, state_.pendingMacros,
+                                    state_.sequencer.useRecorded);
         savePreset(storage_, bank, slot, out);
         state_.dirty = false;
         state_.currentPresetName = existing.name;
@@ -154,6 +157,7 @@ void PresetEngine::confirmPrompt(uint64_t now_us) {
         state_.pendingBass   = BassParams::defaults();
         state_.pendingRhythm = RhythmParams::defaults();
         state_.pendingMacros = MacroConfig::defaults();
+        state_.sequencer.useRecorded = true;
         savePreset(storage_, bank, slot, PresetSlot::defaults());
         state_.dirty = false;
         if (oldMode != state_.pendingChord.play_mode && modeChanged_) {
@@ -250,6 +254,7 @@ void PresetEngine::loadStartupPreset() {
     state_.pendingBass   = stored.bass;
     state_.pendingRhythm = stored.rhythm;
     state_.pendingMacros = stored.macros;
+    state_.sequencer.useRecorded = stored.seq_use_recorded;
     state_.currentPresetName = stored.name;
     state_.dirty = false;
 }

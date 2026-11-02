@@ -28,6 +28,8 @@ void StateManager::loadDefaults() {
     editParam = 0;
     rhythmClock.running.store(false);
     rhythmClock.stepAbs.store(0);
+    rhythmClock.tickAbs.store(0);
+    rhythmClock.nextTickUs.store(0);
     rhythmClock.step.store(0);
     rhythmClock.stepsPerBar.store(16);
     rhythmClock.beat.store(0);

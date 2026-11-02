@@ -161,19 +161,20 @@ The system is a set of cooperating modules coordinated by a central state manage
   - *Pattern:* chord tones played through the selected chord pattern's 16th-note grid (6.10), in lockstep with the rhythm clock; momentary (releases on key-up).
   - *PatternHold:* like *Pattern*, but latches on key release until the next chord / cancel.
   - *Silent (strum-only):* no chord notes sounded directly; chord defines the note pool for the strum plate only.
-- **FR-C4** Adjustable chord parameters: note duration, velocity, pan (CC10), chord roll, minimum note count, minimum interval, inversion, arpeggio mode, and chord pattern, via the Chord Edit menu (5.4). Values shown on LCD when edited.
+- **FR-C4** Adjustable chord parameters: note duration, velocity, pan (CC10), chord roll, minimum note count, minimum interval, inversion, arpeggio mode, arpeggio rate, and chord pattern, via the Chord Edit menu (5.4). Values shown on LCD when edited.
 - **FR-C5** Chord octave shift via `+` / `-` keys (Section 5), clamped to a sensible MIDI range.
 - **FR-C6** Voicing mode is a live-toggleable parameter (`root_position` ⇄ `smart` voice-leading), saved per-preset (see Section 6.4).
 - **FR-C7** Chord extensions (add9, add11, add13) are **held modifiers**, not toggleable parameters. Holding `Left` arrow adds add9, `Down` arrow adds add11, and `Right` arrow adds add13 to the currently-held chord (they latch per chord; see 5.4). They are **not** saved per-preset.
 - **FR-C8** Left-adjacent chord combinations (newer Omnichord behavior): Major + left-adjacent 7th = **sus4**; Major + left-adjacent Minor = **add9**. Leftmost column uses the `` ` `` key as modifier source (see 6.3).
-- **FR-C9** **Parameter latching in Held mode:** while chord mode is `held`, changing any chord parameter (note duration, velocity, pan, octave, voicing mode, chord roll, min notes, min interval, inversion, arp mode, channel, chord type/combination) — **including loading a preset** — must NOT alter notes that are currently sounding. The change takes effect only on the **next** chord triggered. The currently-held chord retains the parameter values it was triggered with until it is released and re-triggered. (In other play modes, parameter changes may apply on the next note event per that mode's timing.)
+- **FR-C9** **Parameter latching in Held mode:** while chord mode is `held`, changing any chord parameter (note duration, velocity, pan, octave, voicing mode, chord roll, min notes, min interval, inversion, arp mode, arp rate, channel, chord type/combination) — **including loading a preset** — must NOT alter notes that are currently sounding. The change takes effect only on the **next** chord triggered. The currently-held chord retains the parameter values it was triggered with until it is released and re-triggered. (In other play modes, parameter changes may apply on the next note event per that mode's timing.)
 - **FR-C10** **Note lifecycle per play mode:**
   - *Held:* chord sounds on trigger and sustains **indefinitely** until the next chord is pressed or the panic/cancel control is used. Pressing a new chord ends the previous one.
   - *Press-to-play:* note-on on key press; note-off on **key-up**.
-  - *Arpeggio:* each arpeggiated note lasts `note_duration_ms` (chord param); sequence timing follows the rhythm clock when rhythm is enabled.
+  - *Arpeggio:* each arpeggiated note lasts `note_duration_ms` (chord param); the `arp_rate` subdivision sets the step timing from the free-running 24-PPQN master clock, so notes stay aligned with the beat LED whether or not the rhythm engine is running. If an arpeggiated chord starts within **30 ms before** the next arp step boundary, its first note is deferred to that boundary instead of sounding immediately (which would otherwise place the first two notes only milliseconds apart). Presses at/after the boundary or earlier than the window start immediately.
   - *Pattern / PatternHold:* each step's degree notes sound for `sustain_steps` (or `note_duration_ms` when percussive); the grid follows the rhythm clock when enabled, else the stored tempo.
   - *Silent:* no chord notes are sounded (strum pool only).
 - **FR-C11** **Panic / all-notes-off:** `Super+Esc` immediately sends All-Sound-Off (CC120) and All-Notes-Off (CC123) on all channels to the DIN output, and clears internal active-note state. Used to recover from stuck notes.
+- **FR-C12** **Chord press grouping:** chord-grid presses within a 15 ms window are treated as one chord event. This prevents a combination such as `T` + `B` (Cmaj7) from sounding the first key's chord and then the combination when the two keys arrive in consecutive USB reports. A quick tap that releases all keys before the window expires still triggers the grouped chord.
 
 ### 4.2 Strum Plate
 - **FR-S1** Number keys simulate the strum plate, playing the notes of the currently selected chord spread across octaves. Per preset, the **top-row** keys `1`…`0` may instead be macro keys (FR-S9); the numpad is always the strum plate.
@@ -184,7 +185,7 @@ The system is a set of cooperating modules coordinated by a central state manage
 - **FR-S7** Strum mode selects the note-pool source: **follow-chord** (default; the active chord's pitch classes, 6.6), **scale** (a selectable root pitch class + scale/mode — the standard major/minor/harmonic/melodic scales, the 7 modes, and pentatonic/blues), or **piano** (a selectable root; each strum key is one semitone higher than the last).
 - **FR-S8** Note duration is a **minimum**: a held strum key sustains its note past `note_duration_ms` until the key is released; a quick tap still sounds for the full minimum duration.
 - **FR-S4** Strum notes are derived from the active chord voicing (including in Silent mode).
-- **FR-S5** Unlike Held-mode chords (FR-C9), the strum plate picks up parameter and chord edits **immediately** — the next strummed note reflects current parameters and the currently-selected chord, with no latching.
+- **FR-S5** Unlike Held-mode chords (FR-C9), the strum plate picks up parameter and chord edits **immediately** — the next strummed note reflects current parameters and the currently-selected chord, with no latching. During sequencer playback the currently sounding sequence chord becomes the selected chord, so FollowChord strumming tracks the sequence; a held/latched live chord still takes priority.
 - **FR-S6** Numpad strum keys are identified via their raw HID **keypad usage codes** and behave identically **regardless of the keyboard's Num Lock state** (the firmware interprets keypad usages directly; Num Lock is ignored). The firmware never asserts Num Lock as a precondition.
 - **FR-S9** **Per-preset top-row macros:** when `number_keys` is `"macro"`, the top-row keys `1`…`9`,`0` trigger ordered per-preset command bundles instead of strumming. Each command is a `set` / `toggle` / `cycle` / `inc` / `dec` parameter action, a per-piece `drum_mute`, or a raw `midi` byte sequence (including SysEx, with an optional cumulative `delay_ms`). Parameter actions apply atomically on key-down, with changes committed before mode/arp/pattern callbacks; MIDI commands are sent to DIN and USB immediately or at their scheduled delay. Each macro has a name (default `M1`…`M9`, `M0`, max 16 chars); the LCD shows `Macro <name> loaded`. Limits are 16 commands per key and 48 per preset (excess is truncated by the firmware; the configurator rejects it). `Super+1`…`Super+8` still loads presets. Macros are configured in the configurator; on-device Save preserves them and Clear resets them.
 
@@ -192,11 +193,11 @@ The system is a set of cooperating modules coordinated by a central state manage
 - **FR-R1** Selectable rhythm modes providing backing percussion, including original Omnichord rhythms plus additional patterns (Section 7).
 - **FR-R2** Percussion output can be muted (rhythm timing continues for sync; drum notes suppressed).
 - **FR-R3** Rhythm emits GM percussion notes on **MIDI channel 10**.
-- **FR-R4** When rhythm is enabled, the Chord Engine's Arpeggio mode follows rhythm step timing, and the walking bass (4.7) follows rhythm beat timing.
+- **FR-R4** The Chord Engine's Arpeggio mode follows the free-running master clock (the same timebase as the beat LED and rhythm), including when the rhythm engine is stopped. Early arp starts are quantized: a chord starting within 30 ms before the next arp step boundary waits for that boundary, so the first two notes never bunch together. The walking bass (4.7) follows rhythm beat timing.
 - **FR-R5** Tempo adjust via `Page Up` / `Page Down`; swing (and other rhythm parameters) adjust in the Rhythm Edit menu (`F11`, see 5.6).
 - **FR-R6** Rhythm patterns are defined as step sequences in JSON on LittleFS (Section 7.2).
 - **FR-R9** Per-drum-piece **note code** and **velocity** are editable (Drum Edit menu, opened by `Super+F11`; 5.6): every percussion instrument used by the shipped rhythms — kick, snare, hi-hat, open-hat, rimshot, clap, crash, ride, bongo, conga-lo, conga-hi, clave, and shaker — can be remapped to a different GM percussion note and given a fixed velocity (or "Auto" to follow the pattern's authored step velocity, or "Off" to mute the piece). Cycling a code auditions the selected sound once. Velocity parameters auto-repeat while the step key is held.
-- **FR-R7** MIDI clock transmission (24 PPQN) can be toggled on/off in the Rhythm Edit menu (Clock Out, see 5.6); when on, clock is sent to the DIN output. Switching it **on** waits for the next 24-tick beat boundary (the same tick as the beat LED) before the first `0xF8`, so external devices start in phase; switching it **off** is immediate.
+- **FR-R7** MIDI clock transmission (24 PPQN) can be toggled on/off in the Rhythm Edit menu (Clock Out, see 5.6); when on, clock is sent to the DIN output. Clock Out is **clock-only**: switching it **on** waits for the next 24-tick beat boundary (the same tick as the beat LED) and then streams `0xF8`; switching it **off** stops the stream immediately. No Start/Stop is sent automatically. **Double-tapping the Clock Out key (`F8` by default)** arms an explicit Clock Resync: MIDI Start (`0xFA`) is sent at the next 24-tick beat boundary, immediately before that tick's clock, so a slave that was stopped or restarted locally re-aligns with the beat LED. Resync also ensures Clock Out is on.
 - **FR-R8** **Keyboard-LED BPM indicator:** the keyboard's **Scroll Lock** LED can flash in time with the Rhythm Engine clock as a visual tempo indicator. Default behavior: a short quarter-note flash on every beat, with a longer accented flash on beat 1 of the bar. The LED is driven by sending a **HID Output Report (SET_REPORT)** to the hosted keyboard. It blinks only while the Rhythm Engine is enabled (follows the active clock), and is disabled if `led.bpm_indicator` is off. Scroll Lock is used because it is not mapped to any chord/strum/function key; Caps Lock and Num Lock LEDs are left untouched to avoid confusion (Caps is a chord root; numpad state is irrelevant per FR-S6). This is best-effort visual feedback and must degrade gracefully if the LED is unavailable (missing keyboard, keyboard that rejects the output report, USB write failure) without affecting timing or MIDI output.
 
 ### 4.4 Presets
@@ -237,10 +238,10 @@ The system is a set of cooperating modules coordinated by a central state manage
 - **FR-B5** **Configurable bass patterns** (`bass.pattern`, 5.9): bass patterns are JSON files in `/bass/*.json` (the 9 built-ins plus user files, loaded like rhythm patterns). The built-ins are `Walking` (root-3rd-5th-6th/7th), `Whole`, `Half`, `Quarter`, `Half Alt`, `Quarter Alt`, `3/4 Alt`, `No 6th`, and `Hold` (root sustains while the chord is sounding — a held key in Press/Arp, indefinitely in Held). Patterns are a 16th-note grid of chord-degree codes (root/3rd/5th/6th-or-7th) so they follow the chord's root and type; whole/half notes sustain via an optional `sustain_steps` array. The beat-driven patterns fire on the rhythm 16th-note grid in lockstep with the drums.
 
 ### 4.8 Chord Sequencer (M14)
-- **FR-Q1** Each preset owns **10 sequence slots** (selectable with `Ctrl+1`…`Ctrl+0`), stored in `/sequences/b<N>p<M>.json` as a compact JSON array of up to 10 slots. A slot is a loop of **1, 2, 4, or 8 bars** on the rhythm 16th-note grid, with a maximum of **64 chord-change events**.
-- **FR-Q2** **Recording:** arm record (`Ctrl+F9`). The normal rhythm pattern is muted immediately. The hi-hat guide stays **silent until the next bar boundary**, then plays **exactly one bar** of quarter-note closed hi-hats (downbeat accented), and recording begins at the bar boundary after that count-in bar. The hi-hat guide continues for the whole take. Only chord changes are recorded (no strum, no individual MIDI notes); onsets are quantized to the nearest 16th. Each event sustains until the next event or the loop end. When the take ends (auto or manual), the guide stops and the original pattern/mute state resumes. Requesting record/play while the rhythm engine is disabled is refused with an LCD prompt (the rhythm may be muted while running).
-- **FR-Q3** **Settings snapshot:** at the start of a recording, the current chord parameters (octave, note duration, velocity, pan, voicing, chord roll, min notes, min interval, inversion, arp mode, chord pattern) are captured once for the sequence. Playback always forces `Held`; the MIDI channel is always live.
-- **FR-Q4** **Playback:** arm play (`Ctrl+F10`), then playback loops from the next rhythm bar until stopped. Recorded settings are used per-setting unless that setting's **Live** bit is set in the configurator, or the on-device global switch is set to **Live** (then all settings are live). Playback is synced to the rhythm clock.
+- **FR-Q1** Each preset owns **10 sequence slots** (selectable with `Ctrl+1`…`Ctrl+0`), stored in `/sequences/b<N>p<M>.json` as a compact JSON array of up to 10 slots. A slot is a loop of **1, 2, 4, or 8 bars** on the rhythm 16th-note grid, with a maximum of **64 chord-change events**. Selecting a different slot during playback queues it: the current sequence finishes its loop, then the new slot starts on its downbeat and continues looping. Selecting an empty slot stops playback at that boundary with `Seq empty`.
+- **FR-Q2** **Recording:** arm record (`Ctrl+F9`). The normal rhythm pattern is muted immediately. The hi-hat guide stays **silent until the next bar boundary**, then plays **exactly one bar** of quarter-note closed hi-hats (downbeat accented), and recording begins at the bar boundary after that count-in bar. The hi-hat guide continues for the whole take. Only chord changes are recorded (no strum, no individual MIDI notes); onsets are quantized to the nearest 16th. Each event sustains until the next event or the loop end. When the take ends (auto or manual), the guide stops and the original pattern/mute state resumes. If the rhythm engine is disabled when record or play is pressed, it is enabled automatically and the drums are muted before the count-in/playback starts. Recording over a slot that already contains a sequence prompts `Overwrite Seq in slot N?` (Enter/Mute confirms, Backspace/Esc cancels) before anything is armed.
+- **FR-Q3** **Settings snapshot:** at the start of a recording, the current chord parameters (octave, note duration, velocity, pan, voicing, chord roll, min notes, min interval, inversion, arp mode, chord pattern, play mode, arp rate) are captured once for the sequence. Playback honors the merged play mode, so recorded arpeggios and patterns reproduce; `PressToPlay` behaves as `Held` and `ArpHold`/`PatternHold` as their non-hold forms because sequence events have no key release. The MIDI channel is always live.
+- **FR-Q4** **Playback:** arm play (`Ctrl+F10`), then playback loops from the next rhythm bar until stopped. Recorded settings are used per-setting unless that setting's **Live** bit is set in the configurator, or the on-device global switch is set to **Live** (then all settings, including play mode and arp rate, are live). Playback is synced to the rhythm clock.
 - **FR-Q5** **Live override:** live chords remain available during playback. While a live chord is held or latched, sequence events are skipped; the sequence keeps advancing and resumes at the next event after the live chord ends.
 - **FR-Q6** **Persistence and clearing:** sequences are per-preset, not copyable. Recording, bar changes, and clearing save the sequence file immediately. Clearing a preset (`Delete`) removes its sequence file. The firmware removes legacy preset banks 6–10 from v0.1 on boot to reclaim flash; users should back them up before upgrading.
 - **FR-Q7** **On-device menu:** `Super+F12` opens the **Seq Edit** menu (Slot / Bars / Settings). Default performance keys: `Ctrl+F9` record, `Ctrl+F10` play/stop, `Ctrl+F11` clear (confirm with `Enter`/`Backspace`), `Ctrl+1`…`Ctrl+0` select sequence slots 1–10. All actions are rebindable in `keymap.json` except `Ctrl+number`. The count-in/recording status uses a **persistent LCD screen** (`Rec arm`/`Wait bar`, then `Count-in`/`1 bar`, then `Recording N/M`) so it does not flash back to idle between bar updates.
@@ -336,7 +337,8 @@ Main-menu single-key shortcuts (no menu):
 | 9 | Min Interval | 0..12 semitones (0 = off) |
 | 10 | Inversion | Root / 1st / 2nd / 3rd |
 | 11 | Arp Mode | Up / Down / Up-Down / Alternating / Random |
-| 12 | Pattern | Built-in + user chord patterns (6.10) |
+| 12 | Arp Rate | Whole / Half / Quarter / Eighth / 16th / 32nd |
+| 13 | Pattern | Built-in + user chord patterns (6.10) |
 
 ### 5.5 Function Keys — Strum Controls & the Strum Edit Menu
 
@@ -368,7 +370,7 @@ Main-menu single-key shortcuts (no menu):
 | `F5` | Enable/disable rhythm |
 | `F6` | Mute/unmute percussion |
 | `F7` | Toggle the walking bass |
-| `F8` | Toggle MIDI clock transmit (Clock Out, FR-R7) |
+| `F8` | Toggle MIDI clock transmit (Clock Out, FR-R7). Double-tap = Clock Resync. |
 | `Page Up` / `Page Down` | Tempo up / down |
 
 **Rhythm Edit menu** — opened by `F11`. Scroll with arrows/volume, select with `Enter`/`Mute`, then edit the selected value:
@@ -487,7 +489,7 @@ Main-menu single-key shortcut:
 | 2 | Bars | 1 / 2 / 4 / 8 |
 | 3 | Settings | Recorded / Live (global override; per-setting Live bits are edited in the configurator) |
 
-Recording and playback require the rhythm engine to be enabled (it may be muted). Recording mutes the normal pattern immediately and stays silent until the next bar boundary, then plays **exactly one bar** of quarter-note closed hi-hats; recording starts at the following bar boundary and the guide continues through the take. The count-in/recording screen is persistent (`Rec arm`/`Wait bar`, then `Count-in`/`1 bar`, then `Recording N/N`) so it does not flash back to idle between bars. Other LCD messages: `Seq saved`, `Seq N play`, `Seq stop`, `Seq full`, `Seq empty`, `Enable rhythm`, `Seq cleared`.
+If the rhythm engine is disabled, recording and playback enable it automatically and mute the drums. Recording mutes the normal pattern immediately and stays silent until the next bar boundary, then plays **exactly one bar** of quarter-note closed hi-hats; recording starts at the following bar boundary and the guide continues through the take. Recording over an existing sequence shows `Overwrite Seq in` / `slot N? Ent/Bk`; Enter/Mute confirms and Backspace/Esc cancels. The count-in/recording screen is persistent (`Rec arm`/`Wait bar`, then `Count-in`/`1 bar`, then `Recording N/N`) so it does not flash back to idle between bars. Other LCD messages: `Seq saved`, `Seq N play`, `Seq stop`, `Seq full`, `Seq empty`, `Seq cleared`.
 
 ---
 
@@ -554,7 +556,7 @@ Voicing behavior is controlled by a **chord voicing-mode parameter** (`root_posi
 - **VR-7 Minimum interval spread (`min_interval`):** no two adjacent notes in the voicing are closer than `min_interval` semitones. Notes are chosen greedily in the tightest ascending configuration — start at the root; each next note is the smallest chord pitch-class ≥ previous + `min_interval`. `0` disables it. (e.g. C major, `min_interval`=5 → `C3 G3 E4`; `min_interval`=4 → `C3 G3 E4`.)
 - **VR-8 Manual inversions:** `PrtSc`/`ScLk`/`Pause` select 1st/2nd/3rd inversion, respectively — determining whether the 1st, 3rd, or 5th of the chord is the bass (3rd inversion uses the 7th when the chord has one). The inversion bass is selected by its position in the chord's **interval formula** (root/3rd/5th/7th), never by the sorted pitch-class list, so it is correct for every root. The ascending note set is rotated so the chosen tone is lowest, then placed within range. When the requested inversion index exceeds the chord's own tones (e.g. the 3rd inversion of a triad with no 7th), the selection wraps into the next octave so it stays distinct from the lower inversions. Composes with smart voice-leading (the bass is pinned; the remaining notes minimize movement).
 - **VR-9 Chord roll (`chord_roll_ms`):** in Held/Press-to-play modes the chord notes are staggered by `|chord_roll_ms|` ms apart (positive = ascending, negative = descending) instead of sounding simultaneously. Note-offs release together.
-- **VR-5 Parameter snapshot on trigger (Held mode):** When a chord is triggered, the engine takes a snapshot of all sounding-relevant chord parameters (voicing mode, octave, note duration, velocity, pan, chord roll, min notes, min interval, inversion, arp mode, channel, and the resolved chord type). The active voice uses this snapshot for its entire lifetime. Subsequent parameter edits (including loading a preset) update only the "pending" parameter state and are applied to the next chord trigger, never mutating an already-sounding held chord (see FR-C9). Implementation: maintain separate `pending_params` (edited live) and `active_params` (snapshot per active chord) structures on the State Manager.
+- **VR-5 Parameter snapshot on trigger (Held mode):** When a chord is triggered, the engine takes a snapshot of all sounding-relevant chord parameters (voicing mode, octave, note duration, velocity, pan, chord roll, min notes, min interval, inversion, arp mode, arp rate, channel, and the resolved chord type). The active voice uses this snapshot for its entire lifetime. Subsequent parameter edits (including loading a preset) update only the "pending" parameter state and are applied to the next chord trigger, never mutating an already-sounding held chord (see FR-C9). Implementation: maintain separate `pending_params` (edited live) and `active_params` (snapshot per active chord) structures on the State Manager.
 
 ### 6.5 Chord Naming (for LCD)
 Display uses `<Root><quality>` shorthand and **Omnichord-style flat spelling** matching the chord-button root table (5.1): roots are spelled `Db Ab Eb Bb F C G D A E B F#`. Examples: `Eb`, `Ebm`, `Eb7`, `Ebmaj7`, `Ebm7`, `Ebdim`, `Ebaug`, `Ebsus4`, `Ebadd9`. (Flats-by-default; this matches the button layout and is the required display convention.)
@@ -571,6 +573,15 @@ The `arp_mode` parameter (5.4) selects how the Arpeggio play mode walks the voic
 - **Up-Down:** lowest → highest → lowest, repeating.
 - **Alternating:** 1 → 3 → 2 → 4 … (indexes 0, 2, 1, 3 for a 4-note chord).
 - **Random:** a random note each step (seeded PRNG; deterministic in tests).
+
+The `arp_rate` parameter (5.4) selects the note subdivision used by Arpeggio and
+Arp-Hold: Whole (1/1), Half (1/2), Quarter (1/4), Eighth (1/8), 16th (1/16, the
+default), or 32nd (1/32). All rates are quantized to the free-running 24-PPQN
+master clock, so the arpeggiator stays phase-locked to the beat LED even when
+the rhythm engine is stopped. An arpeggiated chord that starts within 30 ms
+before the next subdivision boundary delays its first note to that boundary;
+this is applied to every arp chord start, including chord changes while the arp
+is already running. Starts outside the window play the first note immediately.
 
 ### 6.8 Walking Bass Interval Blueprint
 The walking bass (4.7) plays a fixed looping interval cycle per beat, relative to the chord root. For a 4-beat bar the cycle is `[beat 1, beat 2, beat 3, beat 4]` semitone offsets; beat 4 uses the chord's 7th when present, else the 6th:
@@ -668,7 +679,7 @@ advances at the stored tempo even when the rhythm is stopped.
 
 ### 6.12 Chord Sequencer Playback (M14)
 
-The sequencer is a separate per-preset chord recorder/player. It records chord **changes** (root, type, and extensions) on the same 16th-note grid and plays them back as held chords through the chord engine. It is not a MIDI sequencer: strummed notes, arpeggios, and pattern notes are never recorded or replayed by it. Playback follows the rhythm clock (rhythm enabled, mute allowed) and loops for 1/2/4/8 bars. Live chords override sequence events while held/latched (FR-Q5). Recorded settings are mixed with live settings per FR-Q3/FR-Q4. See 8.4 for the file schema.
+The sequencer is a separate per-preset chord recorder/player. It records chord **changes** (root, type, and extensions) on the same 16th-note grid and plays them through the chord engine using the merged play mode, so recorded Held/Arp/Pattern playback is reproduced. It is not a MIDI sequencer: strummed notes, arpeggios, and pattern notes are never recorded as events; they are generated live from the sequence chord and the recorded/live settings. Playback follows the rhythm clock (rhythm enabled, mute allowed) and loops for 1/2/4/8 bars. The sounding sequence chord becomes the selected chord, so FollowChord strumming tracks playback. Selecting a new slot while playing takes effect at the end of the current loop. Live chords override sequence events while held/latched (FR-Q5). Recorded settings are mixed with live settings per FR-Q3/FR-Q4. See 8.4 for the file schema.
 
 ---
 
@@ -704,7 +715,7 @@ All timing math runs on Core 1 using integer microseconds; the RP2040 has no FPU
 - **Tempo:** BPM, adjustable via Page Up/Down (FR-R5). Range e.g. 40–260 BPM. Step interval is computed with integer division, e.g. `step_us = 60000000 / (bpm * steps_per_beat)`. A live tempo change re-slaves the pattern to the next 24-tick master-clock beat boundary (the monotonic step counter continues for arp/sequencer sync), so the drums, hi-hat guide, and LED do not drift apart when the tempo changes.
 - **Swing:** stored as a **signed integer percentage −75..+75** (0 = straight; positive = laid-back, negative = rushed), adjustable in the Rhythm Edit menu (Swing parameter) in steps of 5. The off-beat delay is applied as fixed-point integer math, e.g. `delay_us = (base_step_us * swing) / 100`, applied to the off-beat 8th-note step only. (Semantically equivalent to the original 0.0–0.75 float, expressed as a signed −0.75..+0.75.)
 - **Sync:** The Rhythm Engine clock drives the Chord Engine Arpeggio mode (FR-R4) and the walking bass's beat (FR-B4).
-- **MIDI clock:** A single **master clock** (24 PPQN) runs continuously in the background from boot — its tick counter and phase never reset, regardless of whether the rhythm or Clock Out is enabled. Clock Out (`F8`, or Clock Out in the Rhythm Edit menu) gates whether the `0xF8` byte is emitted; when switched on, emission starts at the next 24-tick beat boundary (the same tick the beat LED flashes), so an external device's 24-clock beat division starts in phase. Switching off is immediate. The beat LED and the rhythm scheduler both **slave to this master clock**: the LED flashes on every 24th tick, and the rhythm downbeat aligns to a 24-tick beat boundary with each 16th-note step = exactly 6 ticks. This keeps LED, drums, and clock mutually phase-locked (nothing preempts or resets the clock). Only the `0xF8` byte is streamed; no Start/Stop/Continue.
+- **MIDI clock:** A single **master clock** (24 PPQN) runs continuously in the background from boot — its tick counter and phase never reset, regardless of whether the rhythm or Clock Out is enabled. Clock Out (`F8`, or Clock Out in the Rhythm Edit menu) gates whether the `0xF8` byte is emitted. Enabling waits for the next 24-tick beat boundary, then streams clocks; disabling stops the stream immediately. No Start/Stop is sent automatically, so the slave's transport remains under its own control. **Double-tap `F8`** to send MIDI Start (`0xFA`) at the next beat boundary and re-align the slave when needed. The beat LED and the rhythm scheduler both **slave to this master clock**: the LED flashes on every 24th tick, and the rhythm downbeat aligns to a 24-tick beat boundary with each 16th-note step = exactly 6 ticks. This keeps LED, drums, and clock mutually phase-locked (nothing preempts or resets the clock).
 - **Mute (FR-R2):** suppresses drum note-ons while the clock/sync continues.
 - **LED BPM indicator (FR-R8):** the beat LED flashes with a **consistent short pulse** (`led.flash_ms`, default 40 ms) on every beat of the master clock, independent of rhythm/clock-out state. The target LED is configurable (`led.led` = `num_lock` default, `caps_lock`, `scroll_lock`, or `all`); Core 0 owns the LED on/off state and retries the HID report until it is queued, so a dropped report cannot leave the LED stuck on.
 
@@ -753,6 +764,7 @@ All config/preset/pattern files live on the Pico's **LittleFS** filesystem in on
     "min_interval": 0,
     "inversion": "root",
     "arp_mode": "up",
+    "arp_rate": "sixteenth",
     "pattern": "Block",
     "voicing_mode": "root_position",
     "channel": 1
@@ -821,7 +833,7 @@ One file per preset (bank 1–5, slot 1–8). The file holds all 10 sequence slo
     {
       "bars": 4,
       "steps_per_bar": 16,
-      "recorded": [0, 500, 100, 64, 0, 0, 3, 0, 0, 0, 0],
+      "recorded": [0, 500, 100, 64, 0, 0, 3, 0, 0, 0, 0, 0, 4],
       "live": 0,
       "events": [[0, 0], [16, 640]]
     }
@@ -830,8 +842,8 @@ One file per preset (bank 1–5, slot 1–8). The file holds all 10 sequence slo
 ```
 
 - `bars` is 1, 2, 4, or 8; `steps_per_bar` is the recorded meter (usually 16, or 12 for 3/4).
-- `recorded` is the fixed 11-value settings array, in this order: `octave`, `note_duration_ms`, `velocity`, `pan`, `voicing_mode`, `chord_roll_ms`, `min_notes`, `min_interval`, `inversion`, `arp_mode`, `pattern index`.
-- `live` is a bitmask; bit *i* set means "use the live value for recorded[i]" during playback. Play mode is always forced to `Held`; the MIDI channel stays live.
+- `recorded` is the fixed 13-value settings array, in this order: `octave`, `note_duration_ms`, `velocity`, `pan`, `voicing_mode`, `chord_roll_ms`, `min_notes`, `min_interval`, `inversion`, `arp_mode`, `pattern index`, `play_mode`, `arp_rate`. Legacy 11-value arrays load with play mode `Held` and arp rate `Sixteenth`.
+- `live` is a bitmask; bit *i* set means "use the live value for recorded[i]" during playback. The MIDI channel stays live.
 - `events` is `[step, chord_id]`. `chord_id = root_pc * 128 + type * 8 + extension_mask`; extension bits are add9=1, add11=2, add13=4. Type order matches `ChordType` (`major`, `minor`, `dom7`, `maj7`, `min7`, `dim`, `dim7`, `aug`, `sus4`, `sus2`, `min7b5`). Maximum 64 events per sequence; steps must be less than `bars * steps_per_bar`.
 
 ---
@@ -853,6 +865,7 @@ All adjustable parameters, with min/max/default/step. On default initialization 
 | min_interval | chord | int | 0 | 12 | 0 | 1 | min semitones between adjacent voicing notes (0 = off) |
 | inversion | chord | enum | — | — | `root` | cycle | root / first / second / third (also PrtSc/ScLk/Pause) |
 | arp_mode | chord | enum | — | — | `up` | cycle | up / down / up_down / alternating / random |
+| arp_rate | chord | enum | — | — | `sixteenth` | cycle | whole / half / quarter / eighth / sixteenth / thirty_second |
 | pattern (chord) | chord | enum | — | — | `Block` | cycle | chord pattern name (6.10): Block / Alberti / Broken Up / Broken Down / Pulse / Oom-Pah / Roll / Split / Arpeggio + user files |
 | channel (chord) | chord | int | 1 | 16 | 1 | 1 | MIDI channel |
 | octave (strum) | strum | int | −3 | +3 | 1 | 1 | strum-pool octave placement |
@@ -890,7 +903,7 @@ All adjustable parameters, with min/max/default/step. On default initialization 
 | drum_shaker_note | rhythm | int | 0 | 127 | 82 | 1 | shaker GM note (FR-R9) |
 | drum_*_vel | rhythm | int | 0 | 127 | 0 | 1 | per-piece velocity; 0 = Auto (follow pattern) (FR-R9) |
 | usb_enabled | global | bool | off | on | on | toggle | USB MIDI device output on/off (M11; interface always enumerates) |
-| clock_enabled | global | bool | off | on | off | toggle | MIDI clock transmit (FR-R7) |
+| clock_enabled | global | bool | off | on | off | toggle | MIDI clock transmit (FR-R7); double-tap the toggle key for Clock Resync |
 | bpm_indicator | global | bool | off | on | on | toggle | keyboard-LED BPM indicator (FR-R8) |
 | led (indicator) | global | enum | — | — | `num_lock` | — | which keyboard LED(s) to flash: num_lock / caps_lock / scroll_lock / all |
 | flash_ms | global | int | 5 | 500 | 40 | 5 | beat flash duration (consistent on every beat) |
@@ -969,7 +982,7 @@ These milestones align with the Build Sequence (Section 1.6); stop for user feed
 - **AC-3** All four play modes behave as specified, including note lifecycle (FR-C3/FR-C10): held sustains until next chord/panic, press-to-play releases on key-up, arpeggio uses note_duration_ms.
 - **AC-4** Strum keys play chord notes in order; both full and limited layouts work; strum params take effect; strum picks up edits immediately (FR-S5).
 - **AC-5** Rhythm patterns play correct GM drum notes on ch10; tempo and swing adjust live; mute suppresses drums but keeps sync.
-- **AC-6** In arpeggio mode with rhythm enabled, chord timing follows the rhythm clock; the walking bass follows the rhythm beat.
+- **AC-6** In arpeggio mode with rhythm enabled, chord timing follows the rhythm clock; early arp starts within 30 ms of the next arp boundary defer their first note to that boundary; the walking bass follows the rhythm beat.
 - **AC-7** All 40 preset slots save/recall chord, strum, bass, rhythm params, macros, and their sequence files on LittleFS/FatFS; navigation keys behave per 4.4; save/clear confirm/cancel works.
 - **AC-8** LCD shows the correct idle screen and updates on parameter edits and prompts.
 - **AC-9** MIDI is emitted correctly on the DIN output; an unconnected/disconnected DIN does not disrupt operation; the firmware keeps running and transmitting.
@@ -979,7 +992,7 @@ These milestones align with the Build Sequence (Section 1.6); stop for user feed
 - **AC-13** add9/add11/add13 extensions apply as held modifiers via `Left`/`Down`/`Right` arrows (latching per chord); they are not persisted.
 - **AC-14** Left-adjacent combos produce sus4 (Major+left-7th) and add9 (Major+left-minor); leftmost column produces these via the `` ` `` key.
 - **AC-15** In Held mode, editing any chord parameter (or loading a preset) while a chord is sounding does not change the currently-held notes; the change applies only when the next chord is triggered (FR-C9 / VR-5).
-- **AC-16** MIDI clock transmit toggle (`F8`, or Clock Out in the Rhythm Edit menu) emits/stops the 24 PPQN clock stream (0xF8 only; no Start/Stop) on the DIN output. Switching on starts at the next 24-tick beat boundary so the external beat aligns with the LED; off is immediate. The master clock timebase keeps running in the background regardless of the toggle (FR-R7, §7.3).
+- **AC-16** MIDI clock transmit toggle (`F8`, or Clock Out in the Rhythm Edit menu) emits/stops the 24 PPQN clock stream (`0xF8` only; no automatic Start/Stop) on the DIN output. Switching on starts at the next 24-tick beat boundary so the external beat aligns with the LED; off is immediate. Double-tapping the Clock Out key sends MIDI Start at the next beat boundary (Clock Resync). The master clock timebase keeps running in the background regardless of the toggle (FR-R7, §7.3).
 - **AC-17** Panic (`Super+Esc`) silences all notes on all channels/DIN and clears active-note state (FR-C11).
 - **AC-18** Numpad strum keys behave identically regardless of the keyboard's Num Lock state (FR-S6).
 - **AC-19** Save/clear prompt auto-cancels after 5 s idle, and any chord/strum key cancels it (FR-P10).
@@ -993,9 +1006,9 @@ These milestones align with the Build Sequence (Section 1.6); stop for user feed
 - **AC-27** `PrtSc`/`ScLk`/`Pause` select 1st/2nd/3rd inversion; the selected inversion is reflected in the output (correct for every root, with the bass taken from the interval formula) and persists in the preset.
 - **AC-28** The five arpeggio modes (Up/Down/Up-Down/Alternating/Random) step the voicing in the specified order.
 - **AC-29** The walking bass plays the correct interval cycle on each beat (root–3rd–5th–6th/7th), adapts the cycle to the pattern's meter, follows the selected chord's root/type, respects its own octave/duration/velocity/channel, and stays in lockstep with the rhythm beat (never early). The configurable bass patterns (FR-B5) select among the walking cycle and the root/5th patterns.
-- **AC-30** Sequence recording arms, mutes the normal pattern, stays silent until the next bar boundary, plays exactly one bar of quarter-note closed hi-hats, starts recording at the following bar boundary, keeps the hi-hat guide through the take, captures chord changes quantized to the 16th grid, and saves the selected slot per preset. The count-in/recording LCD status persists smoothly between bars. It refuses when the rhythm is disabled; the rhythm may be muted.
-- **AC-31** Sequence playback loops in sync with the rhythm clock, forces `Held`, mixes recorded/live settings per the Live bits/global switch, and stops cleanly.
-- **AC-32** Live chords override sequence events while held/latched and playback resumes at the next event afterward. Strum never records or plays back.
+- **AC-30** Sequence recording arms, mutes the normal pattern, stays silent until the next bar boundary, plays exactly one bar of quarter-note closed hi-hats, starts recording at the following bar boundary, keeps the hi-hat guide through the take, captures chord changes quantized to the 16th grid, and saves the selected slot per preset. The count-in/recording LCD status persists smoothly between bars. If the rhythm is disabled it is enabled automatically and the drums are muted. Recording over an existing sequence requires confirmation (`Overwrite Seq in` / `slot N? Ent/Bk`; Enter/Mute confirms, Backspace/Esc cancels).
+- **AC-31** Sequence playback loops in sync with the rhythm clock, reproduces the merged recorded/live play mode (including arpeggio and chord-pattern modes), mixes recorded/live settings per the Live bits/global switch, and stops cleanly. Selecting another slot during playback queues it to start on the next loop boundary.
+- **AC-32** Live chords override sequence events while held/latched and playback resumes at the next event afterward. FollowChord strumming follows the sounding sequence chord during playback, but strum never records or plays back.
 - **AC-33** 40 presets (5 banks × 8) load/save; each preset owns 10 editable sequences (max 64 events each); clearing a preset removes its sequence file; legacy banks are removed on boot after a backup warning.
 
 > **Removed vs. the Pi spec:** the USB-MIDI-gadget acceptance clauses are gone (no USB MIDI in v1). AC-9 is reworded from "both USB and DIN" to DIN-only with graceful behavior when unconnected.

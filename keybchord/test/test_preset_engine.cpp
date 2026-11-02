@@ -291,6 +291,26 @@ TEST_F(PresetEngineTest, ClearResetsLiveParamsAndWritesDefaults) {
     EXPECT_TRUE(stored.sameParams(PresetSlot::defaults()));
 }
 
+TEST_F(PresetEngineTest, SeqSettingsAffectsDirtyAndPersists) {
+    EXPECT_FALSE(state_.dirty);
+
+    state_.sequencer.useRecorded = false;
+    engine_->recomputeDirty();
+    EXPECT_TRUE(state_.dirty);
+
+    route(key(INSERT, true));   // save
+    route(key(ENTER, true));
+    EXPECT_FALSE(state_.dirty);
+
+    PresetSlot saved = loadPreset(storage_, 0, 0);
+    EXPECT_FALSE(saved.seq_use_recorded);
+
+    route(key(ESC, true));      // leave the post-save name edit
+    state_.sequencer.useRecorded = true;
+    route(key(0x1E, true, SUPER));   // Super+1 -> reload slot 0
+    EXPECT_FALSE(state_.sequencer.useRecorded);
+}
+
 TEST_F(PresetEngineTest, DirtyAppearsOnEditAndClearsOnSave) {
     EXPECT_FALSE(state_.dirty);
 

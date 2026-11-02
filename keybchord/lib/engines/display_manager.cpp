@@ -60,9 +60,16 @@ void DisplayManager::showValue(const std::string& fullName, const std::string& v
 }
 
 void DisplayManager::showPrompt(const std::string& text, uint64_t now_us) {
+    showPrompt(text, "Enter=Yes Bk=No", now_us);
+}
+
+void DisplayManager::showPrompt(const std::string& line1,
+                                const std::string& line2,
+                                uint64_t now_us) {
     screen_       = Screen::Prompt;
     revertToMenu_ = false;
-    promptText_   = text;
+    promptLine1_  = line1;
+    promptLine2_  = line2;
     revertDeadlineUs_ = now_us + static_cast<uint64_t>(state_.config.display_prompt_ms) * 1000ULL;
 }
 
@@ -151,8 +158,8 @@ void DisplayManager::render(std::string& l1, std::string& l2, uint64_t now_us) c
             l2 = padTrunc(editValue_, kCols);
             break;
         case Screen::Prompt:
-            l1 = padTrunc(promptText_, kCols);
-            l2 = "Enter=Yes Bk=No";
+            l1 = padTrunc(promptLine1_, kCols);
+            l2 = padTrunc(promptLine2_, kCols);
             break;
         case Screen::NameEdit:
             l1 = padTrunc("Rename", kCols);

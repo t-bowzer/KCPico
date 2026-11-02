@@ -12,6 +12,7 @@ from typing import Optional
 
 from .enums import (
     ArpMode,
+    ArpRate,
     EditMenu,
     InversionMode,
     PlayMode,
@@ -66,7 +67,7 @@ SEQUENCE_BARS_CHOICES = (1, 2, 4, 8)
 SEQUENCE_MIN_STEPS_PER_BAR = 4
 SEQUENCE_MAX_STEPS_PER_BAR = 64
 SEQUENCE_DEFAULT_STEPS = 16
-SEQUENCE_SETTING_COUNT = 11
+SEQUENCE_SETTING_COUNT = 13
 SEQUENCE_LIVE_MASK_ALL = (1 << SEQUENCE_SETTING_COUNT) - 1
 
 
@@ -163,6 +164,20 @@ _add(
             ("Up-down", ArpMode.UP_DOWN),
             ("Alternating", ArpMode.ALTERNATING),
             ("Random", ArpMode.RANDOM),
+        ),
+    ),
+    ParamSpec(
+        "arp_rate",
+        "Arpeggio rate",
+        "Chord",
+        "enum",
+        values=_enum_values(
+            ("Whole", ArpRate.WHOLE),
+            ("Half", ArpRate.HALF),
+            ("Quarter", ArpRate.QUARTER),
+            ("Eighth", ArpRate.EIGHTH),
+            ("16th", ArpRate.SIXTEENTH),
+            ("32nd", ArpRate.THIRTY_SECOND),
         ),
     ),
     ParamSpec("chord_pattern", "Pattern", "Chord", "pattern"),

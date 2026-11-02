@@ -1,0 +1,33 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"],
+  "tool_output": {
+    "max_lines": 1000,
+    "max_bytes": 40000
+  },
+  "permission": {
+    "read": {
+      "*": "allow",
+      "**/.pio/**": "deny",
+      "**/.venv/**": "deny",
+      "**/__pycache__/**": "deny",
+      "**/.pytest_cache/**": "deny",
+      "**/.ruff_cache/**": "deny",
+      "**/configurator/build/**": "deny",
+      "**/configurator/dist/**": "deny",
+      "**/firmware/ch559/*.asm": "deny",
+      "**/firmware/ch559/*.lst": "deny",
+      "**/firmware/ch559/*.rel": "deny",
+      "**/firmware/ch559/*.rst": "deny",
+      "**/firmware/ch559/*.sym": "deny",
+      "**/firmware/ch559/*.map": "deny",
+      "**/firmware/ch559/*.mem": "deny",
+      "**/firmware/ch559/*.hex": "deny",
+      "**/firmware/ch559/*.bin": "deny",
+      "**/firmware/ch559/*.ihx": "deny",
+      "**/firmware/ch559/*.lk": "deny",
+      "**/JD-Xi_MIDI_Imple_e01_W.pdf": "deny",
+      "**/configurator/src/keybchord_configurator/libraries/roland-jd-xi-*.json": "ask"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+# Search-only exclusions for grep/glob. Files can still be read directly.
+firmware/ch559/*.asm
+firmware/ch559/*.lst
+firmware/ch559/*.rel
+firmware/ch559/*.rst
+firmware/ch559/*.sym
+firmware/ch559/*.map
+firmware/ch559/*.mem
+firmware/ch559/*.ihx
+firmware/ch559/*.hex
+firmware/ch559/*.bin
+firmware/ch559/*.lk
+configurator/src/keybchord_configurator/libraries/roland-jd-xi-*.json
+KCPico.net
+KCPico.kicad_sch

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <vector>
 
@@ -26,6 +27,12 @@ public:
     void setPatterns(std::vector<RhythmPattern> patterns);
     void setPattern(const RhythmPattern& p, int index);
 
+    // Stage a new rhythm set from Core 0 (pattern editor save/delete). Core 1
+    // swaps it in at the top of update(); the editor must not stage again until
+    // the pending flag clears.
+    void stagePatterns(std::vector<RhythmPattern> patterns);
+    bool patternsPending() const { return patternsPending_.load(); }
+
     // The pattern at `index` (null if out of range). Used by the edit engine to
     // resolve the Alt+F1..F12 drum-mute track list.
     const RhythmPattern* patternAt(int index) const;
@@ -47,11 +54,19 @@ public:
     // continuous clock and never sends transport automatically.
     void resyncClock();
 
+    // After a blocking UI/storage operation, skip any missed step output and
+    // rebase the step deadline to the current clock phase. Safe to call from
+    // Core 0; Core 1 consumes it at the top of its next update.
+    void requestRebase() { rebasePending_.store(true); }
+
 private:
     StateManager& state_;
     MidiEventQueue& out_;
 
     std::vector<RhythmPattern> patterns_;
+    std::vector<RhythmPattern> pendingPatterns_;
+    std::atomic<bool> patternsPending_{false};
+    mutable std::atomic<bool> patternsBusy_{false};
     bool running_ = false;
     uint32_t step_ = 0;          // step index within the bar
     uint32_t stepAbs_ = 0;       // monotonic step counter
@@ -73,6 +88,7 @@ private:
     bool     clockOutPending_ = false;
     bool     clockOutActive_ = false;
     bool     clockResyncPending_ = false;
+    std::atomic<bool> rebasePending_{false};
 
     uint16_t lastTempo_ = 0;
 

@@ -72,9 +72,8 @@ The agent will produce the entire firmware project. Work in the following ordere
 | CH559L (USB host coprocessor) | WCH 8051 MCU with a **hardware USB host controller**, hosting hubs + full-length descriptors + report/NKRO protocols and forwarding key events over UART (see 2.2). Replaces the PIO-USB software host. Powered from `3V3(OUT)`; runs off its internal oscillator (no crystal). |
 | 2× 22Ω resistors (1/4 W) | **Required** series resistors on the CH559 HP/HM (D+/D-) lines. These are the only series elements on D+/D-; the keyboard supplies its own device-side pull-ups. |
 | 2× 0.1 µF ceramic capacitors | Decoupling on the CH559 `VIN5` (pin 41) and `VDD33` (pin 42). |
-| 1× 10 kΩ resistor (1/4 W) | **BOOT** pull-up (`DP`→3V3) for CH559 bootloader entry (see `docs/wiring.md` §Flashing the CH559). |
-| 2× tactile switch (BOOT, RESET) | CH559 bootloader entry / reset — BOOT pulls `DP` high via 10 kΩ, RESET on `RST` (pin 3). Two shortable solder pads may substitute. |
-| 1× 4-pin 0.1" (2.54 mm) male header | CH559 **programming header** — `DP` (31), `DM` (32), `GND`, `3V3`. Mates with a USB-A plug breakout pigtail for flashing (see `docs/wiring.md` §Flashing the CH559). |
+| 1× tactile switch (BOOT) | CH559 bootloader entry — pulls `P4.6/XI/SCS` (pin 16) to `GND`; hold at power-up (see `docs/wiring.md` §Flashing the CH559). |
+| 1× 4-pin 0.1" (2.54 mm) male header | CH559 **programming header** — `DP` (31), `DM` (32), `GND`, and `3V3` (intentionally **NC** on the v0.2 PCB). Mates with a USB-A plug breakout pigtail for flashing (see `docs/wiring.md` §Flashing the CH559). |
 | LCD1602 display + PCF8574 I2C backpack | Status / parameter display. **Operated at 3.3V** so its I2C bus stays 3.3V-safe for the RP2040 (see 2.2). |
 | 5-pin DIN socket (DIN-5, 180°) | Classic MIDI output. |
 | 3.5 mm TRS (Type-A) MIDI out jack | Secondary MIDI output, wired **in parallel** with the DIN current loop (shares the same 10Ω/33Ω loop resistors — no additional parts). TRS Type-A: tip = DIN pin 5 (data), ring = DIN pin 4 (source), sleeve = DIN pin 2 (GND). See 2.2. |
@@ -90,7 +89,7 @@ The agent will produce the entire firmware project. Work in the following ordere
 
 This is the **canonical default pin map**. GPIO are given with their physical Pico header pin numbers. The only supported overrides are the CH559 UART pins and the DIN/I2C pins (via `pins.h`); the wiring below and the firmware defaults must always agree. The authoritative map lives in the roadmap (§5.2).
 
-- **Keyboard (USB host, CH559L coprocessor on UART0):** USB keyboard → USB-A receptacle → **CH559L** → Pico `Serial1` (UART0). **`GP0` (header pin 1) = TX → CH559 `RXD1` (pin 27), `GP1` (header pin 2) = RX ← CH559 `TXD1` (pin 28)**. The CH559 **HP** (pin 29) / **HM** (pin 30) run to the receptacle through **22Ω series resistors** (the only series elements; the keyboard provides device-side pull-ups); `DP` (pin 31) / `DM` (pin 32) go to a 4-pin programming header. **Power:** `VIN5` (pin 41) and `VDD33` (pin 42) both to `3V3(OUT)` (0.1 µF decoupling; the internal LDO is bypassed below 3.6 V), `GND` (pin 18), `RST` (pin 3). Signaling is full/low-speed USB at 3.3V logic levels. The keyboard is powered from `VBUS` (5V, header pin 40) + GND through the receptacle (receptacle pin 1 = VBUS, pin 2 = D-, pin 3 = D+, pin 4 = GND). The CH559 runs its own 8051-C host firmware and forwards parsed key events to the RP2040 over UART.
+- **Keyboard (USB host, CH559L coprocessor on UART0):** USB keyboard → USB-A receptacle → **CH559L** → Pico `Serial1` (UART0). **`GP0` (header pin 1) = TX → CH559 `RXD1` (pin 27), `GP1` (header pin 2) = RX ← CH559 `TXD1` (pin 28)**. The CH559 **HP** (pin 29) / **HM** (pin 30) run to the receptacle through **22Ω series resistors** (the only series elements; the keyboard provides device-side pull-ups); `DP` (pin 31) / `DM` (pin 32) go to a 4-pin programming header (its `3V3` pin is intentionally **NC** on the v0.2 PCB). **Power:** `VIN5` (pin 41) and `VDD33` (pin 42) both to `3V3(OUT)` (0.1 µF decoupling; the internal LDO is bypassed below 3.6 V), `GND` (pin 18). `P4.6/XI/SCS` (pin 16) is the **BOOT** input (button to `GND`, hold at power-up); there is no board RESET button, so `RST` (pin 3) is left unconnected and a power-cycle resets the CH559. Signaling is full/low-speed USB at 3.3V logic levels. The keyboard is powered from `VBUS` (5V, header pin 40) + GND through the receptacle (receptacle pin 1 = VBUS, pin 2 = D-, pin 3 = D+, pin 4 = GND). The CH559 runs its own 8051-C host firmware and forwards parsed key events to the RP2040 over UART.
 - **LCD1602 (I2C):** SDA→`GP4` (header pin 6), SCL→`GP5` (header pin 7) on I2C0. **VCC→3.3V (`3V3(OUT)`, header pin 36), GND→GND** — the backpack is run at 3.3V so the I2C bus stays within the RP2040's 3.3V range (do not power the backpack from 5V without a level shifter). Pull-ups: use the backpack's onboard pull-ups, or add 4.7 kΩ from SDA/SCL to 3.3V if absent. The firmware auto-probes the PCF8574 address at boot: try `0x27`, then `0x3F`; if neither ACKs, fall back to the null LCD adapter (no crash, per NFR-5). (`GP4`/`GP5` are the fixed default, chosen to avoid the UART and SPI pins.)
 - **DIN MIDI out (UART, 3.3V current loop):** DIN uses **`Serial2` (UART1), TX on `GP8` (header pin 11)**, chosen to avoid the UART0 (`GP0`/`GP1`) and I2C (`GP4`/`GP5`) pins. In firmware, call `Serial2.setTX(8)` before `Serial2.begin(31250)` (UART1's default TX pin is not guaranteed to be `GP8`). MIDI OUT is driven **directly from the 3.3V `GP8` TX pin** — a standards-compliant 3.3V current loop per the MIDI 1.0 Electrical Specification update (2014). Wiring: `GP8` → 10Ω → DIN pin 5; `3V3(OUT)` (header pin 36) → 33Ω → DIN pin 4; GND → DIN pin 2. 31250 baud, 8N1. Notes: the RP2040 UART TX is push-pull, not open-drain — a benign deviation from the letter of the spec that works with standard opto-isolated MIDI inputs (see references, roadmap §5.5); optional ferrite beads on the DIN signal pins reduce RFI (2014 update, optional). No transistor/level-shifter is required at 3.3V.
 - **TRS MIDI out (3.5 mm, Type-A, parallel with DIN):** A 3.5 mm TRS jack carries the same signal as the DIN loop, wired in parallel so both connectors work simultaneously (driving a second receiver on the same current loop is within the MIDI 1.0 spec). Type-A pinout: **tip = DIN pin 5** (data, the `GP8`→10Ω node), **ring = DIN pin 4** (source, the `3V3(OUT)`→33Ω node), **sleeve = DIN pin 2** (GND). No firmware change and no additional resistors are required.
@@ -132,7 +131,7 @@ The system is a set of cooperating modules coordinated by a central state manage
 | State Manager | Owns global runtime state; mediates between modules; central source of truth (incl. `pending_params` vs `active_params`). |
 
 ### 3.2 Cores, Event Loop & Timing
-- **Core 0 — real-time input path:** USB-host polling → Input Manager → Keymap Resolver → engines mutate state → MIDI Router dispatch over UART. Target key-to-MIDI latency <10 ms (NFR-1). UART writes are effectively non-blocking at MIDI baud for the small messages involved.
+- **Core 0 — real-time input and output path:** USB-host polling → Input Manager → Keymap Resolver → engines mutate state → MIDI Router dispatch over UART. Target key-to-MIDI latency <10 ms (NFR-1). Rhythm/clock MIDI from Core 1 is drained by a priority service at the top of the loop, between input events, and before LCD/UI work. UART writes are effectively non-blocking at MIDI baud for the small messages involved.
 - **Core 1 — rhythm/clock scheduler:** a monotonic-time scheduler (`micros()` / `time_us_64()` / hardware timer) drives tempo/swing, rhythm steps, MIDI-clock ticks (24 PPQN), arpeggio sync, the walking bass, and the Scroll Lock LED beat callback. Target step jitter <2 ms (NFR-2). LED HID writes happen here, off the Core 0 critical path.
 - **Shared state:** the State Manager mediates cross-core access; the scheduler reads a consistent snapshot of chord/arp params. Use lightweight synchronization appropriate to RP2040 dual-core (e.g. the SDK's spin-lock/`mutex`/inter-core FIFO or double-buffered snapshots). Keep shared mutable state minimal.
 - **No FPU:** all real-time math (Section 1.4) is integer/fixed-point; swing in particular is fixed-point (Sections 7.3, 9).
@@ -193,8 +192,8 @@ The system is a set of cooperating modules coordinated by a central state manage
 - **FR-R1** Selectable rhythm modes providing backing percussion, including original Omnichord rhythms plus additional patterns (Section 7).
 - **FR-R2** Percussion output can be muted (rhythm timing continues for sync; drum notes suppressed).
 - **FR-R3** Rhythm emits GM percussion notes on **MIDI channel 10**.
-- **FR-R4** The Chord Engine's Arpeggio mode follows the free-running master clock (the same timebase as the beat LED and rhythm), including when the rhythm engine is stopped. Early arp starts are quantized: a chord starting within 30 ms before the next arp step boundary waits for that boundary, so the first two notes never bunch together. The walking bass (4.7) follows rhythm beat timing.
-- **FR-R5** Tempo adjust via `Page Up` / `Page Down`; swing (and other rhythm parameters) adjust in the Rhythm Edit menu (`F11`, see 5.6).
+- **FR-R4** The Chord Engine's Arpeggio mode follows the free-running master clock (the same timebase as the beat LED and rhythm), including when the rhythm engine is stopped. Early arp starts are quantized: a chord starting within 30 ms before the next arp step boundary waits for that boundary, so the first two notes never bunch together. Chord-pattern starts are fully quantized to the rhythm: while the rhythm is running, step 0 always waits for the next rhythm step boundary. The walking bass (4.7) follows rhythm beat timing while the rhythm runs and free-runs at the preset tempo when it is stopped.
+- **FR-R5** Tempo adjust via `Page Up` / `Page Down`; swing (and other rhythm parameters) adjust in the Rhythm Edit menu (`F10`, see 5.6).
 - **FR-R6** Rhythm patterns are defined as step sequences in JSON on LittleFS (Section 7.2).
 - **FR-R9** Per-drum-piece **note code** and **velocity** are editable (Drum Edit menu, opened by `Super+F11`; 5.6): every percussion instrument used by the shipped rhythms — kick, snare, hi-hat, open-hat, rimshot, clap, crash, ride, bongo, conga-lo, conga-hi, clave, and shaker — can be remapped to a different GM percussion note and given a fixed velocity (or "Auto" to follow the pattern's authored step velocity, or "Off" to mute the piece). Cycling a code auditions the selected sound once. Velocity parameters auto-repeat while the step key is held.
 - **FR-R7** MIDI clock transmission (24 PPQN) can be toggled on/off in the Rhythm Edit menu (Clock Out, see 5.6); when on, clock is sent to the DIN output. Clock Out is **clock-only**: switching it **on** waits for the next 24-tick beat boundary (the same tick as the beat LED) and then streams `0xF8`; switching it **off** stops the stream immediately. No Start/Stop is sent automatically. **Double-tapping the Clock Out key (`F8` by default)** arms an explicit Clock Resync: MIDI Start (`0xFA`) is sent at the next 24-tick beat boundary, immediately before that tick's clock, so a slave that was stopped or restarted locally re-aligns with the beat LED. Resync also ensures Clock Out is on.
@@ -227,14 +226,14 @@ The system is a set of cooperating modules coordinated by a central state manage
   q=120  Rk  >Held
   ```
   (Line 1: active chord + optional `*` dirty marker + bank/preset. Line 2: tempo, rhythm short-code, play mode — final layout **[DRAFT — REVIEW]**.)
-- **FR-D2** Parameters are edited through six **edit menus** (Chord, Strum, Rhythm, Bass, Drum, and Sequence; see 5.4–5.10). Inside a menu the LCD shows the menu title on line 1 and the highlighted parameter on line 2. `Up`/`Down`/`Left`/`Right` and volume +/− scroll the parameter highlight; `Enter`/`Mute` select it. While selected, the same keys change the value live (shown as a transient full name/value screen) and the parameter remains selected indefinitely; `Enter`/`Mute` commits and deselects, while `Backspace`/`Esc` restores the value captured on selection and deselects. An unselected (browsing) menu auto-exits after `display.menu_timeout_ms`.
+- **FR-D2** Parameters are edited through six **parameter edit menus** (Chord, Rhythm, Strum, Bass, Drum, and Sequence; see 5.4–5.10), plus the three-kind **Pattern Edit** mode for bass, rhythm, and chord patterns (4.9, 5.11). Inside a menu the LCD shows the menu title on line 1 and the highlighted parameter on line 2. `Up`/`Down`/`Left`/`Right` and volume +/− scroll the parameter highlight; `Enter`/`Mute` select it. While selected, the same keys change the value live (shown as a transient full name/value screen) and the parameter remains selected indefinitely; `Enter`/`Mute` commits and deselects, while `Backspace`/`Esc` restores the value captured on selection and deselects. An unselected (browsing) menu auto-exits after `display.menu_timeout_ms`.
 - **FR-D3** Save/clear/confirm prompts are shown on the LCD, including the auto-cancel behavior (FR-P10).
 
 ### 4.7 Bass Function (Walking Bass)
 - **FR-B1** A **walking bass** line plays alongside the chord, following the Rhythm Engine's beat. It is a **separate engine** with its own parameters and edit menu (5.9); it is toggleable on/off (default off) and usable in Held, Press-to-play, and Arpeggio chord modes (silent in Silent mode).
 - **FR-B2** The bass plays a fixed looping **interval cycle** on each beat of the bar (see 6.8): root → 3rd → 5th → 6th/7th → (repeat). The cycle length adapts to the pattern's meter (`beats_per_bar`; a 3/4 waltz cycles over root–3rd–5th only).
 - **FR-B3** Bass voice parameters (5.9): enable, octave (whole-octave transpose from the base root, default −1), note duration, velocity, pattern, and MIDI channel (default 3; may equal any other function's channel). The bass follows the currently-selected chord's root and type (including in Held mode after key release).
-- **FR-B4** The bass note is short/percussive (note-on with rapid note-off after `note_duration_ms`), mimicking the Omnichord's plucked double-bass "thump". It is driven by the rhythm clock's beat edges and is silent when the rhythm is not running.
+- **FR-B4** The bass note is short/percussive (note-on with rapid note-off after `note_duration_ms`), mimicking the Omnichord's plucked double-bass "thump". It follows the rhythm clock's beat edges while the rhythm is running, and free-runs on the same 16th-note grid at the preset tempo when the rhythm is stopped, so the bass remains audible without drums (and resyncs to the shared step counter when the rhythm starts).
 - **FR-B5** **Configurable bass patterns** (`bass.pattern`, 5.9): bass patterns are JSON files in `/bass/*.json` (the 9 built-ins plus user files, loaded like rhythm patterns). The built-ins are `Walking` (root-3rd-5th-6th/7th), `Whole`, `Half`, `Quarter`, `Half Alt`, `Quarter Alt`, `3/4 Alt`, `No 6th`, and `Hold` (root sustains while the chord is sounding — a held key in Press/Arp, indefinitely in Held). Patterns are a 16th-note grid of chord-degree codes (root/3rd/5th/6th-or-7th) so they follow the chord's root and type; whole/half notes sustain via an optional `sustain_steps` array. The beat-driven patterns fire on the rhythm 16th-note grid in lockstep with the drums.
 
 ### 4.8 Chord Sequencer (M14)
@@ -244,8 +243,21 @@ The system is a set of cooperating modules coordinated by a central state manage
 - **FR-Q4** **Playback:** arm play (`Ctrl+F10`), then playback loops from the next rhythm bar until stopped. Recorded settings are used per-setting unless that setting's **Live** bit is set in the configurator, or the on-device global switch is set to **Live** (then all settings, including play mode and arp rate, are live). Playback is synced to the rhythm clock.
 - **FR-Q5** **Live override:** live chords remain available during playback. While a live chord is held or latched, sequence events are skipped; the sequence keeps advancing and resumes at the next event after the live chord ends.
 - **FR-Q6** **Persistence and clearing:** sequences are per-preset, not copyable. Recording, bar changes, and clearing save the sequence file immediately. Clearing a preset (`Delete`) removes its sequence file. The firmware removes legacy preset banks 6–10 from v0.1 on boot to reclaim flash; users should back them up before upgrading.
-- **FR-Q7** **On-device menu:** `Super+F12` opens the **Seq Edit** menu (Slot / Bars / Settings). Default performance keys: `Ctrl+F9` record, `Ctrl+F10` play/stop, `Ctrl+F11` clear (confirm with `Enter`/`Backspace`), `Ctrl+1`…`Ctrl+0` select sequence slots 1–10. All actions are rebindable in `keymap.json` except `Ctrl+number`. The count-in/recording status uses a **persistent LCD screen** (`Rec arm`/`Wait bar`, then `Count-in`/`1 bar`, then `Recording N/M`) so it does not flash back to idle between bar updates.
+- **FR-Q7** **On-device menu:** `Ctrl+F12` opens the **Seq Edit** menu (Slot / Bars / Settings). Default performance keys: `Ctrl+F9` record, `Ctrl+F10` play/stop, `Ctrl+F11` clear (confirm with `Enter`/`Backspace`), `Ctrl+1`…`Ctrl+0` select sequence slots 1–10. All actions are rebindable in `keymap.json` except `Ctrl+number`. The count-in/recording status uses a **persistent LCD screen** (`Rec arm`/`Wait bar`, then `Count-in`/`1 bar`, then `Recording N/M`) so it does not flash back to idle between bar updates.
 - **FR-Q8** **Configurator editor:** a full per-preset sequence editor edits events on a bar/step grid with a chord picker (root, type, add9/add11/add13), bar length, the recorded settings snapshot, and per-setting Live checkboxes. The configurator rejects more than 64 events and invalid chord IDs; the firmware truncates excess events.
+
+### 4.9 Bass, Rhythm & Chord Pattern Editors (M17)
+
+- **FR-E1** On-device **Pattern Edit** screens create and edit user rhythm, bass, and chord patterns and can overwrite built-ins. Each pattern type has its own editor screen (Chord Pattern, Rhythm Pattern, Bass Pattern); there is no in-editor kind selector. A screen is opened by an **Edit Pattern** item at the end of its Chord/Rhythm/Bass parameter menu, or by direct keys: `Super+F9` (chord), `Super+F10` (rhythm), and `Super+F12` (bass) by default. These are rebindable `open_menu` actions using the menu names `chord_pattern`, `rhythm_pattern`, and `bass_pattern`. Each editor opens with the active preset's currently selected pattern for that type.
+- **FR-E2** The editor works on an in-memory copy. Nothing is written until **Save** or **Save As**; leaving with unsaved changes prompts `Discard?`. **New** runs a guided flow: enter a name (prefilled with the unique default), choose Bars (1, 2, 4, or 8), then answer `Record now?` / `Ent/Bk`. Accepting starts the count-in immediately; declining keeps the new pattern in the command menu and shows `New Pat N` / `Created`. Esc during name or bars cancels creation and restores the previous pattern. New patterns inherit the live rhythm meter (`steps_per_bar`: 16 in 4/4, 12 in 3/4). Editing preserves the pattern's existing meter and length; the stored length is `bars * steps_per_bar`.
+- **FR-E3** **Recording:** the user selects Bars and Quantize (`1/4`, `1/8`, or `1/16`, default `1/16`), then Record. If the rhythm engine is off it is enabled for the session (and restored on exit) and its normal pattern is suppressed. Recording follows the M14 count-in: one bar of quarter-note closed hi-hats (downbeat accented), then N bars are recorded while the hi-hat guide continues; recording stops automatically at the end of the take. A pad pressed before the first recorded step is ignored. Live chord-grid keys remain available; the top-row strum/macro path is disabled, and keypad keys are captured as pattern pads instead of the normal strum path.
+- **FR-E4** **Recording pads:** Rhythm uses the 13 Num-Lock-independent numpad keys in canonical order (`1`–`9`, `0`, `.`, `/`, `*` = kick, snare, hi-hat, open-hat, rimshot, clap, crash, ride, bongo, conga-lo, conga-hi, clave, shaker). Bass uses numpad `1`–`5` = root/3rd/5th/6th-or-7th/root-one-octave-up and `0` = rest. Chord patterns use numpad `1`–`4` = root/3rd/5th/7th and `0` = clear; multiple degree pads at one step combine into the step's bitmask. A pad press auditions the sound and records at the nearest quantized step. Rhythm and chord-pattern recording are polyphonic; bass recording is monophonic (the last degree at a step wins). Rhythm hits record velocity `1` (default) or `127` (accent) as edited; bass and chord holds capture `sustain_steps` for the number of steps held.
+- **FR-E5** **Overdub:** recording preserves steps and tracks that the take does not touch. Rhythm pads add/replace only their own track's step; chord degree pads add bits to the step; bass pads replace the degree at the step. A **Clear** command resets the working buffer to rests when a fresh take is wanted.
+- **FR-E6** **Preview:** loops the working pattern from the next rhythm bar until stopped. The normal rhythm/bass playback is suppressed. Rhythm plays through the preset drum map; bass and chord patterns resolve their degrees through the current/last selected chord (C major if none). Live chords remain available; a live chord that takes over playback stops the preview, which can be restarted. Preview works before saving.
+- **FR-E7** **Grid editor:** a two-line LCD editor. Rhythm selects one of the 13 standard pieces (Up/Down), shows one bar of 16/12 step cells, moves the cursor with Left/Right across steps and bars, and cycles `rest → hit → accent` with Enter. Bass shows degree cells and cycles `rest → root → 3rd → 5th → 6th/7th`; sustained steps display as `-`. Chord shows each step as a hex digit `0`–`F`; the line above decodes the cursor step's degrees, numpad `1`–`4`/`0` toggle bits, and sustained steps display as `-`. The cursor cell is shown as `>`; editing a sustained step breaks its sustain. Custom-note rhythm tracks are preserved but not editable on device.
+- **FR-E8** **Save/New/Rename/Delete:** `New` prompts for the pattern name and Bars and then offers `Record now?`, creating a user pattern in `/rhythms/userN.json`, `/bass/userN.json`, or `/chordpatterns/userN.json`; declining recording shows the two-line confirmation (`New Pat N` / `Created`, where N is the user-file number); `Save` overwrites the current file (built-in overwrite requires confirmation); `Save As` creates a new user file; `Rename` edits a user pattern's name using the preset name-entry flow; `Delete` removes a user pattern after confirmation. Built-ins cannot be renamed or deleted. Pattern names must be unique. The 32-total cap per kind and the combined pattern-file budget (8.5) are enforced; a save that would exceed either is rejected with `Pattern limit`.
+- **FR-E9** **Compatibility and exclusion:** files use the existing rhythm/bass/chord JSON schemas; no new fields are required, and `bars` is inferred from `steps.length / steps_per_bar`. On-device and configurator writes use compact JSON (like sequence files) so the pattern budget stays predictable. On save the runtime library reloads and the saved pattern becomes the preset's selected pattern; presets store pattern names, so file ordering does not break references. On-device-created patterns appear in the configurator editors. Opening the pattern editor stops sequence recording/playback; starting a sequence stops the editor. Write actions are disabled while the MSC drive is active. Panic/all-notes-off stops recording and preview.
+- **FR-E10** **Live pads and pass-through:** while the bass editor is open, the plain numpad pad keys play the bass (`KP1`–`KP5` = root/3rd/5th/6th-or-7th/root+8va, `KP0` = rest) using the current chord and the preset bass parameters; while the rhythm editor is open, the 13 numpad pad keys play drums through the preset `DrumMap` and rhythm channel; while the chord editor is open, `KP1`–`KP4` play root/3rd/5th/7th through the current/last chord, combining when several pads are held without retriggering already-held degrees, and `KP0` releases the live chord/clears the step. Pads audition outside recording and also write the pattern while recording. Bass/rhythm live pads work in command, grid, record, preview, and value-selected states; chord live pads work in those states except the chord grid, where `KP1`–`KP4`/`KP0` keep their bit-toggle editing role. Live pads do not work during name entry or confirmation prompts. Chord-grid keys remain live in every state. Direct parameter-modifying keymap actions (`cycle`/`set`/`inc`/`dec`/`toggle`, drum mute, tap tempo) also remain active, including while a value item is selected. Two exceptions keep the pattern editors emitting: in the rhythm editor, actions targeting `RhythmMute` (default F6) are ignored and the rhythm is forced unmuted for the session; in the bass editor, actions targeting `BassEnable` (default F7) are ignored and the bass is forced enabled. The rhythm editor restores the preset's prior mute/enable state on exit; the bass editor leaves the bass enabled so the edited pattern plays through the normal bass engine. The editor reserves its navigation keys (arrows, Volume +/− in menus/grid/value editing, Enter/Mute, Esc/Backspace, plain numpad); menu-open/preset/sequence/strum/top-row actions remain editor-owned, and the top-row strum/macro path stays disabled. Modified numpad keys are not live pads and follow their keymap actions; the numpad `+`/`−`/`Enter` keys are not live pads and retain their normal parameter actions. `F2`/`F3`/`F4` are not editor shortcuts; they retain their normal parameter actions.
 
 ---
 
@@ -281,7 +293,7 @@ The three main letter rows plus their bounding modifiers are fully consumed by t
 | Limited strum path `0 . 2 3 5 6 8 9 / *` | Strum (Limited layout, when enabled) |
 
 ### 5.3 Function Modifier Convention
-Because `Shift` (both keys) is a chord root, **Shift is never used as a function modifier**. Parameter editing uses dedicated menu keys: `F9`–`F12` open the Chord/Strum/Rhythm/Bass menus, `Super+F11` opens Drum, and `Super+F12` opens the sequencer menu (see 5.4–5.10). Arrows/volume scroll parameters and `Enter`/`Mute` select one for editing.
+Because `Shift` (both keys) is a chord root, **Shift is never used as a function modifier**. Parameter editing uses dedicated menu keys: `F9`/`F10`/`F11`/`F12` open the Chord/Rhythm/Strum/Bass menus, `Super+F11` opens Drum, and `Ctrl+F12` opens the sequencer menu (see 5.4–5.10). The matching pattern editors are `Super+F9`, `Super+F10`, and `Super+F12` (5.11). Arrows/volume scroll parameters and `Enter`/`Mute` select one for editing.
 
 Consumer/media keys (`Mute`, `PlayPause`, `Stop`, transport keys, browser keys,
 `Calculator`, `Mail`, etc.) are configurable in `keymap.json` when the keyboard
@@ -293,13 +305,17 @@ scroll parameters while browsing and change the selected value once selected
 (with repeat).
 
 - **`F9`** — opens the **Chord Edit** menu (toggle).
-- **`F10`** — opens the **Strum Edit** menu (toggle).
-- **`F11`** — opens the **Rhythm Edit** menu (toggle).
+- **`F10`** — opens the **Rhythm Edit** menu (toggle).
+- **`F11`** — opens the **Strum Edit** menu (toggle).
 - **`F12`** — opens the **Bass Edit** menu (toggle).
-- **`Super+F12`** — opens the **Seq Edit** menu (sequence slot / bars / settings).
+- **`Super+F9`** — opens the **Chord Pattern Edit** mode.
+- **`Super+F10`** — opens the **Rhythm Pattern Edit** mode.
+- **`Super+F11`** — opens the **Drum Edit** menu (toggle).
+- **`Super+F12`** — opens the **Bass Pattern Edit** mode.
+- **`Ctrl+F12`** — opens the **Seq Edit** menu (sequence slot / bars / settings).
 - **`Ctrl+F9`** — arm/stop sequence recording; **`Ctrl+F10`** — arm/stop sequence playback; **`Ctrl+F11`** — clear the selected sequence (confirm with `Enter`).
 - **`Ctrl+1`…`Ctrl+0`** — select sequence slots 1–10 (global; overrides Ctrl+number strum).
-- **`Super`** (`Windows` key) — global/system modifier, used for preset navigation/save/clear (5.7) and panic (5.8). The target keyboard has no `Fn` key, so the `Windows`/`Super` key is used. (Stored in config as `global_fn: "super"`.)
+- **`Super`** (`Windows` key) — global/system modifier, used for preset navigation/save/clear (5.7), panic (5.8), and the pattern-editor shortcuts above. The target keyboard has no `Fn` key, so the `Windows`/`Super` key is used. (Stored in config as `global_fn: "super"`.)
 - **`Esc` / `Backspace`** — while a parameter is selected, cancel its edits, restore the original value, and return to scrolling; when browsing, exit the edit menu. `Esc` also cancels prompts.
 - **`Esc`** (held at **power-on only**) — reboot into the USB bootloader (`RPI-RP2` drive) so the Pico can be reflashed over USB without opening the enclosure.
 - **`Ctrl`** — held at **power-on only**, to also present the USB Mass Storage drive (M9); it has no runtime function. Ejecting the drive from the host reboots the firmware automatically so it reloads the edited files.
@@ -339,6 +355,7 @@ Main-menu single-key shortcuts (no menu):
 | 11 | Arp Mode | Up / Down / Up-Down / Alternating / Random |
 | 12 | Arp Rate | Whole / Half / Quarter / Eighth / 16th / 32nd |
 | 13 | Pattern | Built-in + user chord patterns (6.10) |
+| 14 | Edit Pattern | Opens the Chord Pattern Edit mode (5.11) |
 
 ### 5.5 Function Keys — Strum Controls & the Strum Edit Menu
 
@@ -348,7 +365,7 @@ Main-menu single-key shortcut:
 |-----|--------|
 | `Keypad +` / `Keypad -` | Strum octave up / down (the numpad math keys are free because they are excluded from the strum plate, FR-S2) |
 
-**Strum Edit menu** — opened by `F10`. Scroll with arrows/volume, select with `Enter`/`Mute`, then edit the selected value:
+**Strum Edit menu** — opened by `F11`. Scroll with arrows/volume, select with `Enter`/`Mute`, then edit the selected value:
 
 | Order | Parameter | Range / cycle |
 |-------|-----------|----------------|
@@ -373,7 +390,7 @@ Main-menu single-key shortcuts (no menu):
 | `F8` | Toggle MIDI clock transmit (Clock Out, FR-R7). Double-tap = Clock Resync. |
 | `Page Up` / `Page Down` | Tempo up / down |
 
-**Rhythm Edit menu** — opened by `F11`. Scroll with arrows/volume, select with `Enter`/`Mute`, then edit the selected value:
+**Rhythm Edit menu** — opened by `F10`. Scroll with arrows/volume, select with `Enter`/`Mute`, then edit the selected value:
 
 | Order | Parameter | Range / cycle |
 |-------|-----------|----------------|
@@ -384,6 +401,7 @@ Main-menu single-key shortcuts (no menu):
 | 5 | Enable | On / Off |
 | 6 | Clock Out | On / Off (MIDI clock transmit, FR-R7) |
 | 7 | Beat LED | On / Off (BPM indicator, FR-R8) |
+| 8 | Edit Pattern | Opens the Rhythm Pattern Edit mode (5.11) |
 
 **Drum Edit menu** — opened by `Super+F11` (the keymap's Drum menu action).
 Scroll with arrows/volume, select with `Enter`/`Mute`, then edit the selected
@@ -421,7 +439,8 @@ selected parameter never times out; an unselected menu auto-exits after
 `display.menu_timeout_ms` (default 10 s).
 
 `F1`–`F12` are inert inside edit menus (they retain their main-menu shortcuts
-outside menus; `F9`–`F12`/`Super+F11` still open/switch menus).
+outside menus; the menu-open keys `F9`–`F12`, `Super+F11`, and `Ctrl+F12` still
+open/switch menus).
 
 ### 5.7 Preset & Navigation
 | Key | Action |
@@ -450,7 +469,7 @@ the cursor open. The cursor auto-resets after 5 s of idleness.
 | `Ctrl + Esc` | Hard-coded debug screen: firmware version and current git commit; any key dismisses it |
 | `Esc` | Exit the current edit menu / cancel the current prompt |
 
-> **Note on modifiers:** all modifiers are read from the HID report modifier byte (`LCtrl/LShift/LAlt/LGui/RCtrl/RShift/RAlt/RGui`). `Shift` is a chord root. `Alt`/`Menu` have no runtime function. `Ctrl` is the power-on boot key and also carries the sequence controls (`Ctrl+1..0`, `Ctrl+F9..F11`); the other function menus are on `F9`–`F12`. `Esc` is the power-on bootloader key. `Super` is the global modifier for presets/panic and the Seq menu (`Super+F12`).
+> **Note on modifiers:** all modifiers are read from the HID report modifier byte (`LCtrl/LShift/LAlt/LGui/RCtrl/RShift/RAlt/RGui`). `Shift` is a chord root. `Alt`/`Menu` have no runtime function. `Ctrl` is the power-on boot key and also carries the sequence controls (`Ctrl+1..0`, `Ctrl+F9..F12`). The parameter menus are on `F9`–`F12`; `Super+F11` opens Drum; `Ctrl+F12` opens Seq Edit. The pattern editors are `Super+F9`, `Super+F10`, and `Super+F12`. `Esc` is the power-on bootloader key. `Super` is the global modifier for presets/panic and the pattern-editor shortcuts.
 
 ### 5.9 Bass Controls & the Bass Edit Menu
 
@@ -470,6 +489,7 @@ Main-menu single-key shortcut:
 | 4 | Velocity | 1..127 (default 90) |
 | 5 | Channel | 1..16 (default 3) |
 | 6 | Pattern | Walking / Whole / Half / Quarter / Half-Alt / Quarter-Alt / 3/4-Alt / Hold (default Walking, FR-B5) |
+| 7 | Edit Pattern | Opens the Bass Pattern Edit mode (5.11) |
 
 ### 5.10 Sequencer Controls & the Seq Edit Menu
 
@@ -479,9 +499,9 @@ Main-menu single-key shortcut:
 | `Ctrl+F9` | Arm recording; recording starts at the next rhythm bar. Press again to stop and save. |
 | `Ctrl+F10` | Arm playback; playback starts at the next rhythm bar. Press again to stop. |
 | `Ctrl+F11` | Clear the selected sequence (Enter confirms, Backspace/Esc cancels) |
-| `Super+F12` | Open the **Seq Edit** menu |
+| `Ctrl+F12` | Open the **Seq Edit** menu |
 
-**Seq Edit menu** — opened by `Super+F12`. Scroll with arrows/volume, select with `Enter`/`Mute`, then edit the selected value:
+**Seq Edit menu** — opened by `Ctrl+F12`. Scroll with arrows/volume, select with `Enter`/`Mute`, then edit the selected value:
 
 | Order | Parameter | Range / cycle |
 |-------|-----------|----------------|
@@ -490,6 +510,54 @@ Main-menu single-key shortcut:
 | 3 | Settings | Recorded / Live (global override; per-setting Live bits are edited in the configurator) |
 
 If the rhythm engine is disabled, recording and playback enable it automatically and mute the drums. Recording mutes the normal pattern immediately and stays silent until the next bar boundary, then plays **exactly one bar** of quarter-note closed hi-hats; recording starts at the following bar boundary and the guide continues through the take. Recording over an existing sequence shows `Overwrite Seq in` / `slot N? Ent/Bk`; Enter/Mute confirms and Backspace/Esc cancels. The count-in/recording screen is persistent (`Rec arm`/`Wait bar`, then `Count-in`/`1 bar`, then `Recording N/N`) so it does not flash back to idle between bars. Other LCD messages: `Seq saved`, `Seq N play`, `Seq stop`, `Seq full`, `Seq empty`, `Seq cleared`.
+
+### 5.11 Bass, Rhythm & Chord Pattern Editor Controls (M17)
+
+| Key | Action |
+|-----|--------|
+| `Super+F9` | Open the **Chord Pattern** editor |
+| `Super+F10` | Open the **Rhythm Pattern** editor |
+| `Super+F12` | Open the **Bass Pattern** editor |
+| `F9` → **Edit Pattern** / `F10` → **Edit Pattern** / `F12` → **Edit Pattern** | Open the matching editor from the corresponding parameter menu |
+
+All three direct shortcuts are rebindable `open_menu` actions (`chord_pattern`, `rhythm_pattern`, `bass_pattern`).
+
+**Command screen** — each type has its own screen, titled `Chord Pattern`, `Rhythm Pattern`, or `Bass Pattern`; there is no Kind parameter. Up/Down/Left/Right or Volume +/− scroll the command list; Enter/Mute selects a value item. While selected, the same keys change the pending value; Enter/Mute applies it and returns to the command list; Esc/Backspace cancels it and returns to the command list. Action items execute on Enter/Mute; while browsing, Esc/Backspace exits the editor (with `Discard?` if dirty).
+
+| Order | Item | Values / action |
+|-------|------|-----------------|
+| 1 | Pattern | Cycle the current type's built-in + user patterns |
+| 2 | New | Create a new user pattern |
+| 3 | Bars | 1 / 2 / 4 / 8 |
+| 4 | Quantize | 1/4, 1/8, 1/16 (recording snap; default 1/16) |
+| 5 | Grid | Open the step grid |
+| 6 | Record | Start/stop a count-in take |
+| 7 | Preview | Start/stop a loop of the working pattern |
+| 8 | Rename | Rename the current user pattern |
+| 9 | Save | Overwrite the current file (confirm for built-ins) |
+| 10 | Save As | Save a copy as a new user pattern |
+| 11 | Delete | Delete the current user pattern (confirm) |
+| 12 | Clear | Reset the working buffer to rests (confirm) |
+
+While the editor is open, plain numpad pad keys are live as described in FR-E10; the top-row strum/macro path remains disabled. Direct parameter-modifying keymap actions and chord-grid keys stay active even while a value is selected, except the matching mute/disable action in the rhythm and bass editors (the editor forces its own emit state for the session). In the chord editor, `KP1`–`KP4` combine as live chord tones and `KP0` releases them; in the chord grid those keys retain bit-toggle editing. Recording and preview stop with `Enter`/`Mute` or `Esc`/`Backspace` and return to the command screen.
+
+**Grid screen** — Left/Right moves the cursor across steps and bars; Up/Down selects a rhythm piece (or changes the bar for bass/chord); Enter/Mute edits the cell for rhythm/bass and advances the cursor for chord patterns; `Esc`/Backspace returns to the command screen. The cell under the cursor is shown as `>`.
+
+| Kind | Cell display | Editing |
+|------|--------------|---------|
+| Rhythm | `.` rest, `x` hit, `X` accent | Enter cycles rest → hit → accent |
+| Bass | `.` rest, `R`/`3`/`5`/`7` degree, `-` sustained | Enter cycles rest → root → 3rd → 5th → 6th/7th |
+| Chord | hex `0`–`F` bitmask, `-` sustained | Numpad `1`–`4` toggle root/3rd/5th/7th; `0` clears |
+
+**Numpad pads (Num-Lock-independent; recording and live audition):**
+
+| Kind | Pads |
+|------|------|
+| Rhythm | `1`–`9`, `0`, `.`, `/`, `*` = the 13 standard drum pieces |
+| Bass | `1`–`5` = root/3rd/5th/6th-or-7th/root+8va; `0` = rest |
+| Chord | `1`–`4` = root/3rd/5th/7th (combine); `0` = clear |
+
+Recording and preview require the live rhythm meter to match the working pattern's `steps_per_bar`; otherwise the editor shows `Meter mismatch`. New patterns inherit the live meter. Recording is overdub; the **Clear** command starts fresh. Plain numpad pads also play live outside recording (FR-E10). See 4.9 and 6.13 for behavior and 8.5 for storage/budget.
 
 ---
 
@@ -553,7 +621,7 @@ Voicing behavior is controlled by a **chord voicing-mode parameter** (`root_posi
 - **VR-3** Octave shift (FR-C5) transposes the whole voicing by ±12 semitones per step, clamped to MIDI 0–127.
 - **VR-4** Pan is applied as CC10 on the chord channel; velocity from the chord velocity param.
 - **VR-6 Minimum note count (`min_notes`):** if the chord has fewer distinct notes than `min_notes`, extra octave notes are appended (root +12, then 5th +12, …) in ascending order until the count is met. Default 3 (e.g. C major with `min_notes`=4 → `C E G C`; Cmaj7 with `min_notes`=5 → `C E G B C`).
-- **VR-7 Minimum interval spread (`min_interval`):** no two adjacent notes in the voicing are closer than `min_interval` semitones. Notes are chosen greedily in the tightest ascending configuration — start at the root; each next note is the smallest chord pitch-class ≥ previous + `min_interval`. `0` disables it. (e.g. C major, `min_interval`=5 → `C3 G3 E4`; `min_interval`=4 → `C3 G3 E4`.)
+- **VR-7 Minimum interval spread (`min_interval`):** no two adjacent notes in the voicing are closer than `min_interval` semitones. Notes are chosen greedily in the tightest ascending configuration — start at the bass selected by the active voicing mode; each next note is the smallest chord pitch-class ≥ previous + `min_interval`. Root position starts at the root (or the pinned inversion tone); smart/up/down choose the spread inversion and octave that best follow the previous voicing, so the modes remain effective when `min_interval` is enabled. `0` disables it. (e.g. C major, `min_interval`=5 → `C3 G3 E4`; `min_interval`=4 → `C3 G3 E4`.)
 - **VR-8 Manual inversions:** `PrtSc`/`ScLk`/`Pause` select 1st/2nd/3rd inversion, respectively — determining whether the 1st, 3rd, or 5th of the chord is the bass (3rd inversion uses the 7th when the chord has one). The inversion bass is selected by its position in the chord's **interval formula** (root/3rd/5th/7th), never by the sorted pitch-class list, so it is correct for every root. The ascending note set is rotated so the chosen tone is lowest, then placed within range. When the requested inversion index exceeds the chord's own tones (e.g. the 3rd inversion of a triad with no 7th), the selection wraps into the next octave so it stays distinct from the lower inversions. Composes with smart voice-leading (the bass is pinned; the remaining notes minimize movement).
 - **VR-9 Chord roll (`chord_roll_ms`):** in Held/Press-to-play modes the chord notes are staggered by `|chord_roll_ms|` ms apart (positive = ascending, negative = descending) instead of sounding simultaneously. Note-offs release together.
 - **VR-5 Parameter snapshot on trigger (Held mode):** When a chord is triggered, the engine takes a snapshot of all sounding-relevant chord parameters (voicing mode, octave, note duration, velocity, pan, chord roll, min notes, min interval, inversion, arp mode, arp rate, channel, and the resolved chord type). The active voice uses this snapshot for its entire lifetime. Subsequent parameter edits (including loading a preset) update only the "pending" parameter state and are applied to the next chord trigger, never mutating an already-sounding held chord (see FR-C9). Implementation: maintain separate `pending_params` (edited live) and `active_params` (snapshot per active chord) structures on the State Manager.
@@ -635,9 +703,11 @@ sounding or the bass is disabled. Whole/half sustained notes re-articulate
 immediately when the chord changes mid-note (so the bass follows the new root),
 and they release slightly before the next note's attack for a clean
 articulation. All beat-driven patterns fire on the rhythm 16th-note step grid in
-lockstep with the drums.
+lockstep with the drums while the rhythm is running; when it is stopped they
+free-run on the same grid at the preset tempo so the bass stays audible without
+drums.
 
-### 6.10 Configurable Chord Patterns (M13)
+### 6.10 Configurable Chord Patterns (M13; on-device editor M17)
 
 Chord patterns are polyphonic, user-authored step sequences for the chord
 engine, selected via the `pattern` chord parameter (5.4) and stored in
@@ -673,6 +743,11 @@ The 9 built-in patterns:
 The pattern follows the rhythm's meter when it is shorter (like the bass), and
 advances at the stored tempo even when the rhythm is stopped.
 
+M17 adds an on-device editor for these patterns (4.9, 5.11): it records degree
+pads into the per-step bitmask, captures held sustains, and edits the grid as
+hex digits `0`–`F`. Recording and preview resolve the bitmask through the
+current/last selected chord, exactly like playback (6.13).
+
 ### 6.11 Pattern and Pattern-Hold Play Modes
 
 `Pattern` steps the selected chord pattern's 16th-note grid and releases on key-up; `PatternHold` latches like `ArpHold` and releases on the next chord, Esc, or panic. Pattern steps resolve through the active chord type (see 6.10). When the rhythm is running, pattern stepping follows the rhythm clock; otherwise it free-runs at the stored tempo.
@@ -680,6 +755,47 @@ advances at the stored tempo even when the rhythm is stopped.
 ### 6.12 Chord Sequencer Playback (M14)
 
 The sequencer is a separate per-preset chord recorder/player. It records chord **changes** (root, type, and extensions) on the same 16th-note grid and plays them through the chord engine using the merged play mode, so recorded Held/Arp/Pattern playback is reproduced. It is not a MIDI sequencer: strummed notes, arpeggios, and pattern notes are never recorded as events; they are generated live from the sequence chord and the recorded/live settings. Playback follows the rhythm clock (rhythm enabled, mute allowed) and loops for 1/2/4/8 bars. The sounding sequence chord becomes the selected chord, so FollowChord strumming tracks playback. Selecting a new slot while playing takes effect at the end of the current loop. Live chords override sequence events while held/latched (FR-Q5). Recorded settings are mixed with live settings per FR-Q3/FR-Q4. See 8.4 for the file schema.
+
+### 6.13 Pattern Recording, Quantization & Overdub (M17)
+
+The bass, rhythm, and chord pattern editors record into the same 16th-note grid
+used by playback. Recording is quantized at capture time: each pad press selects
+the nearest step (using the same half-step comparison as the sequencer) and then
+snaps to the selected Quantize division (`1/4` = 4 steps, `1/8` = 2 steps,
+`1/16` = 1 step). Quantize is a recording setting only; it is not stored in the
+pattern JSON and the grid always edits 16th steps.
+
+- **Count-in and guide:** recording uses the M14 count-in: the normal pattern is
+  suppressed, the hi-hat guide plays one bar of quarter-note closed hi-hats
+  (downbeat accented), and the take records the next N bars while the guide
+  continues. The rhythm engine is enabled for the session if needed and its
+  previous enable/mute state is restored when the editor exits. Recording and
+  preview require the live rhythm meter to match the working pattern's
+  `steps_per_bar`; a mismatch shows `Meter mismatch`.
+- **Rhythm:** each pad press targets its own track, so simultaneous pads record
+  polyphonically. Hits store velocity `1` (default) or `127` (accent); a
+  repeated hit on the same track/step replaces the previous velocity. Drums are
+  one-shot, so pad holds do not sustain.
+- **Bass:** monophonic. A pad press sets the degree at the quantized step and
+  clears any previous degree there. Held pads write `sustain_steps` for the
+  number of steps held, capped to the loop length; releasing before the next
+  step leaves a percussive note.
+- **Chord:** each pad press adds its degree bit to the step's bitmask; `0`
+  clears the step. Multiple pads at one step combine, and held pads write the
+  longest held duration as `sustain_steps`. A new attack on a step breaks any
+  sustain that previously covered it.
+- **Overdub:** recording preserves every step/track the take does not touch.
+  The editor's **Clear** command resets the working buffer to rests (keeping
+  bars/meter) for a fresh take.
+- **Preview:** loops the working buffer from the next bar. It uses the drum map
+  for rhythm and resolves bass/chord degrees through the current/last selected
+  chord. Live chords override preview; starting Preview again resumes. Nothing
+  is written until Save/Save As.
+- **Live pads:** outside recording the same rhythm/bass pads audition using the
+  preset DrumMap/bass parameters. Chord-grid keys and direct
+  parameter-modifying actions stay active; live pads work in command, grid,
+  record, preview, and value-selected states, but not during name entry or
+  prompts (FR-E10).
 
 ---
 
@@ -709,6 +825,7 @@ Each rhythm is a step sequence stored as a JSON file on LittleFS (one file per p
 - `pattern` values may be `0` (rest) or `1..127` (velocity; `1` = default velocity).
 - GM percussion note numbers: kick 36, snare 38, closed hat 42, open hat 46, etc.
 - **`swing` is an integer** here (see 7.3): per-pattern swing is stored as a signed integer percentage −75..+75, not a float. (A pattern authored with `"swing": 0` means none; `"swing": 50` means a 50% off-beat delay.) This differs from the original Pi spec, which used a 0.0–0.75 float.
+- **On-device authoring (M17):** rhythm, bass, and chord patterns can be created or edited on the device (4.9, 5.11). The editor writes the same schema to `userN.json` in the pattern's directory, compactly (the configurator also writes pattern files compactly). `bars` is inferred from `steps.length / steps_per_bar`; no `bars` field is stored. Built-in files may be overwritten, and user files are appended alphabetically at load time. See 8.5 for naming, caps, and the pattern-file budget.
 
 ### 7.3 Timing, Tempo & Swing (integer / fixed-point)
 All timing math runs on Core 1 using integer microseconds; the RP2040 has no FPU (Section 1.4), so **no floats are used in the scheduler**.
@@ -717,6 +834,7 @@ All timing math runs on Core 1 using integer microseconds; the RP2040 has no FPU
 - **Sync:** The Rhythm Engine clock drives the Chord Engine Arpeggio mode (FR-R4) and the walking bass's beat (FR-B4).
 - **MIDI clock:** A single **master clock** (24 PPQN) runs continuously in the background from boot — its tick counter and phase never reset, regardless of whether the rhythm or Clock Out is enabled. Clock Out (`F8`, or Clock Out in the Rhythm Edit menu) gates whether the `0xF8` byte is emitted. Enabling waits for the next 24-tick beat boundary, then streams clocks; disabling stops the stream immediately. No Start/Stop is sent automatically, so the slave's transport remains under its own control. **Double-tap `F8`** to send MIDI Start (`0xFA`) at the next beat boundary and re-align the slave when needed. The beat LED and the rhythm scheduler both **slave to this master clock**: the LED flashes on every 24th tick, and the rhythm downbeat aligns to a 24-tick beat boundary with each 16th-note step = exactly 6 ticks. This keeps LED, drums, and clock mutually phase-locked (nothing preempts or resets the clock).
 - **Mute (FR-R2):** suppresses drum note-ons while the clock/sync continues.
+- **Playback priority:** rhythm/clock output from Core 1 is serviced before UI/LCD work on Core 0. Sequence/chord/bass engines are updated before key-menu handling. If a blocking operation delays service by more than a few milliseconds, stale rhythm output is dropped and the Core 1 step deadline is rebased to the current clock phase rather than firing a burst of late notes.
 - **LED BPM indicator (FR-R8):** the beat LED flashes with a **consistent short pulse** (`led.flash_ms`, default 40 ms) on every beat of the master clock, independent of rhythm/clock-out state. The target LED is configurable (`led.led` = `num_lock` default, `caps_lock`, `scroll_lock`, or `all`); Core 0 owns the LED on/off state and retries the HID report until it is queued, so a dropped report cannot leave the LED stuck on.
 
 ---
@@ -846,6 +964,22 @@ One file per preset (bank 1–5, slot 1–8). The file holds all 10 sequence slo
 - `live` is a bitmask; bit *i* set means "use the live value for recorded[i]" during playback. The MIDI channel stays live.
 - `events` is `[step, chord_id]`. `chord_id = root_pc * 128 + type * 8 + extension_mask`; extension bits are add9=1, add11=2, add13=4. Type order matches `ChordType` (`major`, `minor`, `dom7`, `maj7`, `min7`, `dim`, `dim7`, `aug`, `sus4`, `sus2`, `min7b5`). Maximum 64 events per sequence; steps must be less than `bars * steps_per_bar`.
 
+### 8.5 On-device Pattern Files (M17)
+
+The pattern editors (4.9, 5.11) write the existing rhythm/bass/chord schemas; no new JSON fields are introduced.
+
+| Kind | Directory | Built-ins | New user file |
+|------|-----------|-----------|---------------|
+| Rhythm | `/rhythms/` | 12 | `/rhythms/userN.json` |
+| Bass | `/bass/` | 9 | `/bass/userN.json` |
+| Chord | `/chordpatterns/` | 9 | `/chordpatterns/userN.json` |
+
+- **Naming:** `userN.json` uses the smallest positive N not already present. The authored `name` must be unique among that kind's patterns; the editor uniquifies `New Rhythm` / `New Bass` / `New Chord` (and `Save As` copies) automatically. Presets store pattern **names**, so adding or reordering user files does not break preset references.
+- **Length:** `steps_per_bar` is 16 (4/4) or 12 (3/4); `bars` is 1/2/4/8 and is inferred from `steps.length / steps_per_bar`. The editor keeps all rhythm tracks the same length and writes `sustain_steps` only when a bass/chord step sustains.
+- **Writing:** on-device and configurator writes use compact JSON (like sequence files) to keep the budget predictable. Built-ins may be overwritten with confirmation; user patterns may be renamed/deleted. A built-in file that is deleted/corrupt is re-provisioned from its embedded template on boot; an overwritten built-in is left as edited until reflashed/factory-reset.
+- **Caps and budget:** at most **32 total patterns per kind** (built-in + user). A combined **72 KB** budget covers all rhythm, bass, and chord pattern files (built-ins + user patterns); user-created patterns have a **48 KB** share of that budget. Per-file caps are **8 KB** rhythm, **4 KB** bass, and **4 KB** chord. The editor rejects a save that would exceed the count, per-file, or combined budget (`Pattern limit`/`Pattern too large`). The configurator enforces the same limits with validation errors/warnings.
+- **MSC:** pattern write actions are disabled while the USB Mass Storage drive is active; the host owns the filesystem at that point.
+
 ---
 
 ## 9. Parameter Reference (defaults, ranges, steps)
@@ -914,6 +1048,8 @@ All adjustable parameters, with min/max/default/step. On default initialization 
 
 > **Sequencer menu parameters** (`seq_slot`, `seq_bars`, `seq_settings`) are runtime performance controls, not persisted preset fields. `seq_bars` edits the selected sequence file; `seq_settings` is a global Recorded/Live override; the per-setting Live bits are stored per sequence (8.4).
 >
+> **Pattern editor runtime controls** (`kind`, `pattern`, `bars`, `quantize`, `grid`, `record`, `preview`, `new`, `rename`, `save`, `save as`, `delete`, `clear`) are runtime-only. `bars`, `kind`, and `quantize` are not persisted; pattern length is stored as `steps`/`steps_per_bar`, and quantize is a recording-time snap only (6.13). The saved pattern file is separate from the preset; selecting the saved pattern updates the preset's pattern name and dirty marker.
+>
 > **Changed from the Pi spec:** `swing` is now a **signed integer −75..+75 with step 5** (was float 0.0–0.75 step 0.05). Semantics are identical (percentage off-beat delay; positive laid-back, negative rushed); the representation is integer for the no-FPU RP2040.
 
 ---
@@ -921,7 +1057,7 @@ All adjustable parameters, with min/max/default/step. On default initialization 
 ## 10. Non-Functional Requirements
 
 - **NFR-1 Latency:** Key-report to MIDI-output latency < 10 ms (target). Bounded largely by USB-host poll interval (typically 1 ms) plus minimal per-event work on Core 0. Measure and document typical/worst-case.
-- **NFR-2 Timing accuracy:** Rhythm/arp step timing jitter < 2 ms. Achieved via the dedicated Core 1 monotonic scheduler with non-blocking MIDI writes; LED HID writes kept off the critical path.
+- **NFR-2 Timing accuracy:** Rhythm/arp step timing jitter < 2 ms. Achieved via the dedicated Core 1 monotonic scheduler with non-blocking MIDI writes; LED HID writes kept off the critical path. Core 0 services Core 1 MIDI before UI work, diagnostic logging is drop-on-full/non-blocking, preset dirty checks use an in-memory cache instead of a filesystem read per edit, and LCD I2C updates are rate-limited/deferred around due playback steps. Explicit flash writes pause playback briefly; the scheduler rebases after the stall instead of emitting a late catch-up burst.
 - **NFR-3 Resource use:** Run within RP2040 constraints (264 KB SRAM, 2 MB flash). The keyboard host runs on the external CH559 (which owns the USB-host RAM/PIO), so the RP2040 cost is only the small UART-bridge buffer; keep the rest lean. No dynamic allocation in real-time paths; prefer static buffers.
 - **NFR-4 Boot-to-ready:** No OS/systemd; firmware runs from flash on power-up. Reach playable state quickly (target < 3 s), dominated by USB enumeration of the keyboard and LittleFS mount.
 - **NFR-5 Robustness:** Handle keyboard hot-plug/unplug (re-enumerate), missing/failed LCD, keyboards that reject LED output reports, and an unconnected DIN, without crashing or hanging. A watchdog may be used to recover from a wedged USB stack.
@@ -948,6 +1084,8 @@ The pure-logic core must be testable on a desktop without the Pico hardware. Str
 - **Config:** validation, default generation, and out-of-range fallback (NFR-9), using an in-memory/std::filesystem stub for the storage adapter.
 - **Keymap:** HID usage page + usage + modifier byte → action mapping; Shift/Caps/Tab resolve as chord roots; keypad usages Num-Lock-independent; `+`/`-` context-sensitivity; Consumer/media keys bindable with fixed Volume +/− controls; `Ctrl+1..0` sequence selection.
 - **Sequencer:** sequence JSON round-trip and chord-ID encoding; nearest-16th quantization; recording arm/bar/cap state machine; loop playback; live-chord suppression/resume; recorded-vs-live settings merge; per-preset file load/save/clear; flash-budget guard.
+- **Pattern editors:** rhythm/bass/chord serializer round-trips; bars/meter inference; quantize math; count-in/record/overdub state machine; polyphonic rhythm and chord bitmask capture; bass/chord sustain capture; grid edit operations; new/rename/save-as/delete rules; per-kind caps, per-file caps, and combined pattern budget; runtime library reload and pattern-name selection.
+- **Keymap:** the M17 remap (`F10`/`F11` menu swap, `Ctrl+F12` Seq Edit, `Super+F9/F10/F12` pattern editors) resolves as documented, including configurator defaults/validation.
 
 ### 11.2 On-device verification
 - **MIDI monitor/log mode:** a build/runtime flag that logs every outgoing MIDI message (channel, note/CC, velocity, timestamp) over USB-CDC/UART for verifying output without external gear.
@@ -972,6 +1110,8 @@ These milestones align with the Build Sequence (Section 1.6); stop for user feed
 8. **M8 — Polish:** panic control, latency/jitter tuning, robustness/hot-plug, config validation/fallback, full test suite, and hardening/finalizing the logging + MIDI monitor introduced in M2.
 9. **M9 — USB Mass Storage & dev serial:** FatFS backend (LittleFS replaced so a PC can mount the drive), self-provisioning defaults in code, MSC bridge, and a boot-key composite mode. (See roadmap §6.)
 10. **M10 — Chord Engine upgrades & Walking Bass:** chord roll, minimum note count, minimum-interval spread, manual inversions (`PrtSc`/`ScLk`/`Pause`), arpeggio modes (Up/Down/Up-Down/Alternating/Random), held extensions (`Left`/`Down`/`Right` as add9/11/13), and a dedicated **walking bass** engine (own params, edit menu `F12`, and preset `bass` block; meter-adaptive interval cycle, 6.8). The menus consolidate to `F9`–`F12`; the `Rhythm` play mode is removed.
+
+> The v0.2 milestone set (M11–M17) is tracked in [`v0.2.0-roadmap.md`](v0.2.0-roadmap.md). M17 adds the on-device bass/rhythm/chord pattern editors (4.9, 5.11, 6.13, 8.5).
 
 ---
 
@@ -1002,7 +1142,7 @@ These milestones align with the Build Sequence (Section 1.6); stop for user feed
 - **AC-23** When `bpm_indicator` is on, the configured LED (default Num Lock) flashes once per beat of the master clock, independent of rhythm/clock-out state; `Ctrl+F5` (or Beat LED in the Rhythm Edit menu) enables/disables it; LED unavailability does not affect timing or MIDI (FR-R8).
 - **AC-24** Chord roll staggers note-ons by `chord_roll_ms` (positive ascending, negative descending) in Held/Press modes; note-offs release together.
 - **AC-25** `min_notes` pads a chord with octave notes to at least the configured count (e.g. C major min 4 → `C E G C`).
-- **AC-26** `min_interval` enforces the minimum semitone spacing between adjacent voicing notes in the tightest ascending configuration.
+- **AC-26** `min_interval` enforces the minimum semitone spacing between adjacent voicing notes in the tightest ascending configuration, composing with root/smart/up/down voicing modes and manual inversions.
 - **AC-27** `PrtSc`/`ScLk`/`Pause` select 1st/2nd/3rd inversion; the selected inversion is reflected in the output (correct for every root, with the bass taken from the interval formula) and persists in the preset.
 - **AC-28** The five arpeggio modes (Up/Down/Up-Down/Alternating/Random) step the voicing in the specified order.
 - **AC-29** The walking bass plays the correct interval cycle on each beat (root–3rd–5th–6th/7th), adapts the cycle to the pattern's meter, follows the selected chord's root/type, respects its own octave/duration/velocity/channel, and stays in lockstep with the rhythm beat (never early). The configurable bass patterns (FR-B5) select among the walking cycle and the root/5th patterns.
@@ -1010,10 +1150,22 @@ These milestones align with the Build Sequence (Section 1.6); stop for user feed
 - **AC-31** Sequence playback loops in sync with the rhythm clock, reproduces the merged recorded/live play mode (including arpeggio and chord-pattern modes), mixes recorded/live settings per the Live bits/global switch, and stops cleanly. Selecting another slot during playback queues it to start on the next loop boundary.
 - **AC-32** Live chords override sequence events while held/latched and playback resumes at the next event afterward. FollowChord strumming follows the sounding sequence chord during playback, but strum never records or plays back.
 - **AC-33** 40 presets (5 banks × 8) load/save; each preset owns 10 editable sequences (max 64 events each); clearing a preset removes its sequence file; legacy banks are removed on boot after a backup warning.
+- **AC-34** The Pattern Edit mode opens for chord/rhythm/bass from the corresponding menu's **Edit Pattern** item and from `Super+F9`/`Super+F10`/`Super+F12`; it opens with the right kind/pattern. Escaping with unsaved edits prompts `Discard?`; the default keymap exposes `F9`/`F10`/`F11`/`F12` as Chord/Rhythm/Strum/Bass menus, `Super+F11` as Drum, and `Ctrl+F12` as Seq Edit.
+- **AC-35** Pattern recording matches the M14 count-in: normal pattern suppressed, one bar of quarter-note closed hi-hats, N-bar take with the guide continuing, automatic stop, and rhythm enable/mute restored on exit. Live chord-grid keys remain available.
+- **AC-36** Rhythm recording is polyphonic (multiple pads/tracks at one step) and bass recording is monophonic; same-track/step hits replace, and overdub preserves untouched steps. Quantize 1/4, 1/8, and 1/16 snap correctly at different tempos.
+- **AC-37** Preview loops the working pattern from the next bar, uses the drum map for rhythm, resolves bass/chord degrees through the current/last chord, works before saving, and stops cleanly. Live chords override preview.
+- **AC-38** The grid editor works for all kinds, bars, and 12/16-step meters: rhythm rest/hit/accent, bass degrees, chord hex bitmasks, sustain `-` display, `>` cursor, and correct cell editing.
+- **AC-39** New/Save/Save As/Rename/Delete follow FR-E8: user files are `userN.json`, names are unique, built-ins overwrite only after confirmation, built-ins cannot be renamed/deleted, and deleting a user pattern leaves referencing presets on their previous/default pattern.
+- **AC-40** Pattern caps/budgets are enforced (32 per kind, 8/4/4 KB per file, 48 KB user / 72 KB all-pattern); the configurator warns/errors at the same thresholds; saved patterns survive power cycles and appear in the configurator.
+- **AC-41** New patterns inherit the live rhythm meter (12 for 3/4, 16 for 4/4); edits preserve the existing meter; record/preview show `Meter mismatch` when the live meter differs; 12-step patterns edit and play correctly.
+- **AC-42** Opening the pattern editor stops sequence recording/playback and vice versa; pattern write actions are disabled while MSC is active; panic/all-notes-off stops recording and preview.
+- **AC-43** Chord-pattern recording/editing captures root/3rd/5th/7th as a per-step bitmask: multiple degree pads at one step combine, `0` clears, held pads capture sustain, the grid displays hex `0`–`F`, and preview resolves the bitmask through the current chord.
+- **AC-44** While the bass editor is open, the plain numpad pad keys play the bass (root/3rd/5th/6th-7th/root+8va, `0` = rest) using the current chord and preset bass parameters, and never strum. While the rhythm editor is open, the 13 numpad pad keys play drums through the preset DrumMap note/velocity and rhythm channel. While the chord editor is open, `KP1`–`KP4` play root/3rd/5th/7th through the current/last chord, held pads combine without retriggering unchanged degrees, and `KP0` releases the audition; in the chord grid the same keys keep their bit-toggle editing role. Modified numpad keys and the `+`/`−`/`Enter` keys keep their keymap actions.
+- **AC-45** While a pattern editor is open, chord-grid keys and direct parameter-modifying keymap actions (including F1–F8, Ctrl/Alt combos, drum mute, tap tempo, and while a value item is selected) remain active, except `RhythmMute` in the rhythm editor and `BassEnable` in the bass editor; those are ignored and the matching editor forces rhythm-unmuted / bass-enabled output for the session. The rhythm editor restores the preset's prior mute/enable state on exit; the bass editor leaves the bass enabled. F2/F3/F4 are not editor shortcuts. Recording and preview stop with Enter/Mute or Esc/Backspace. The editor restores its screen after a passed parameter's transient value display.
 
 > **Removed vs. the Pi spec:** the USB-MIDI-gadget acceptance clauses are gone (no USB MIDI in v1). AC-9 is reworded from "both USB and DIN" to DIN-only with graceful behavior when unconnected.
 
-> **Acceptance-criteria numbering:** the criteria above are final for this Pico edition and numbered **AC-1 … AC-33** with no gaps; the roadmap's coverage matrix (Roadmap §6.1) maps every one of these to a milestone.
+> **Acceptance-criteria numbering:** the criteria above are final for this Pico edition and numbered **AC-1 … AC-45** with no gaps; the roadmap's coverage matrix (Roadmap §6.1) maps every one of these to a milestone.
 
 ---
 
@@ -1025,4 +1177,6 @@ Still open (deferred to post-hardware testing):
 2. **LCD line-2 layout (4.6 FR-D1):** to revisit after hardware testing. (Implementation approach in Roadmap §8.2 item 2 — shipped as the draft layout, data-sourced for tuning.)
 3. **Rhythm list (7.1):** confirm/expand the pattern set. (The 12 named patterns to ship as-is are listed in Roadmap §8.2 item 3.)
 4. **Persistence detail:** confirm JSON-on-FatFS for all tables vs. compiling large static tables into flash with JSON overrides (8.3).
+5. **Pattern-file limits (8.5):** the initial 48 KB user / 72 KB all-pattern budget, 8/4/4 KB per-file caps, and 32-per-kind cap are provisional; tune them after measuring real on-device patterns.
+6. **Pattern editor pad layout (5.11):** confirm the 13-piece numpad order and chord-degree pad layout on hardware; the mapping is fixed in the spec but can be revisited before release.
 

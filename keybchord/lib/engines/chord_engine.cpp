@@ -31,6 +31,19 @@ uint32_t arpTicksPerStep(ArpRate rate) {
     }
 }
 
+// Voice-leading memory must use the chord's unpadded core notes. min_notes
+// appends octave duplicates above the core; keeping those in prevVoicing_ makes
+// the directional voicers see a size mismatch and silently fall back to root
+// position. Extensions are stripped for the same reason.
+std::vector<uint8_t> coreVoicing(const std::vector<uint8_t>& notes,
+                                 const ResolvedChord& chord) {
+    ResolvedChord base = chord;
+    base.add9 = base.add11 = base.add13 = false;
+    size_t core = chordPitchClasses(base).size();
+    if (notes.size() <= core) return notes;
+    return std::vector<uint8_t>(notes.begin(), notes.begin() + core);
+}
+
 } // namespace
 
 
@@ -166,7 +179,7 @@ void ChordEngine::applyExtensionMerge(const ResolvedChord& chord, uint64_t now_u
         }
     }
 
-    prevVoicing_ = base;
+    prevVoicing_ = coreVoicing(base, chord);
     voicing_ = notes;
     activeNotes_ = notes;
     currentChord_ = chord;
@@ -181,7 +194,7 @@ void ChordEngine::applyArpExtension(const ResolvedChord& chord, uint64_t now_us)
     std::vector<uint8_t> base, notes;
     computeVoicing(chord, base, notes);
 
-    prevVoicing_ = base;
+    prevVoicing_ = coreVoicing(base, chord);
     voicing_ = notes;
     currentChord_ = chord;
     currentChordValid_ = true;
@@ -229,6 +242,12 @@ void ChordEngine::onArpModeChanged() {
         arpTicksPerStep(state_.activeChord.arp_rate);
 }
 
+void ChordEngine::onVoicingChanged() {
+    // Defer to the next chord trigger; an already-sounding chord keeps the
+    // parameter snapshot it was voiced with (FR-C9).
+    voicingChangePending_ = true;
+}
+
 void ChordEngine::resetVoicing() {
     prevVoicing_.clear();
 }
@@ -263,8 +282,18 @@ const ChordPattern* ChordEngine::currentPattern() const {
     return &patterns_[idx];
 }
 
+void ChordEngine::ensurePatternIndexValid() {
+    if (patterns_.empty()) return;
+    uint8_t& idx = sequenceActive_ ? state_.activeChord.pattern
+                                   : state_.pendingChord.pattern;
+    if (idx >= patterns_.size()) idx = 0;
+}
+
 void ChordEngine::beginPattern(uint64_t now_us) {
+    ensurePatternIndexValid();
     patternActive_ = true;
+    patternStartPending_ = false;
+    patternStartDeadlineUs_ = 0;
     patternStep_ = 0;
     lastPatternClockStep_ = state_.rhythmClock.stepAbs;
     patternNextUs_ = now_us + stepUs(state_.pendingRhythm.tempo);
@@ -275,12 +304,24 @@ void ChordEngine::beginPattern(uint64_t now_us) {
     uint32_t effective = static_cast<uint32_t>(
         (rhythmSpb > 0 && rhythmSpb < spb) ? rhythmSpb : spb);
     if (effective == 0) effective = 16;
+
+    // Full quantization: while the rhythm is running, always wait for the
+    // next rhythm step before sounding pattern step 0.
+    if (followRhythmClock()) {
+        uint64_t boundaryUs = state_.rhythmClock.nextStepUs.load();
+        if (boundaryUs > now_us) {
+            patternStartPending_ = true;
+            patternStartDeadlineUs_ = boundaryUs;
+            return;
+        }
+    }
     firePatternStep(0, now_us, effective);
 }
 
 void ChordEngine::firePatternStep(int stepInBar, uint64_t now_us, uint32_t effectiveSteps) {
     if (!currentChordValid_) return;
 
+    ensurePatternIndexValid();
     const ChordPattern* pat = currentPattern();
     if (!pat) return;
     if (stepInBar < 0 || stepInBar >= static_cast<int>(pat->steps.size())) return;
@@ -320,6 +361,8 @@ void ChordEngine::releasePatternNotes() {
 }
 
 void ChordEngine::update(uint64_t now_us) {
+    ensurePatternIndexValid();
+
     // Chord roll (VR-9): fire note-ons as their stagger deadlines pass.
     if (!rollPending_.empty()) {
         auto it = rollPending_.begin();
@@ -361,6 +404,13 @@ void ChordEngine::update(uint64_t now_us) {
         }
     }
 
+    if (state_.patternEditorActive.load() && patternActive_) {
+        // The pattern editor supplies its own preview; stop any live pattern
+        // stepping so the two do not run at once.
+        patternActive_ = false;
+        releasePatternNotes();
+    }
+
     if (patternActive_) {
         // Release sustained pattern notes whose deadline passed (covers rests and
         // the Block pattern; percussive steps release between steps).
@@ -375,7 +425,13 @@ void ChordEngine::update(uint64_t now_us) {
             (rhythmSpb > 0 && rhythmSpb < spb) ? rhythmSpb : spb);
         if (effective == 0) effective = 16;
 
-        if (followRhythmClock()) {
+        if (patternStartPending_) {
+            if (!followRhythmClock() || now_us >= patternStartDeadlineUs_) {
+                patternStartPending_ = false;
+                lastPatternClockStep_ = state_.rhythmClock.stepAbs;
+                firePatternStep(0, now_us, effective);
+            }
+        } else if (followRhythmClock()) {
             uint32_t stepAbs = state_.rhythmClock.stepAbs;
             if (stepAbs != lastPatternClockStep_) {
                 lastPatternClockStep_ = stepAbs;
@@ -529,7 +585,7 @@ void ChordEngine::resolveAndTriggerIfChanged(uint64_t now_us, bool force) {
         state_.selectedChord = merged;
         state_.selectedChordValid = true;
 
-        if (force || chordChanged(merged)) {
+        if (force || voicingChangePending_ || chordChanged(merged)) {
             triggerChord(merged, now_us);
         }
         return;
@@ -555,12 +611,13 @@ void ChordEngine::resolveAndTriggerIfChanged(uint64_t now_us, bool force) {
 
 void ChordEngine::triggerChord(const ResolvedChord& chord, uint64_t now_us) {
     state_.snapshotChord();
+    voicingChangePending_ = false;
     state_.lastChordUs = now_us;
     const ChordParams& p = state_.activeChord;
 
     std::vector<uint8_t> base, notes;
     computeVoicing(chord, base, notes);
-    prevVoicing_ = base;
+    prevVoicing_ = coreVoicing(base, chord);
 
     stopSound();
     sequenceActive_ = false;
@@ -631,7 +688,7 @@ void ChordEngine::playSequenceChord(const ResolvedChord& chord,
 
     std::vector<uint8_t> base, notes;
     computeVoicing(chord, base, notes);
-    prevVoicing_ = base;
+    prevVoicing_ = coreVoicing(base, chord);
     voicing_ = notes;
     currentChord_ = chord;
     currentChordValid_ = true;
@@ -861,6 +918,8 @@ void ChordEngine::stopSound() {
     arpStartPending_ = false;
     arpStartDeadlineUs_ = 0;
     patternActive_ = false;
+    patternStartPending_ = false;
+    patternStartDeadlineUs_ = 0;
 }
 
 bool ChordEngine::chordChanged(const ResolvedChord& chord) const {

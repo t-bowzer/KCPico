@@ -10,14 +10,17 @@ TEST(ParamEdit, MenuTitles) {
     EXPECT_STREQ(menuTitle(EditMenu::Rhythm), "Rhythm Edit");
     EXPECT_STREQ(menuTitle(EditMenu::Bass), "Bass Edit");
     EXPECT_STREQ(menuTitle(EditMenu::Drum), "Drum Edit");
+    EXPECT_STREQ(menuTitle(EditMenu::ChordPattern), "Chord Pattern");
+    EXPECT_STREQ(menuTitle(EditMenu::RhythmPattern), "Rhythm Pattern");
+    EXPECT_STREQ(menuTitle(EditMenu::BassPattern), "Bass Pattern");
     EXPECT_STREQ(menuTitle(EditMenu::None), "");
 }
 
 TEST(ParamEdit, MenuParamLists) {
-    EXPECT_EQ(menuParamCount(EditMenu::Chord), 13);
+    EXPECT_EQ(menuParamCount(EditMenu::Chord), 14);
     EXPECT_EQ(menuParamCount(EditMenu::Strum), 7);
-    EXPECT_EQ(menuParamCount(EditMenu::Rhythm), 7);
-    EXPECT_EQ(menuParamCount(EditMenu::Bass), 6);
+    EXPECT_EQ(menuParamCount(EditMenu::Rhythm), 8);
+    EXPECT_EQ(menuParamCount(EditMenu::Bass), 7);
     EXPECT_EQ(menuParamCount(EditMenu::Drum), 26);
 
     EXPECT_EQ(menuParamAt(EditMenu::Chord, 0), ParamId::ChordOctave);
@@ -26,17 +29,20 @@ TEST(ParamEdit, MenuParamLists) {
     EXPECT_EQ(menuParamAt(EditMenu::Chord, 10), ParamId::ChordArpMode);
     EXPECT_EQ(menuParamAt(EditMenu::Chord, 11), ParamId::ChordArpRate);
     EXPECT_EQ(menuParamAt(EditMenu::Chord, 12), ParamId::ChordPattern);
+    EXPECT_EQ(menuParamAt(EditMenu::Chord, 13), ParamId::ChordPatternEdit);
 
     EXPECT_EQ(menuParamAt(EditMenu::Strum, 0), ParamId::StrumOctave);
     EXPECT_EQ(menuParamAt(EditMenu::Strum, 4), ParamId::StrumMode);
 
     EXPECT_EQ(menuParamAt(EditMenu::Rhythm, 0), ParamId::RhythmTempo);
     EXPECT_EQ(menuParamAt(EditMenu::Rhythm, 6), ParamId::RhythmLed);
+    EXPECT_EQ(menuParamAt(EditMenu::Rhythm, 7), ParamId::RhythmPatternEdit);
 
     EXPECT_EQ(menuParamAt(EditMenu::Bass, 0), ParamId::BassEnable);
+    EXPECT_EQ(menuParamAt(EditMenu::Bass, 6), ParamId::BassPatternEdit);
 
     // Out of range -> COUNT.
-    EXPECT_EQ(menuParamAt(EditMenu::Chord, 13), ParamId::COUNT);
+    EXPECT_EQ(menuParamAt(EditMenu::Chord, 14), ParamId::COUNT);
     EXPECT_EQ(menuParamAt(EditMenu::Strum, 7), ParamId::COUNT);
     EXPECT_EQ(menuParamAt(EditMenu::None, 0), ParamId::COUNT);
 }
@@ -51,6 +57,9 @@ TEST(ParamEdit, Names) {
     EXPECT_STREQ(paramFullName(ParamId::StrumLayout), "Strum Layout");
     EXPECT_STREQ(paramShortName(ParamId::ChordRoll), "Roll");
     EXPECT_STREQ(paramShortName(ParamId::ChordInversion), "Inversion");
+    EXPECT_STREQ(paramShortName(ParamId::ChordPatternEdit), "Edit Pattern");
+    EXPECT_STREQ(paramFullName(ParamId::RhythmPatternEdit), "Edit Rhythm Pattern");
+    EXPECT_STREQ(paramFullName(ParamId::BassPatternEdit), "Edit Bass Pattern");
 }
 
 TEST(ParamEdit, ValueStrings) {
@@ -79,6 +88,9 @@ TEST(ParamEdit, ValueStrings) {
     EXPECT_EQ(paramValueString(s, ParamId::BassEnable), "Off");
     EXPECT_EQ(paramValueString(s, ParamId::BassOctave), "-1");
     EXPECT_EQ(paramValueString(s, ParamId::DrumKickVel), "Auto");
+    EXPECT_EQ(paramValueString(s, ParamId::ChordPatternEdit), "Open");
+    EXPECT_EQ(paramValueString(s, ParamId::RhythmPatternEdit), "Open");
+    EXPECT_EQ(paramValueString(s, ParamId::BassPatternEdit), "Open");
 }
 
 TEST(ParamEdit, StepIntClamps) {

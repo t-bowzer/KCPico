@@ -62,8 +62,17 @@ void BassEngine::update(uint64_t now_us) {
         releaseNote();
     }
 
+    // The pattern editor drives its own audition/preview while it is open.
+    if (state_.patternEditorActive.load()) {
+        if (noteActive_) releaseNote();
+        freeRunActive_ = false;
+        lastStepAbs_ = state_.rhythmClock.stepAbs;
+        return;
+    }
+
     if (!b.enabled) {
         if (noteActive_) releaseNote();
+        freeRunActive_ = false;
         lastStepAbs_ = state_.rhythmClock.stepAbs;
         return;
     }
@@ -74,6 +83,7 @@ void BassEngine::update(uint64_t now_us) {
     const BassPattern* pat = currentPattern();
     if (pat && pat->hold) {
         updateHold(now_us);
+        freeRunActive_ = false;
         lastStepAbs_ = state_.rhythmClock.stepAbs;
         return;
     }
@@ -88,23 +98,53 @@ void BassEngine::update(uint64_t now_us) {
     bool running = state_.rhythmClock.running;
     uint32_t stepAbs = state_.rhythmClock.stepAbs;
 
-    if (running && stepAbs != lastStepAbs_) {
-        if (pat) {
-            int spb = pat->steps_per_bar;
-            int rhythmSpb = state_.rhythmClock.stepsPerBar.load();
-            // Follow the rhythm's meter when it is shorter (e.g. a 4/4 bass over
-            // a 3/4 waltz plays only its first 12 steps, then wraps).
-            uint32_t effective = static_cast<uint32_t>(
-                (rhythmSpb > 0 && rhythmSpb < spb) ? rhythmSpb : spb);
-            if (effective == 0) effective = 16;
+    int spb = pat ? pat->steps_per_bar : 16;
+    int rhythmSpb = state_.rhythmClock.stepsPerBar.load();
+    // Follow the rhythm's meter when it is shorter (e.g. a 4/4 bass over a 3/4
+    // waltz plays only its first 12 steps, then wraps).
+    uint32_t runningEffective = static_cast<uint32_t>(
+        (rhythmSpb > 0 && rhythmSpb < spb) ? rhythmSpb : spb);
+    if (runningEffective == 0) runningEffective = 16;
+    // With no rhythm running there is no live meter to follow; use the bass
+    // pattern's own length rather than a stale clock snapshot.
+    uint32_t freeRunEffective = static_cast<uint32_t>(spb > 0 ? spb : 16);
+
+    if (running) {
+        freeRunActive_ = false;
+        if (!lastRunning_) {
+            // Resync without firing retroactively: wait for the next shared step.
+            lastStepAbs_ = stepAbs;
+        } else if (stepAbs != lastStepAbs_) {
             // `stepAbs` is incremented after each fired step, so the step that
             // just fired is (stepAbs - 1) on the shared 16th-note grid.
-            uint32_t stepInBar = (stepAbs - 1) % effective;
-            fireStep(stepInBar, now_us, effective);
+            uint32_t stepInBar = (stepAbs - 1) % runningEffective;
+            fireStep(stepInBar, now_us, runningEffective);
+            lastStepAbs_ = stepAbs;
         }
+    } else {
+        const uint16_t tempo = state_.pendingRhythm.tempo;
+        const uint64_t stepIntervalUs = stepUs(tempo);
+        if (!freeRunActive_) {
+            // Start on the next 16th so stopping the rhythm does not insert an
+            // extra note immediately after the last running step.
+            freeRunActive_ = true;
+            freeRunStep_ = 0;
+            freeRunTempo_ = tempo;
+            freeRunNextUs_ = now_us + stepIntervalUs;
+        } else if (tempo != freeRunTempo_) {
+            freeRunTempo_ = tempo;
+            freeRunNextUs_ = now_us + stepIntervalUs;
+        }
+
+        if (now_us >= freeRunNextUs_) {
+            fireStep(freeRunStep_, now_us, freeRunEffective);
+            freeRunStep_ = (freeRunStep_ + 1) % freeRunEffective;
+            freeRunNextUs_ = now_us + stepIntervalUs;
+        }
+        lastStepAbs_ = stepAbs;
     }
 
-    lastStepAbs_ = stepAbs;
+    lastRunning_ = running;
 }
 
 void BassEngine::fireStep(uint32_t stepInBar, uint64_t now_us, uint32_t effectiveSteps) {

@@ -252,14 +252,17 @@ def save_tree(tree: ConfigTree, directory: str | Path) -> None:
         _write_json(root / PRESETS_DIR / f"bank{bank + 1}.json",
                     [slot.to_dict() for slot in tree.banks[bank]])
 
+    # Pattern libraries are compact like the on-device writes: the pattern
+    # budget (and the per-file caps) are based on compact JSON.
     for filename, pattern in tree.rhythms:
-        _write_json(root / RHYTHMS_DIR / filename, pattern.to_dict())
+        _write_json_compact(root / RHYTHMS_DIR / filename, pattern.to_dict())
 
     for filename, pattern in tree.bass:
-        _write_json(root / BASS_DIR / filename, pattern.to_dict())
+        _write_json_compact(root / BASS_DIR / filename, pattern.to_dict())
 
     for filename, pattern in tree.chordpatterns:
-        _write_json(root / CHORD_PATTERNS_DIR / filename, pattern.to_dict())
+        _write_json_compact(root / CHORD_PATTERNS_DIR / filename,
+                            pattern.to_dict())
 
     # Sequence files are compact (the firmware flash budget assumes no pretty
     # whitespace). Empty libraries remove the file.

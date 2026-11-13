@@ -105,6 +105,9 @@ class EditMenu(IntEnum):
     BASS = 3
     DRUM = 4
     SEQUENCE = 5
+    CHORD_PATTERN = 6
+    RHYTHM_PATTERN = 7
+    BASS_PATTERN = 8
 
 
 class NumberKeyMode(IntEnum):
@@ -221,6 +224,9 @@ EDIT_MENU_JSON: dict[EditMenu, str] = {
     EditMenu.BASS: "bass",
     EditMenu.DRUM: "drum",
     EditMenu.SEQUENCE: "sequence",
+    EditMenu.CHORD_PATTERN: "chord_pattern",
+    EditMenu.RHYTHM_PATTERN: "rhythm_pattern",
+    EditMenu.BASS_PATTERN: "bass_pattern",
 }
 
 CHORD_TYPE_JSON: dict[ChordType, str] = {

@@ -21,12 +21,13 @@ TEST(Bass, DegreeOffsets) {
     EXPECT_EQ(bassDegreeOffset(ChordType::Sus2, 1), 2);
     EXPECT_EQ(bassDegreeOffset(ChordType::Min7b5, 2), 6);
     EXPECT_EQ(bassDegreeOffset(ChordType::Min7b5, 3), 10);
+    EXPECT_EQ(bassDegreeOffset(ChordType::Major, 4), 12);  // root +1 octave
 }
 
 // Invalid degrees and chord types fall back cleanly.
 TEST(Bass, DegreeOffsetBounds) {
     EXPECT_EQ(bassDegreeOffset(ChordType::Major, -1), -1);
-    EXPECT_EQ(bassDegreeOffset(ChordType::Major, 4), -1);
+    EXPECT_EQ(bassDegreeOffset(ChordType::Major, 5), -1);
     // Out-of-range chord type clamps to Major (degree 3 -> 9).
     EXPECT_EQ(bassDegreeOffset(static_cast<ChordType>(200), 3), 9);
 }
@@ -62,9 +63,9 @@ TEST(Bass, ParsePatternDefaultsSustainAndClampsDegrees) {
     })";
     BassPattern p;
     ASSERT_TRUE(parseBassPattern(json, p));
-    // Degrees clamp to -1..3.
+    // Degrees clamp to -1..4.
     EXPECT_EQ(p.steps[0], 0);
-    EXPECT_EQ(p.steps[1], 3);   // 5 clamped to 3
+    EXPECT_EQ(p.steps[1], 4);   // 5 clamped to 4 (root +1 octave)
     EXPECT_EQ(p.steps[2], -1);  // -9 clamped to -1
     EXPECT_EQ(p.steps[3], 2);
     // No sustain array -> default percussive.

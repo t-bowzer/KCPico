@@ -51,7 +51,7 @@ bool parseBassPattern(const std::string& json, BassPattern& out) {
         p.name = doc["name"].as<std::string>();
     }
     if (doc.containsKey("steps_per_bar") && doc["steps_per_bar"].is<int>()) {
-        p.steps_per_bar = doc["steps_per_bar"].as<int>();
+        p.steps_per_bar = clamp<int>(doc["steps_per_bar"].as<int>(), 4, 64);
     }
     if (doc.containsKey("hold") && doc["hold"].is<bool>()) {
         p.hold = doc["hold"].as<bool>();
@@ -60,7 +60,7 @@ bool parseBassPattern(const std::string& json, BassPattern& out) {
         for (JsonVariant v : doc["steps"].as<JsonArray>()) {
             int val = v.is<int>() ? v.as<int>() : 0;
             p.steps.push_back(static_cast<int8_t>(
-                clamp<int>(val, -1, 3)));
+                clamp<int>(val, -1, 4)));
         }
     }
     if (doc.containsKey("sustain_steps") && doc["sustain_steps"].is<JsonArray>()) {
@@ -77,7 +77,29 @@ bool parseBassPattern(const std::string& json, BassPattern& out) {
     return true;
 }
 
+std::string serializeBassPattern(const BassPattern& p, bool pretty) {
+    JsonDocument doc;
+    doc["name"] = p.name;
+    doc["steps_per_bar"] = p.steps_per_bar;
+    JsonArray steps = doc["steps"].to<JsonArray>();
+    for (int8_t v : p.steps) steps.add(static_cast<int>(v));
+    if (!p.sustain_steps.empty()) {
+        JsonArray sustain = doc["sustain_steps"].to<JsonArray>();
+        for (uint8_t v : p.sustain_steps) sustain.add(static_cast<int>(v));
+    }
+    if (p.hold) doc["hold"] = true;
+
+    std::string out;
+    if (pretty) {
+        serializeJsonPretty(doc, out);
+    } else {
+        serializeJson(doc, out);
+    }
+    return out;
+}
+
 int bassDegreeOffset(ChordType type, int degree) {
+    if (degree == BASS_DEGREE_ROOT_OCTAVE) return 12;
     int t = static_cast<int>(type);
     if (t < 0 || t >= static_cast<int>(ChordType::COUNT)) t = 0;
     if (degree < 0 || degree >= 4) return -1;

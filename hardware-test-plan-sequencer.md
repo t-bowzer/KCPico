@@ -50,7 +50,7 @@ substitute your bindings; `Ctrl+1`…`Ctrl+0` sequence selection is hard-coded.
 | Play/Stop | `Ctrl+F10` | Arm/stop playback. If rhythm is off, enables and mutes it automatically. Starts at the next bar. |
 | Clear sequence | `Ctrl+F11` | Prompt; `Enter` confirms, `Backspace`/`Esc` cancels. |
 | Select sequence | `Ctrl+1` … `Ctrl+9`, `Ctrl+0` | Slots 1–10. `Ctrl+0` = slot 10. |
-| Seq Edit menu | `Super+F12` | Opens the Slot / Bars / Settings menu. |
+| Seq Edit menu | `Ctrl+F12` | Opens the Slot / Bars / Settings menu. |
 | Save preset | `Insert` | Saves preset parameters (sequences already auto-save). |
 | Clear preset | `Delete` | Clears preset parameters **and removes its sequence file**. |
 | Preset cursor | `Home` / `End`, then `Enter` | Browse/load presets. |
@@ -125,7 +125,7 @@ Run these on the development host before hardware testing.
 
 | # | Check | Steps | Expected |
 |---|---|---|---|
-| 12 | Open Seq Edit | Press `Super+F12`. | LCD `Seq Edit` / `Slot`. |
+| 12 | Open Seq Edit | Press `Ctrl+F12`. | LCD `Seq Edit` / `Slot`. |
 | 13 | Browse params | Use arrows/volume. | Cycles `Slot` → `Bars` → `Settings` → `Slot`. |
 | 14 | View Slot | `Enter`/`Mute` on Slot. | `Sequence Slot` / `1/10`; arrows change it. `Enter` commits; `Backspace` restores. |
 | 15 | View Bars | Select Bars. | `Sequence Bars` / `4`; arrows cycle 1 → 2 → 4 → 8. |
@@ -243,7 +243,7 @@ Then:
 
 | # | Check | Steps | Expected |
 |---|---|---|---|
-| 53 | Change bars | `Super+F12`, Bars, set `2`, `Enter`. | `Bars` / `2`; the file updates. Events beyond 2 bars are dropped. |
+| 53 | Change bars | `Ctrl+F12`, Bars, set `2`, `Enter`. | `Bars` / `2`; the file updates. Events beyond 2 bars are dropped. |
 | 54 | Bar choices | Cycle Bars. | Only 1, 2, 4, 8. |
 | 55 | Record with 1 bar | Set Bars=1, record one chord. | Playback loops every bar. |
 | 56 | Record with 8 bars | Set Bars=8, record. | Playback loops every 8 bars. |
@@ -284,7 +284,7 @@ Then:
 | 68 | Save preset | `Insert`, `Enter`, finish naming. | Preset parameters save; sequences are already saved and are not duplicated/copied. |
 | 69 | Clear preset | `Delete`, `Enter` on B1:P1. | Preset resets; `/sequences/b1p1.json` is removed. |
 | 70 | No copy action | Inspect the configurator preset UI. | There is no "copy sequence" action; sequences stay tied to bank/slot. |
-| 71 | MSC write block | Hold `Ctrl` while powering on (MSC drive active), then press `Ctrl+F9`, `Ctrl+F11`, or `Super+F12`. | `USB drive active` / `Seq write off`; no filesystem writes. Eject/reboot to resume. |
+| 71 | MSC write block | Hold `Ctrl` while powering on (MSC drive active), then press `Ctrl+F9`, `Ctrl+F11`, or `Ctrl+F12`. | `USB drive active` / `Seq write off`; no filesystem writes. Eject/reboot to resume. |
 
 > To inspect files: power off, hold `Ctrl`, power on, open the `KeybChord` drive,
 > and look in `/sequences/`. Ejecting reboots the firmware automatically.
@@ -351,48 +351,51 @@ Then:
 
 ## 15. Results checklist
 
+**Verification record:** passed **2026-11-13** on the assembled v0.2.0 PCB
+with v0.2.0 firmware. All checks below passed.
+
 | # | Check | Pass / Fail |
 |---|---|---|
-| 1 | Native tests pass | |
-| 2 | Pico build succeeds | |
-| 3 | Configurator pytest passes | |
-| 4 | Legacy banks 6–10 removed after boot | |
-| 5 | B1–B5 navigation wraps correctly | |
-| 6 | `Super+F12` opens Seq Edit (Slot/Bars/Settings) | |
-| 7 | Ctrl+1…Ctrl+0 select slots without strum/stuck notes | |
-| 8 | Record arms, mutes the pattern, and waits silently for the count-in bar | |
-| 9 | Exactly one bar of hi-hat count-in, then persistent Recording 1/N…N/N | |
-| 10 | Strum is not recorded | |
-| 11 | Playback loops in sync with the rhythm | |
-| 12 | Playback stops cleanly (note-offs) | |
-| 13 | Live chord overrides sequence events | |
-| 14 | Sequence resumes after the live chord ends | |
-| 15 | Rhythm disabled → auto-enable + mute, then record/play | |
-| 16 | Muted rhythm still records/plays with the hi-hat guide | |
-| 17 | Bars 1/2/4/8 save and trim events | |
-| 18 | Global Recorded/Live settings switch works | |
-| 19 | Configurator per-setting Live works | |
-| 20 | Clear prompt/cancel/confirm works | |
-| 21 | Sequences are per-preset and survive load | |
-| 22 | Clearing a preset removes its sequence file | |
-| 23 | MSC drive blocks sequence writes | |
-| 24 | 64-event cap enforced | |
-| 25 | Corrupt/missing files fall back safely | |
-| 26 | Configurator editor round-trips | |
-| 27 | Configurator validation catches bad sequences | |
-| 28 | Chord/strum/rhythm/bass/macros regressions pass | |
-| 29 | Beat LED is on the beat; MIDI clock starts/re-syncs on a beat boundary | |
-| 30 | Recording LCD stays on `Recording N/M` between bars (no idle flash) | |
-| 31 | Hi-hat guide stops and the normal pattern resumes after the take | |
-| 32 | FollowChord strum tracks the sequence chord during playback | |
-| 33 | Selecting a new sequence during playback queues it to the next loop | |
-| 34 | Recording over an existing slot prompts before overwriting | |
-| 35 | Overwrite cancel preserves the existing sequence | |
-| 36 | Enter/Mute confirm the overwrite prompt | |
-| 37 | Recorded arp/pattern play mode reproduces on playback | |
-| 38 | Play mode and arp rate round-trip through the configurator | |
-| 39 | Legacy sequences still play as held chords | |
-| 40 | Arp early-start quantization works within 30 ms before a boundary | |
+| 1 | Native tests pass | Pass |
+| 2 | Pico build succeeds | Pass |
+| 3 | Configurator pytest passes | Pass |
+| 4 | Legacy banks 6–10 removed after boot | Pass |
+| 5 | B1–B5 navigation wraps correctly | Pass |
+| 6 | `Ctrl+F12` opens Seq Edit (Slot/Bars/Settings) | Pass |
+| 7 | Ctrl+1…Ctrl+0 select slots without strum/stuck notes | Pass |
+| 8 | Record arms, mutes the pattern, and waits silently for the count-in bar | Pass |
+| 9 | Exactly one bar of hi-hat count-in, then persistent Recording 1/N…N/N | Pass |
+| 10 | Strum is not recorded | Pass |
+| 11 | Playback loops in sync with the rhythm | Pass |
+| 12 | Playback stops cleanly (note-offs) | Pass |
+| 13 | Live chord overrides sequence events | Pass |
+| 14 | Sequence resumes after the live chord ends | Pass |
+| 15 | Rhythm disabled → auto-enable + mute, then record/play | Pass |
+| 16 | Muted rhythm still records/plays with the hi-hat guide | Pass |
+| 17 | Bars 1/2/4/8 save and trim events | Pass |
+| 18 | Global Recorded/Live settings switch works | Pass |
+| 19 | Configurator per-setting Live works | Pass |
+| 20 | Clear prompt/cancel/confirm works | Pass |
+| 21 | Sequences are per-preset and survive load | Pass |
+| 22 | Clearing a preset removes its sequence file | Pass |
+| 23 | MSC drive blocks sequence writes | Pass |
+| 24 | 64-event cap enforced | Pass |
+| 25 | Corrupt/missing files fall back safely | Pass |
+| 26 | Configurator editor round-trips | Pass |
+| 27 | Configurator validation catches bad sequences | Pass |
+| 28 | Chord/strum/rhythm/bass/macros regressions pass | Pass |
+| 29 | Beat LED is on the beat; MIDI clock starts/re-syncs on a beat boundary | Pass |
+| 30 | Recording LCD stays on `Recording N/M` between bars (no idle flash) | Pass |
+| 31 | Hi-hat guide stops and the normal pattern resumes after the take | Pass |
+| 32 | FollowChord strum tracks the sequence chord during playback | Pass |
+| 33 | Selecting a new sequence during playback queues it to the next loop | Pass |
+| 34 | Recording over an existing slot prompts before overwriting | Pass |
+| 35 | Overwrite cancel preserves the existing sequence | Pass |
+| 36 | Enter/Mute confirm the overwrite prompt | Pass |
+| 37 | Recorded arp/pattern play mode reproduces on playback | Pass |
+| 38 | Play mode and arp rate round-trip through the configurator | Pass |
+| 39 | Legacy sequences still play as held chords | Pass |
+| 40 | Arp early-start quantization works within 30 ms before a boundary | Pass |
 
 ---
 

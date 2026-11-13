@@ -157,6 +157,69 @@ TEST(Voicing, MinIntervalInversionUsesIntervalOrder) {
               (std::vector<uint8_t>{57, 65, 72}));  // A3 F4 C5
 }
 
+// VR-7 composes with the voicing mode: smart picks the spread inversion nearest
+// the previous voicing instead of always rebuilding from the root.
+TEST(Voicing, MinIntervalFollowsSmart) {
+    ResolvedChord f{5, ChordType::Major};  // F major (F A C)
+    VoicingConfig cfg;
+    cfg.voicing_mode = VoicingMode::Smart;
+    cfg.min_interval = 4;
+
+    std::vector<uint8_t> prev = {60, 64, 67};  // C major
+    EXPECT_EQ(voiceChord(f, 60, 0, 48, 84, cfg, prev),
+              (std::vector<uint8_t>{60, 65, 69}));  // C F A
+
+    // Root position would place F in the bass instead.
+    cfg.voicing_mode = VoicingMode::RootPosition;
+    EXPECT_EQ(voiceChord(f, 60, 0, 48, 84, cfg, prev),
+              (std::vector<uint8_t>{65, 72, 81}));  // F C A
+}
+
+// VR-7 composes with the directional modes: the spread must still descend/ascend
+// relative to the previous voicing.
+TEST(Voicing, MinIntervalFollowsDirection) {
+    ResolvedChord f{5, ChordType::Major};  // F major
+    VoicingConfig cfg;
+    cfg.min_interval = 4;
+    std::vector<uint8_t> prev = {60, 64, 67};  // C major
+
+    cfg.voicing_mode = VoicingMode::Down;
+    EXPECT_EQ(voiceChord(f, 60, 0, 48, 84, cfg, prev),
+              (std::vector<uint8_t>{48, 53, 57}));  // C F A, below previous
+
+    cfg.voicing_mode = VoicingMode::Up;
+    EXPECT_EQ(voiceChord(f, 60, 0, 48, 84, cfg, prev),
+              (std::vector<uint8_t>{60, 65, 69}));  // C F A, above previous
+}
+
+// Without a previous voicing the directional modes fall back to the root spread.
+TEST(Voicing, MinIntervalDirectionalFallsBackToRootWhenEmpty) {
+    ResolvedChord f{5, ChordType::Major};
+    VoicingConfig cfg;
+    cfg.min_interval = 4;
+
+    cfg.voicing_mode = VoicingMode::Down;
+    EXPECT_EQ(voiceChord(f, 60, 0, 48, 84, cfg, {}),
+              (std::vector<uint8_t>{65, 72, 81}));
+    cfg.voicing_mode = VoicingMode::Up;
+    EXPECT_EQ(voiceChord(f, 60, 0, 48, 84, cfg, {}),
+              (std::vector<uint8_t>{65, 72, 81}));
+}
+
+// A manual inversion still pins the bass pitch class while smart voice-leading
+// chooses the nearest spread octave.
+TEST(Voicing, MinIntervalInversionComposesWithSmart) {
+    ResolvedChord f{5, ChordType::Major};  // F major
+    VoicingConfig cfg;
+    cfg.voicing_mode = VoicingMode::Smart;
+    cfg.inversion = InversionMode::First;  // A in the bass
+    cfg.min_interval = 4;
+
+    std::vector<uint8_t> prev = {57, 60, 65};  // A3 C4 F4
+    EXPECT_EQ(voiceChord(f, 60, -1, 48, 84, cfg, prev),
+              (std::vector<uint8_t>{57, 65, 72}));  // A3 F4 C5
+}
+
 // The 3rd inversion of a triad (no 7th) wraps to the next octave instead of
 // collapsing onto the 2nd inversion (which also uses the 5th as the bass).
 TEST(Voicing, ThirdInversionOfTriadDistinct) {
@@ -202,6 +265,37 @@ TEST(Voicing, DirectionalFallsBackToRootWhenEmpty) {
     ResolvedChord c{0, ChordType::Major};
     EXPECT_EQ(voiceDown(c, 60, 0, 48, 84, {}), (std::vector<uint8_t>{60, 64, 67}));
     EXPECT_EQ(voiceUp(c, 60, 0, 48, 84, {}), (std::vector<uint8_t>{60, 64, 67}));
+}
+
+// Directional voicing also applies between same-cardinality 7th chords.
+TEST(Voicing, DirectionalSeventhToSeventh) {
+    ResolvedChord g7{7, ChordType::Dom7};
+    std::vector<uint8_t> prev = {60, 64, 67, 71};  // Cmaj7
+
+    VoicingConfig cfg;
+    cfg.voicing_mode = VoicingMode::Down;
+    EXPECT_EQ(voiceChord(g7, 60, 0, 48, 84, cfg, prev),
+              (std::vector<uint8_t>{59, 62, 65, 67}));
+
+    cfg.voicing_mode = VoicingMode::Up;
+    EXPECT_EQ(voiceChord(g7, 60, 0, 48, 84, cfg, prev),
+              (std::vector<uint8_t>{62, 65, 67, 71}));
+}
+
+// When the chord cardinality changes, direction follows the bass note instead
+// of silently snapping to root position.
+TEST(Voicing, DirectionalHandlesCardinalityChange) {
+    ResolvedChord g{7, ChordType::Major};
+    std::vector<uint8_t> prev = {60, 64, 67, 71};  // Cmaj7
+
+    VoicingConfig cfg;
+    cfg.voicing_mode = VoicingMode::Down;
+    EXPECT_EQ(voiceChord(g, 60, 0, 48, 84, cfg, prev),
+              (std::vector<uint8_t>{59, 62, 67}));
+
+    cfg.voicing_mode = VoicingMode::Up;
+    EXPECT_EQ(voiceChord(g, 60, 0, 48, 84, cfg, prev),
+              (std::vector<uint8_t>{62, 67, 71}));
 }
 
 // voiceChord dispatches to the directional modes.

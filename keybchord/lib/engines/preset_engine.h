@@ -6,6 +6,7 @@
 
 #include "base.h"
 #include "keymap.h"
+#include "presets.h"
 
 class StateManager;
 class StorageAdapter;
@@ -72,6 +73,9 @@ private:
     std::string nameBuffer_;
 
     uint64_t cursorDeadlineUs_ = 0;
+
+    PresetSlot storedSlot_;
+    bool       storedSlotValid_ = false;
 
     void enterCursor();
     void rearmCursor(uint64_t now_us);

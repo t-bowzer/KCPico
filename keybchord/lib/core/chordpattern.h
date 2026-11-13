@@ -49,6 +49,10 @@ struct ChordPatternLibrary {
 // `out` untouched on malformed input or when the pattern has no note data.
 bool parseChordPattern(const std::string& json, ChordPattern& out);
 
+// Serializes a chord pattern to JSON. Compact is the on-device user-pattern
+// form; pretty is available for configurator-style files and tests.
+std::string serializeChordPattern(const ChordPattern& p, bool pretty = false);
+
 // Semitone offsets (ascending) for the degrees set in `mask`, per chord type.
 // Degree 3 uses the chord's 7th when present, else 12 (root an octave up).
 std::vector<int> chordPatternOffsets(ChordType type, uint8_t mask);

@@ -54,6 +54,25 @@ TEST(Rhythm, ParsePatternClampsNegativeSwing) {
     EXPECT_EQ(p.swing, -75);  // clamped to the -75..75 min
 }
 
+TEST(Rhythm, ParsePatternClampsStepsPerBar) {
+    const char* zero = R"({
+      "name": "Broken",
+      "steps_per_bar": 0,
+      "tracks": [ { "note": 36, "name": "kick", "pattern": [1,0,0,0] } ]
+    })";
+    RhythmPattern p;
+    ASSERT_TRUE(parseRhythmPattern(zero, p));
+    EXPECT_EQ(p.steps_per_bar, 4);
+
+    const char* high = R"({
+      "name": "Huge",
+      "steps_per_bar": 999,
+      "tracks": [ { "note": 36, "name": "kick", "pattern": [1,0,0,0] } ]
+    })";
+    ASSERT_TRUE(parseRhythmPattern(high, p));
+    EXPECT_EQ(p.steps_per_bar, 64);
+}
+
 TEST(Rhythm, ParseRejectsMalformed) {
     RhythmPattern p;
     EXPECT_FALSE(parseRhythmPattern("not json", p));

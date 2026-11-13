@@ -17,7 +17,7 @@ configurator (`configurator/`), and a CH559 USB-host coprocessor
 
 - `keybchord/lib/core/` — portable C++ data/logic; no Arduino headers.
 - `keybchord/lib/engines/` — stateful engines (chord, strum, rhythm, bass,
-  sequence, edit, preset, display).
+  sequence, edit, preset, display, pattern editor).
 - `keybchord/lib/hw/` — hardware adapters behind `base.h`, selected in
   `factory.cpp`.
 - `keybchord/src/main.cpp` — RP2040 wiring and the Core 0/Core 1 loop.
@@ -35,6 +35,13 @@ configurator (`configurator/`), and a CH559 USB-host coprocessor
 - Native tests must pass without hardware; add tests next to the code you change.
 - Configurator models and validators mirror firmware behavior; update both sides.
 - Preset JSON and keymap/macro JSON use different enum spellings.
+- Pattern editors share the per-kind 32-pattern cap and the combined 72 KB
+  rhythm/bass/chord budget; keep firmware, configurator validation, and docs in
+  sync. The default keymap is `F9`=Chord, `F10`=Rhythm, `F11`=Strum,
+  `F12`=Bass, `Super+F9/F10/F12`=pattern editors, `Super+F11`=Drum, and
+  `Ctrl+F12`=Seq Edit. In the bass/rhythm editors numpad pad keys are live;
+  chord keys and direct parameter keys stay active (F2/F3/F4 are not editor
+  shortcuts).
 - Do not edit generated CH559 artifacts or bundled `roland-jd-xi-*.json` files
   unless the task is specifically about them.
 - `testhook` is a gated debug build; keep test-hook code out of the `pico` build.

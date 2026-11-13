@@ -216,3 +216,10 @@ def test_legacy_bank_files_are_detected(tmp_path):
     presets.mkdir()
     (presets / "bank6.json").write_text("[]", encoding="utf-8")
     assert legacy_bank_files(tmp_path) == ["bank6.json"]
+
+
+def test_pattern_files_are_saved_compact(tmp_path):
+    tree = default_tree()
+    save_tree(tree, tmp_path)
+    text = (tmp_path / "rhythms" / "rock1.json").read_text(encoding="utf-8")
+    assert "\n" not in text

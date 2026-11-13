@@ -555,7 +555,8 @@ TEST_F(SequencerEngineTest, PlaybackUsesRecordedPatternMode) {
 
     ASSERT_TRUE(seq_->handleKeyEvent(key(HID_F10, true, CTRL), atStep(0)));
     advanceTo(16);
-    advanceTo(17);
+    advanceTo(17);            // sequence event starts pattern pending
+    chord_->update(atStep(18));  // fully quantized to the next rhythm step
     EXPECT_EQ(midi_.noteOnCount(), 3);  // recorded Triad, not live Rest
 }
 

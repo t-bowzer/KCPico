@@ -11,10 +11,10 @@ at the end.
 > bare chip. It does **not** re-verify USB MIDI out (covered by
 > `hardware-test-plan-usb-midi.md`) or the DIN/TRS MIDI loop.
 
-> **Note.** This document is **untracked** — a working scratch plan, not yet part
-> of the committed docs. It intentionally records one open finding that affects
-> the committed `docs/wiring.md`/schematic (see §5.4, the UART mismatch) and
-> should be resolved before this plan is promoted into the repo.
+> **Note.** The earlier UART0/UART1 mismatch is resolved: the CH559 fork emits
+> on **UART1** at 115,200 baud, matching the committed `docs/wiring.md` and
+> schematic. The v0.2 PCB replaces the breakout's BOOT/RESET arrangement with a
+> single BOOT button on CH559 `P4.6`; see §4.5 and §8.
 
 ---
 
@@ -34,7 +34,8 @@ The committed design (`docs/wiring.md`, Spec §2.2, `KCPico.kicad_sch`) is
 | `VIN5` | 41 | 3V3 (LDO bypassed < 3.6 V) |
 | `VDD33` | 42 | 3V3 |
 | `GND` | 18 | GND |
-| `RST` | 3 (P5.7) | RESET button → GND |
+| `P4.6/XI/SCS` | 16 (P4.6) | **BOOT** button → GND (hold at power-up) |
+| `RST` | 3 (P5.7) | no board reset button; power-cycle to reset |
 | `P0.2/RXD_` (UART0 RX), `P0.3/TXD_` (UART0 TX) | 38, 37 | **unused** |
 
 So the three things you flagged are all correct:
@@ -196,11 +197,12 @@ bytes = `[modifiers, reserved, key0..key5]`. Report-protocol keyboards prefix a
 
 ### 4.5 Bootloader entry points (for flashing convenience)
 
-- **USB bootloader:** pull `DP` high through ~10 kΩ to 3.3 V during reset.
-- **Stock firmware has two extras:** the `kb` command over its UART (see
-  `processUart()`), and holding **P4.6 low** (`main()` checks `P4_IN & (1<<6)`)
-  enters `runBootloader()`. On the breakout P4.6 is accessible if you want a
-  hardware BOOT button without the DP pull-up.
+- **USB bootloader:** pull `DP` high through ~10 kΩ to 3.3 V during reset, or
+  hold **P4.6 low** (`main()` checks `P4_IN & (1<<6)`) at power-up to enter
+  `runBootloader()`.
+- **v0.2 PCB:** uses the P4.6 path with a single **BOOT** button
+  (`P4.6/XI/SCS`, pin 16 → GND). There is no board RESET button and no DP
+  pull-up; power-cycle the board while holding BOOT.
 - After the first successful flash, `ch55xtool`/`chflasher` re-enter the
   bootloader over USB automatically.
 
@@ -226,9 +228,9 @@ is **not** a programming header).
 5. **Reconnect** the Pico `VBUS`→`5V` jumper for run mode.
 
 > The committed `docs/wiring.md` "Flashing the CH559" section describes the
-> bare-chip path (a 4-pin `DP`/`DM`/`GND`/`3V3` header + USB-A plug breakout).
-> On the breakout, the device USB port replaces that header; everything else in
-> that section still applies.
+> bare-chip path (a 4-pin `DP`/`DM`/`GND`/`3V3` header + USB-A plug breakout;
+> the `3V3` pin is NC on the v0.2 PCB). On the breakout, the device USB port
+> replaces that header; everything else in that section still applies.
 
 ---
 
@@ -269,37 +271,41 @@ Implementation steps (retained for reference):
 Run in order. Use the Pico's CDC debug log (`[KEY DN/UP …]`, `[INFO] …`) and a
 MIDI monitor on the device's USB-MIDI input.
 
+**Verification record:** passed **2026-11-13** on the assembled v0.2.0 PCB
+(single BOOT button on CH559 `P4.6`, J5 `3V3` NC) with v0.2.0 firmware. All
+checks below passed.
+
 ### 7.1 Firmware + flash (standalone)
 
 | # | Check | Pass / Fail |
 |---|---|---|
-| 1 | CH559 flashes over its device USB port | |
-| 2 | On reset it emits `STARTUP` (`0x08`) frames on UART1 (see §3.1) | |
+| 1 | CH559 flashes over its device USB port | Pass |
+| 2 | On reset it emits `STARTUP` (`0x08`) frames on UART1 (see §3.1) | Pass |
 
 ### 7.2 CH559 hosts the keyboard
 
 | # | Check | Pass / Fail |
 |---|---|---|
-| 3 | Plug a keyboard → `CONNECTED` (`0x01`) + `DEVICE_INFO` (`0x06`) frames | |
-| 4 | Press keys → `DEVICE_POLL` (`0x04`, HID usage `0x06`) frames appear | |
-| 5 | Press media/volume keys → `DEVICE_POLL` frames with HID usage `0x0C` (Consumer) appear | |
-| 5a | Unplug → `DISCONNECTED` (`0x02`) | |
+| 3 | Plug a keyboard → `CONNECTED` (`0x01`) + `DEVICE_INFO` (`0x06`) frames | Pass |
+| 4 | Press keys → `DEVICE_POLL` (`0x04`, HID usage `0x06`) frames appear | Pass |
+| 5 | Press media/volume keys → `DEVICE_POLL` frames with HID usage `0x0C` (Consumer) appear | Pass |
+| 5a | Unplug → `DISCONNECTED` (`0x02`) | Pass |
 
 ### 7.3 RP2040 end-to-end
 
 | # | Check | Pass / Fail |
 |---|---|---|
-| 6 | Pico debug log shows `[KEY DN/UP usage=0x…]` for real key presses | |
-| 7 | Chord press (`T`) + strum (`1`) produce MIDI notes (USB MIDI monitor) | |
-| 8 | Rhythm (`F5`) + bass (`F7`) produce drums (ch10) + bass (ch3) | |
-| 9 | **Boot-key gestures:** power-on `Esc` → RPI-RP2 bootloader; power-on `Ctrl` → MSC drive | |
-| 10 | **Beat LED** on the keyboard flashes | |
-| 11 | **Hot-plug:** unplug/replug the keyboard mid-session recovers without reset | |
-| 12 | **Problem keyboards:** a hub-connected keyboard and a long-descriptor/NKRO keyboard that failed on PIO-USB now enumerate and type | |
-| 13 | **Volume keys:** `Volume +`/`−` change tempo on the main screen and the selected value in an edit menu (with repeat while held) | |
-| 14 | **Mute:** behaves like `Enter` (confirms a save/clear prompt, loads a cursor-selected preset, commits name editing) | |
-| 15 | A media key bound in `keymap.json` (e.g. `PlayPause`) triggers its action, including on QMK keyboards that share the Consumer report with the keyboard endpoint (e.g. Keychron V6) | |
-| 16 | Native GoogleTest suite green (`pio test -e native`) | |
+| 6 | Pico debug log shows `[KEY DN/UP usage=0x…]` for real key presses | Pass |
+| 7 | Chord press (`T`) + strum (`1`) produce MIDI notes (USB MIDI monitor) | Pass |
+| 8 | Rhythm (`F5`) + bass (`F7`) produce drums (ch10) + bass (ch3) | Pass |
+| 9 | **Boot-key gestures:** power-on `Esc` → RPI-RP2 bootloader; power-on `Ctrl` → MSC drive | Pass |
+| 10 | **Beat LED** on the keyboard flashes | Pass |
+| 11 | **Hot-plug:** unplug/replug the keyboard mid-session recovers without reset | Pass |
+| 12 | **Problem keyboards:** a hub-connected keyboard and a long-descriptor/NKRO keyboard that failed on PIO-USB now enumerate and type | Pass |
+| 13 | **Volume keys:** `Volume +`/`−` change tempo on the main screen and the selected value in an edit menu (with repeat while held) | Pass |
+| 14 | **Mute:** behaves like `Enter` (confirms a save/clear prompt, loads a cursor-selected preset, commits name editing) | Pass |
+| 15 | A media key bound in `keymap.json` (e.g. `PlayPause`) triggers its action, including on QMK keyboards that share the Consumer report with the keyboard endpoint (e.g. Keychron V6) | Pass |
+| 16 | Native GoogleTest suite green (`pio test -e native`) | Pass |
 
 ---
 
@@ -320,12 +326,13 @@ changes:
    `HM` (30) to the receptacle (the only series elements), plus the **100 µF**
    bulk cap on the 5 V rail near the receptacle.
 4. **Programming header.** `DP` (31)/`DM` (32) go to the **4-pin
-   `DP`/`DM`/`GND`/`3V3` header** (not a USB connector). Flashing then uses a
-   USB-A plug breakout (`D+`→`DP`, `D−`→`DM`, `GND`→`GND`, leave `VBUS`
-   floating) per `docs/wiring.md` §"Flashing the CH559".
-5. **BOOT/RESET buttons.** Place the two tactile buttons — **BOOT**
-   (10 kΩ `DP`→3V3) and **RESET** (`RST` pin 3 → GND) — for first-flash
-   bootloader entry.
+   `DP`/`DM`/`GND`/`3V3` header** (not a USB connector); the `3V3` pin is
+   intentionally **NC** on v0.2. Flashing then uses a USB-A plug breakout
+   (`D+`→`DP`, `D−`→`DM`, `GND`→`GND`, leave `VBUS` floating) per
+   `docs/wiring.md` §"Flashing the CH559".
+5. **BOOT button.** Place one tactile button from `P4.6/XI/SCS` (pin 16) to
+   **GND** for first-flash bootloader entry. No RESET button or DP pull-up is
+   fitted; power-cycle the board while holding BOOT.
 6. **Unused pins.** `P0.2`/`P0.3` (UART0) and the device-port connector disappear
    entirely; they were only needed by the stock firmware/breakout.
 7. **Re-verify.** Re-run §7.2/§7.3 after assembly; pay special attention to #12

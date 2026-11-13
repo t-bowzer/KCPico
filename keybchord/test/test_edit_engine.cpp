@@ -39,9 +39,11 @@ protected:
         edit_ = new EditEngine(state_, *display_);
         modeChanged_ = 0;
         patternChanged_ = 0;
+        voicingChanged_ = 0;
         clockResync_ = 0;
         edit_->setModeChangedCallback([this]() { modeChanged_++; });
         edit_->setPatternChangedCallback([this]() { patternChanged_++; });
+        edit_->setVoicingChangedCallback([this]() { voicingChanged_++; });
         edit_->setClockResyncCallback([this]() { clockResync_++; });
     }
 
@@ -76,6 +78,7 @@ protected:
     EditEngine* edit_ = nullptr;
     int modeChanged_ = 0;
     int patternChanged_ = 0;
+    int voicingChanged_ = 0;
     int clockResync_ = 0;
 };
 
@@ -83,12 +86,12 @@ protected:
 TEST_F(EditEngineTest, MenuToggleEnterAndExit) {
     EXPECT_EQ(state_.editMenu, EditMenu::None);
 
-    edit_->handleKeyEvent(key(0x44, true), 0);   // F11 -> Rhythm
+    edit_->handleKeyEvent(key(0x43, true), 0);   // F10 -> Rhythm
     EXPECT_EQ(state_.editMenu, EditMenu::Rhythm);
-    edit_->handleKeyEvent(key(0x44, true), 0);   // F11 again -> exit
+    edit_->handleKeyEvent(key(0x43, true), 0);   // F10 again -> exit
     EXPECT_EQ(state_.editMenu, EditMenu::None);
 
-    edit_->handleKeyEvent(key(0x43, true), 0);   // F10 -> Strum
+    edit_->handleKeyEvent(key(0x44, true), 0);   // F11 -> Strum
     EXPECT_EQ(state_.editMenu, EditMenu::Strum);
     edit_->handleKeyEvent(key(0x42, true), 0);   // F9 -> switch to Chord
     EXPECT_EQ(state_.editMenu, EditMenu::Chord);
@@ -104,8 +107,44 @@ TEST_F(EditEngineTest, SuperF11OpensDrumMenu) {
     EXPECT_EQ(state_.editMenu, EditMenu::Drum);
 }
 
+TEST_F(EditEngineTest, PatternEditCallbackFromMenuAndDirectKeys) {
+    int count = 0;
+    EditMenu last = EditMenu::None;
+    edit_->setPatternEditCallback([&](EditMenu menu) {
+        count++;
+        last = menu;
+    });
+
+    // Direct Super+F9 / F10 / F12.
+    edit_->handleKeyEvent(key(0x42, true, 0x08), 0);
+    EXPECT_EQ(count, 1);
+    EXPECT_EQ(last, EditMenu::ChordPattern);
+    EXPECT_EQ(state_.editMenu, EditMenu::None);
+
+    edit_->handleKeyEvent(key(0x43, true, 0x08), 0);
+    EXPECT_EQ(count, 2);
+    EXPECT_EQ(last, EditMenu::RhythmPattern);
+
+    edit_->handleKeyEvent(key(0x45, true, 0x08), 0);
+    EXPECT_EQ(count, 3);
+    EXPECT_EQ(last, EditMenu::BassPattern);
+    EXPECT_EQ(state_.editMenu, EditMenu::None);
+
+    // Menu item: F9 -> Chord Edit, scroll to Edit Pattern, Enter.
+    edit_->handleKeyEvent(key(0x42, true), 0);
+    ASSERT_EQ(state_.editMenu, EditMenu::Chord);
+    for (int i = 0; i < 13; i++) {
+        edit_->handleKeyEvent(key(0x51, true), 0);  // Down
+    }
+    EXPECT_EQ(state_.editParam, 13);
+    edit_->handleKeyEvent(key(0x28, true), 0);  // Enter
+    EXPECT_EQ(count, 4);
+    EXPECT_EQ(last, EditMenu::ChordPattern);
+    EXPECT_EQ(state_.editMenu, EditMenu::None);
+}
+
 TEST_F(EditEngineTest, RhythmF8NoLongerOpensDrumMenu) {
-    edit_->handleKeyEvent(key(0x44, true), 0);   // F11 -> Rhythm
+    edit_->handleKeyEvent(key(0x43, true), 0);   // F10 -> Rhythm
     EXPECT_EQ(state_.editMenu, EditMenu::Rhythm);
     edit_->handleKeyEvent(key(0x41, true), 0);   // F8 -> inert in menus
     EXPECT_EQ(state_.editMenu, EditMenu::Rhythm);
@@ -189,7 +228,7 @@ TEST_F(EditEngineTest, F8TapsOutsideWindowToggleNormally) {
 }
 
 TEST_F(EditEngineTest, F8DoubleTapWorksInsideMenu) {
-    edit_->handleKeyEvent(key(0x44, true), 0);        // F11 -> Rhythm menu
+    edit_->handleKeyEvent(key(0x43, true), 0);        // F10 -> Rhythm menu
     EXPECT_EQ(state_.editMenu, EditMenu::Rhythm);
 
     edit_->handleKeyEvent(key(0x41, true), 1000000);  // single tap inert
@@ -233,6 +272,7 @@ TEST_F(EditEngineTest, CtrlF1CyclesVoicing) {
     EXPECT_EQ(state_.pendingChord.voicing_mode, VoicingMode::Up);
     edit_->handleKeyEvent(key(0x3A, true, 0x01), 0);
     EXPECT_EQ(state_.pendingChord.voicing_mode, VoicingMode::RootPosition);
+    EXPECT_EQ(voicingChanged_, 4);
 }
 
 TEST_F(EditEngineTest, CtrlF2CyclesInversion) {
@@ -337,12 +377,12 @@ TEST_F(EditEngineTest, UpDownNavigateParamsInMenu) {
     EXPECT_EQ(state_.editParam, 1);
     edit_->handleKeyEvent(key(0x52, true), 0);   // Up -> Octave
     EXPECT_EQ(state_.editParam, 0);
-    edit_->handleKeyEvent(key(0x52, true), 0);   // Up wraps to ChordPattern (last)
-    EXPECT_EQ(state_.editParam, 12);
+    edit_->handleKeyEvent(key(0x52, true), 0);   // Up wraps to Edit Pattern (last)
+    EXPECT_EQ(state_.editParam, 13);
 }
 
 TEST_F(EditEngineTest, LeftRightStepSelectedValueInMenu) {
-    edit_->handleKeyEvent(key(0x44, true), 0);   // F11 -> Rhythm (Tempo)
+    edit_->handleKeyEvent(key(0x43, true), 0);   // F10 -> Rhythm (Tempo)
     edit_->handleKeyEvent(key(0x28, true), 0);   // Enter -> select Tempo
     edit_->handleKeyEvent(key(0x4F, true), 0);   // Right -> tempo 121
     EXPECT_EQ(state_.pendingRhythm.tempo, 121);
@@ -351,7 +391,7 @@ TEST_F(EditEngineTest, LeftRightStepSelectedValueInMenu) {
 }
 
 TEST_F(EditEngineTest, FKeysAreInertInsideMenus) {
-    edit_->handleKeyEvent(key(0x43, true), 0);   // F10 -> Strum
+    edit_->handleKeyEvent(key(0x44, true), 0);   // F11 -> Strum
     EXPECT_EQ(state_.editParam, 0);              // Octave
 
     edit_->handleKeyEvent(key(0x3B, true), 0);   // F2 -> inert
@@ -362,7 +402,7 @@ TEST_F(EditEngineTest, FKeysAreInertInsideMenus) {
 }
 
 TEST_F(EditEngineTest, PlusMinusStepsSelectedParamInMenu) {
-    edit_->handleKeyEvent(key(0x44, true), 0);   // F11 -> Rhythm (F1 = Tempo)
+    edit_->handleKeyEvent(key(0x43, true), 0);   // F10 -> Rhythm (F1 = Tempo)
     edit_->handleKeyEvent(key(0x2E, true), 0);   // = -> tempo 121
     EXPECT_EQ(state_.pendingRhythm.tempo, 121);
     edit_->handleKeyEvent(key(0x2D, true), 0);   // - -> tempo 120
@@ -377,7 +417,7 @@ TEST_F(EditEngineTest, EscExitsMenu) {
 }
 
 TEST_F(EditEngineTest, ValueShownThenRevertsToSelectedMenu) {
-    edit_->handleKeyEvent(key(0x44, true), 0);   // F11 -> Rhythm
+    edit_->handleKeyEvent(key(0x43, true), 0);   // F10 -> Rhythm
     edit_->handleKeyEvent(key(0x28, true), 0);   // Enter -> select Tempo
     display_->update(0);
     lcd_.reset();
@@ -506,7 +546,7 @@ TEST_F(EditEngineTest, VolumeKeysStepTempoOnMainScreen) {
 }
 
 TEST_F(EditEngineTest, VolumeKeysStepSelectedMenuValue) {
-    edit_->handleKeyEvent(key(0x44, true), 0);   // F11 -> Rhythm (Tempo)
+    edit_->handleKeyEvent(key(0x43, true), 0);   // F10 -> Rhythm (Tempo)
     edit_->handleKeyEvent(key(0x28, true), 0);   // Enter -> select Tempo
     edit_->handleKeyEvent(key(hid_usage::CONSUMER_VOLUME_UP, true, 0,
                               hid_usage::PAGE_CONSUMER), 1000);
@@ -541,7 +581,7 @@ TEST_F(EditEngineTest, BrowsingAllDirectionsScrollWithoutChangingValue) {
     edit_->handleKeyEvent(key(0x50, true), 0);   // Left -> Octave
     EXPECT_EQ(state_.editParam, 0);
     edit_->handleKeyEvent(key(0x52, true), 0);   // Up wraps to last
-    EXPECT_EQ(state_.editParam, 12);
+    EXPECT_EQ(state_.editParam, 13);
     edit_->handleKeyEvent(key(0x51, true), 0);   // Down wraps to first
     EXPECT_EQ(state_.editParam, 0);
     edit_->handleKeyEvent(key(hid_usage::CONSUMER_VOLUME_UP, true, 0,
@@ -556,7 +596,7 @@ TEST_F(EditEngineTest, BrowsingAllDirectionsScrollWithoutChangingValue) {
 }
 
 TEST_F(EditEngineTest, MuteSelectsParameterAndSteersValue) {
-    edit_->handleKeyEvent(key(0x44, true), 0);   // F11 -> Rhythm (Tempo)
+    edit_->handleKeyEvent(key(0x43, true), 0);   // F10 -> Rhythm (Tempo)
     edit_->handleKeyEvent(key(hid_usage::CONSUMER_MUTE, true, 0,
                               hid_usage::PAGE_CONSUMER), 0);
     edit_->handleKeyEvent(key(0x51, true), 0);   // Down -> tempo 121
@@ -566,7 +606,7 @@ TEST_F(EditEngineTest, MuteSelectsParameterAndSteersValue) {
 }
 
 TEST_F(EditEngineTest, EnterCommitsSelectedValue) {
-    edit_->handleKeyEvent(key(0x44, true), 0);   // F11 -> Rhythm
+    edit_->handleKeyEvent(key(0x43, true), 0);   // F10 -> Rhythm
     edit_->handleKeyEvent(key(0x28, true), 0);   // Enter -> select Tempo
     edit_->handleKeyEvent(key(0x4F, true), 0);   // Right -> tempo 121
     edit_->handleKeyEvent(key(0x28, true), 0);   // Enter -> commit/deselect
@@ -575,7 +615,7 @@ TEST_F(EditEngineTest, EnterCommitsSelectedValue) {
 }
 
 TEST_F(EditEngineTest, MuteCommitsSelectedValue) {
-    edit_->handleKeyEvent(key(0x44, true), 0);   // F11 -> Rhythm
+    edit_->handleKeyEvent(key(0x43, true), 0);   // F10 -> Rhythm
     edit_->handleKeyEvent(key(hid_usage::CONSUMER_MUTE, true, 0,
                               hid_usage::PAGE_CONSUMER), 0);
     edit_->handleKeyEvent(key(0x4F, true), 0);   // Right -> tempo 121
@@ -586,7 +626,7 @@ TEST_F(EditEngineTest, MuteCommitsSelectedValue) {
 }
 
 TEST_F(EditEngineTest, BackspaceCancelsSelectedValueAndStaysInMenu) {
-    edit_->handleKeyEvent(key(0x44, true), 1000);   // F11 -> Rhythm
+    edit_->handleKeyEvent(key(0x43, true), 1000);   // F10 -> Rhythm
     edit_->handleKeyEvent(key(0x28, true), 1000);   // Enter -> select Tempo
     edit_->handleKeyEvent(key(0x4F, true), 1000);   // Right -> tempo 121
     EXPECT_EQ(state_.pendingRhythm.tempo, 121);
@@ -600,7 +640,7 @@ TEST_F(EditEngineTest, BackspaceCancelsSelectedValueAndStaysInMenu) {
 }
 
 TEST_F(EditEngineTest, EscCancelsSelectedValueThenExitsOnSecondPress) {
-    edit_->handleKeyEvent(key(0x44, true), 0);   // F11 -> Rhythm
+    edit_->handleKeyEvent(key(0x43, true), 0);   // F10 -> Rhythm
     edit_->handleKeyEvent(key(0x28, true), 0);   // Enter -> select Tempo
     edit_->handleKeyEvent(key(0x4F, true), 0);   // Right -> tempo 121
 

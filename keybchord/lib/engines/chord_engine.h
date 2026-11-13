@@ -39,6 +39,12 @@ public:
     // never leaves a stale/empty sequence behind.
     void onArpModeChanged();
 
+    // Called after a voicing-related parameter changes (voicing mode, inversion,
+    // octave, min notes, min interval). The currently-sounding chord keeps its
+    // snapshot (FR-C9), but the next trigger must apply the new voicing even if
+    // it resolves to the same chord through an overlapped/release-buffer path.
+    void onVoicingChanged();
+
     // Install the chord pattern library (indices align with the name list).
     void setPatterns(std::vector<ChordPattern> patterns);
 
@@ -124,6 +130,10 @@ private:
     // still lands on the new chord.
     bool pendingSwitch_ = false;
 
+    // A voicing parameter changed since the last trigger. Re-resolved presses
+    // that land on the same chord must still re-voice the next trigger.
+    bool voicingChangePending_ = false;
+
     // Arpeggio state.
     bool arpActive_ = false;
     std::vector<int> arpSeq_;    // index sequence for Up/Down/UpDown/Alternating
@@ -136,6 +146,8 @@ private:
     // Chord-pattern state (spec 6.10).
     std::vector<ChordPattern> patterns_;
     bool patternActive_ = false;
+    bool patternStartPending_ = false;
+    uint64_t patternStartDeadlineUs_ = 0;
     uint32_t patternStep_ = 0;        // next step index within the bar
     uint32_t lastPatternClockStep_ = 0;
     uint64_t patternNextUs_ = 0;      // free-run step deadline (rhythm stopped)
@@ -171,6 +183,7 @@ private:
     bool chordChanged(const ResolvedChord& chord) const;
 
     const ChordPattern* currentPattern() const;
+    void ensurePatternIndexValid();
     void beginPattern(uint64_t now_us);
     void firePatternStep(int stepInBar, uint64_t now_us, uint32_t effectiveSteps);
     void releasePatternNotes();

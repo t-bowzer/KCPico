@@ -566,3 +566,76 @@ TEST_F(RhythmEngineTest, RecordGuideHatsHonorAbsoluteStartStep) {
     engine_->update(24 * tick + 24 * base);  // absolute step 24 (count-in)
     EXPECT_EQ(countNoteOn(drain(), 42, 10), 1);
 }
+
+TEST_F(RhythmEngineTest, StagePatternsAppliesOnUpdate) {
+    RhythmPattern staged = rock1Pattern();
+    staged.name = "Staged";
+    engine_->stagePatterns({staged});
+    EXPECT_TRUE(engine_->patternsPending());
+
+    engine_->update(0);
+    EXPECT_FALSE(engine_->patternsPending());
+
+    const RhythmPattern* got = engine_->patternAt(0);
+    ASSERT_NE(got, nullptr);
+    EXPECT_EQ(got->name, "Staged");
+}
+
+TEST_F(RhythmEngineTest, InvalidPatternIndexRecoversAndPublishesClock) {
+    state_.pendingRhythm.pattern = 9;  // out of range for one loaded pattern
+    state_.pendingRhythm.enabled = true;
+    engine_->update(0);
+    engine_->update(24 * clockTickUs(120));
+
+    EXPECT_EQ(state_.pendingRhythm.pattern, 0);
+    EXPECT_TRUE(state_.rhythmClock.running);
+    EXPECT_EQ(state_.rhythmClock.stepsPerBar, 16);
+}
+
+TEST_F(RhythmEngineTest, ZeroStepsPerBarDoesNotStallTheClock) {
+    RhythmPattern broken = rock1Pattern();
+    broken.steps_per_bar = 0;
+    engine_->setPatterns({broken});
+    state_.pendingRhythm.enabled = true;
+    engine_->update(0);
+    engine_->update(24 * clockTickUs(120));
+
+    EXPECT_TRUE(state_.rhythmClock.running);
+    EXPECT_EQ(state_.rhythmClock.stepsPerBar, 16);
+}
+
+
+TEST(RhythmQueue, TimestampAndOverflow) {
+    MidiEventQueue q;
+    ASSERT_TRUE(q.push(midi::makeNoteOn(10, 36, 100), 1234));
+    QueuedMidi out;
+    ASSERT_TRUE(q.pop(out));
+    EXPECT_EQ(out.queued_us, 1234u);
+    EXPECT_EQ(out.msg.data1, 36);
+
+    for (size_t i = 0; i < MidiEventQueue::CAPACITY; i++) {
+        ASSERT_TRUE(q.push(midi::makeSystem(midi::SYSTEM_CLOCK), 1));
+    }
+    EXPECT_FALSE(q.push(midi::makeSystem(midi::SYSTEM_CLOCK), 1));
+    EXPECT_EQ(q.takeOverflowCount(), 1u);
+}
+
+TEST_F(RhythmEngineTest, RebaseSkipsMissedStepOutput) {
+    uint32_t tick = clockTickUs(120);
+    uint32_t base = tick * CLOCK_TICKS_PER_STEP;
+    state_.pendingRhythm.enabled = true;
+
+    engine_->update(0);
+    engine_->update(24 * tick);  // downbeat
+    drain();
+
+    uint32_t before = state_.rhythmClock.stepAbs.load();
+    engine_->requestRebase();
+    engine_->update(24 * tick + 10 * base);  // ten missed steps
+
+    EXPECT_GT(state_.rhythmClock.stepAbs.load(), before);
+    auto msgs = drain();
+    EXPECT_EQ(countNoteOn(msgs, 36, 10), 0);
+    EXPECT_EQ(countNoteOn(msgs, 38, 10), 0);
+    EXPECT_EQ(countNoteOn(msgs, 42, 10), 0);
+}

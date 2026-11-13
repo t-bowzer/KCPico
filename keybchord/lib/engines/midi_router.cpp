@@ -47,17 +47,22 @@ void MidiRouter::flush() {
 }
 
 void MidiRouter::sendRaw(const MidiMessage& msg) {
-    if (msg.status != midi::SYSTEM_CLOCK) {
-        logMidiOut(msg.status, msg.data1, msg.data2);
-    }
     midiOut_.send(msg);
     if (usbOut_ && state_.config.usb_midi_enabled) {
         usbOut_->send(msg);
+    }
+    if (msg.status != midi::SYSTEM_CLOCK) {
+        logMidiOut(msg.status, msg.data1, msg.data2);
     }
 }
 
 void MidiRouter::sendBytes(const uint8_t* data, size_t length) {
     if (!data || length == 0) return;
+
+    midiOut_.sendBytes(data, length);
+    if (usbOut_ && state_.config.usb_midi_enabled) {
+        usbOut_->sendBytes(data, length);
+    }
 
     if (length <= 3) {
         logMidiOut(data[0],
@@ -65,11 +70,6 @@ void MidiRouter::sendBytes(const uint8_t* data, size_t length) {
                    length > 2 ? data[2] : 0);
     } else {
         logMidiOutBytes(data, length);
-    }
-
-    midiOut_.sendBytes(data, length);
-    if (usbOut_ && state_.config.usb_midi_enabled) {
-        usbOut_->sendBytes(data, length);
     }
 }
 
@@ -85,11 +85,11 @@ void MidiRouter::setUsbOut(MidiOutAdapter* usbOut) {
 }
 
 void MidiRouter::send(const MidiMessage& msg) {
-    logMidiOut(msg.status, msg.data1, msg.data2);
     midiOut_.send(msg);
     if (usbOut_ && state_.config.usb_midi_enabled) {
         usbOut_->send(msg);
     }
+    logMidiOut(msg.status, msg.data1, msg.data2);
 }
 
 

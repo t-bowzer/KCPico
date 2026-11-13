@@ -30,7 +30,12 @@ public:
     void setModeChangedCallback(std::function<void()> cb);
     void setArpModeChangedCallback(std::function<void()> cb);
     void setPatternChangedCallback(std::function<void()> cb);
+    void setVoicingChangedCallback(std::function<void()> cb);
     void setAnyEditCallback(std::function<void()> cb);
+
+    // Fired when a pattern editor is requested (menu Edit Pattern item or a
+    // direct chord_pattern/rhythm_pattern/bass_pattern open_menu action).
+    void setPatternEditCallback(std::function<void(EditMenu)> cb);
 
     // Audition callback: fired with a drum note code when a drum note parameter
     // changes in the Drum menu, so the user can hear the selected drum sound.
@@ -66,7 +71,9 @@ private:
     std::function<void()> modeChanged_;
     std::function<void()> arpModeChanged_;
     std::function<void()> patternChanged_;
+    std::function<void()> voicingChanged_;
     std::function<void()> anyEdit_;
+    std::function<void(EditMenu)> patternEdit_;
     std::function<void(uint8_t)> drumAudition_;
     std::function<const RhythmPattern*(int)> patternProvider_;
     std::function<void(const std::vector<uint8_t>&)> midiSend_;

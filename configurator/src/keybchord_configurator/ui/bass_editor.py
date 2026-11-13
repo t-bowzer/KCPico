@@ -29,16 +29,17 @@ from ..models.bass import (
 from ..models.defaults import default_bass_template
 from .grid import StepGrid
 
-DEGREE_PALETTE = [BASS_DEGREE_REST, 0, 1, 2, 3]
+DEGREE_PALETTE = [BASS_DEGREE_REST, 0, 1, 2, 3, 4]
 SUSTAIN_PALETTE = [0, 2, 4, 8, 16]
 
-_DEGREE_SHORT = {BASS_DEGREE_REST: "", 0: "R", 1: "3", 2: "5", 3: "7"}
+_DEGREE_SHORT = {BASS_DEGREE_REST: "", 0: "R", 1: "3", 2: "5", 3: "7", 4: "R+"}
 _DEGREE_COLORS = {
     BASS_DEGREE_REST: QColor("#2a2a2a"),
     0: QColor("#2d7dd2"),
     1: QColor("#3fa34d"),
     2: QColor("#7a4fbf"),
     3: QColor("#b07a2d"),
+    4: QColor("#5f9ea0"),
 }
 
 
@@ -97,7 +98,7 @@ class BassEditor(QWidget):
         meta_form.addRow(self.hold_check)
         right.addWidget(meta)
 
-        steps_group = QGroupBox("Steps (left-click to cycle: rest / root / 3rd / 5th / 7th)")
+        steps_group = QGroupBox("Steps (left-click to cycle: rest / root / 3rd / 5th / 7th / root+8va)")
         steps_layout = QVBoxLayout(steps_group)
         self.steps_grid = StepGrid()
         self.steps_grid.set_palette(DEGREE_PALETTE)

@@ -43,6 +43,13 @@ read `build/` or `dist/`.
   tables in sync.
 - Pattern counts (12 rhythms, 9 bass, 9 chord patterns, max 32 each) live in
   both firmware headers and `models/bounds.py`.
+- Pattern-file limits mirror the firmware: per-kind 32 cap, combined 72 KB
+  rhythm/bass/chord budget (48 KB user share), and 8/4/4 KB per-file caps.
+  On-device-created `userN.json` files use the same schemas.
+- Keymap menu names include `chord_pattern`, `rhythm_pattern`, and `bass_pattern`
+  for the pattern editors. The default keymap mirrors the firmware remap:
+  `F9`=Chord, `F10`=Rhythm, `F11`=Strum, `F12`=Bass, `Super+F9/F10/F12`=pattern
+  editors, `Super+F11`=Drum, `Ctrl+F12`=Seq Edit.
 - Update both sides of the mirror whenever either side changes.
 
 ## Adding or changing a field
@@ -62,8 +69,10 @@ read `build/` or `dist/`.
 - `load(model)` populates widgets; `store(model)` writes them back.
 - `main_window.py` connects tabs to `ConfigTree` and marks the document dirty.
 - Keymap display labels live in the keymap editor/visual modules; when adding
-  an action or parameter, update its label tables and check
+  an action, menu name, or parameter, update its label tables and check
   `tests/test_keymap_visual.py`.
+- Pattern budget/count validation belongs with the validator; update its tests
+  when the firmware limits change.
 
 ## IO and validation
 

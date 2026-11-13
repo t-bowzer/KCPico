@@ -324,9 +324,31 @@ KeyAction KeymapResolver::resolve(uint16_t usage_code, uint8_t modifiers,
         a.cmd = KeyCmd::SequenceClear;
         return a;
     }
-    if (combo == KMOD_SUPER && usage == 0x45) {
+    if (combo == KMOD_CTRL && usage == 0x45) {
         a.cmd = KeyCmd::OpenMenu;
         a.menu = EditMenu::Sequence;
+        return a;
+    }
+    // M17 pattern editors and the moved Drum menu. These are fallbacks for
+    // older keymaps; an explicit keymap binding above always wins.
+    if (combo == KMOD_SUPER && usage == 0x42) {
+        a.cmd = KeyCmd::OpenMenu;
+        a.menu = EditMenu::ChordPattern;
+        return a;
+    }
+    if (combo == KMOD_SUPER && usage == 0x43) {
+        a.cmd = KeyCmd::OpenMenu;
+        a.menu = EditMenu::RhythmPattern;
+        return a;
+    }
+    if (combo == KMOD_SUPER && usage == 0x44) {
+        a.cmd = KeyCmd::OpenMenu;
+        a.menu = EditMenu::Drum;
+        return a;
+    }
+    if (combo == KMOD_SUPER && usage == 0x45) {
+        a.cmd = KeyCmd::OpenMenu;
+        a.menu = EditMenu::BassPattern;
         return a;
     }
 

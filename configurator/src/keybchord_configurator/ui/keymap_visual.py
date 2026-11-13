@@ -384,6 +384,9 @@ MENU_LABELS: dict[str, str] = {
     "bass": "Bass menu",
     "drum": "Drum menu",
     "sequence": "Sequence menu",
+    "chord_pattern": "Chord pattern editor",
+    "rhythm_pattern": "Rhythm pattern editor",
+    "bass_pattern": "Bass pattern editor",
 }
 
 PARAM_VALUE_LABELS: dict[str, dict[Any, str]] = {

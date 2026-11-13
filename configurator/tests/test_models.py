@@ -109,6 +109,13 @@ def test_bass_example_roundtrip():
     assert pattern.to_dict()["steps"] == data["steps"]
 
 
+def test_bass_octave_root_degree_roundtrip():
+    pattern = BassPattern.from_dict(
+        {"name": "Octave", "steps_per_bar": 4, "steps": [4, 5, -9, 2]})
+    assert pattern.steps == [4, 4, -1, 2]
+    assert pattern.to_dict()["steps"] == [4, 4, -1, 2]
+
+
 def test_builtin_tables_consistent():
     assert len(BUILTIN_RHYTHMS) == len(RHYTHM_NAMES) == 12
     assert len(BUILTIN_BASS) == len(BASS_NAMES) == 9
@@ -145,6 +152,23 @@ def test_keymap_default_roundtrip():
     data = km.to_dict()
     assert data["bindings"][0]["keys"] == ["F1"]
     assert KeymapConfig.from_dict(data).to_dict() == data
+
+def test_keymap_default_pattern_editors_and_menu_remap():
+    from keybchord_configurator.models.enums import EDIT_MENU_BY_JSON
+
+    data = default_keymap().to_dict()
+    by_keys = {tuple(b["keys"]): b["action"] for b in data["bindings"]}
+
+    assert by_keys[("F10",)]["menu"] == "rhythm"
+    assert by_keys[("F11",)]["menu"] == "strum"
+    assert by_keys[("Super", "F9")]["menu"] == "chord_pattern"
+    assert by_keys[("Super", "F10")]["menu"] == "rhythm_pattern"
+    assert by_keys[("Super", "F11")]["menu"] == "drum"
+    assert by_keys[("Super", "F12")]["menu"] == "bass_pattern"
+    assert by_keys[("Ctrl", "F12")]["menu"] == "sequence"
+
+    for name in ("chord_pattern", "rhythm_pattern", "bass_pattern"):
+        assert name in EDIT_MENU_BY_JSON
 
 
 def test_preset_macros_default_and_roundtrip():

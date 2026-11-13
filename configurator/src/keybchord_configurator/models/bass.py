@@ -16,6 +16,7 @@ BASS_DEGREE_ROOT = 0
 BASS_DEGREE_THIRD = 1
 BASS_DEGREE_FIFTH = 2
 BASS_DEGREE_SIXTH_SEVENTH = 3
+BASS_DEGREE_ROOT_OCTAVE = 4
 
 BASS_DEGREE_LABELS: dict[int, str] = {
     BASS_DEGREE_REST: "Rest",
@@ -23,6 +24,7 @@ BASS_DEGREE_LABELS: dict[int, str] = {
     BASS_DEGREE_THIRD: "3rd",
     BASS_DEGREE_FIFTH: "5th",
     BASS_DEGREE_SIXTH_SEVENTH: "6th/7th",
+    BASS_DEGREE_ROOT_OCTAVE: "Root +8va",
 }
 
 # Built-in pattern names/files (bass.cpp), in index order.
@@ -62,7 +64,7 @@ class BassPattern:
         step_data = data.get("steps")
         if isinstance(step_data, list):
             p.steps = [
-                clamp(int(v), -1, 3) if isinstance(v, int) else BASS_DEGREE_REST
+                clamp(int(v), -1, 4) if isinstance(v, int) else BASS_DEGREE_REST
                 for v in step_data
             ]
         sustain = data.get("sustain_steps")

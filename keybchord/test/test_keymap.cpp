@@ -123,10 +123,16 @@ TEST(Keymap, TogglesF5ToF8) {
 
 TEST(Keymap, MenusF9ToF12) {
     EXPECT_EQ(resolve(0x42).menu, EditMenu::Chord);   // F9
-    EXPECT_EQ(resolve(0x43).menu, EditMenu::Strum);   // F10
-    EXPECT_EQ(resolve(0x44).menu, EditMenu::Rhythm);  // F11
+    EXPECT_EQ(resolve(0x43).menu, EditMenu::Rhythm);  // F10
+    EXPECT_EQ(resolve(0x44).menu, EditMenu::Strum);   // F11
     EXPECT_EQ(resolve(0x45).menu, EditMenu::Bass);    // F12
     EXPECT_EQ(resolve(0x42).cmd, KeyCmd::OpenMenu);
+}
+
+TEST(Keymap, SuperPatternEditors) {
+    EXPECT_EQ(resolve(0x42, SUPER).menu, EditMenu::ChordPattern);   // Super+F9
+    EXPECT_EQ(resolve(0x43, SUPER).menu, EditMenu::RhythmPattern);  // Super+F10
+    EXPECT_EQ(resolve(0x45, SUPER).menu, EditMenu::BassPattern);    // Super+F12
 }
 
 TEST(Keymap, SuperF11OpensDrum) {
@@ -477,7 +483,7 @@ TEST(Keymap, SequenceControlsAndMenu) {
     EXPECT_EQ(resolve(0x43, CTRL).cmd, KeyCmd::SequencePlay);    // Ctrl+F10
     EXPECT_EQ(resolve(0x44, CTRL).cmd, KeyCmd::SequenceClear);   // Ctrl+F11
 
-    KeyAction a = resolve(0x45, SUPER);  // Super+F12
+    KeyAction a = resolve(0x45, CTRL);  // Ctrl+F12
     EXPECT_EQ(a.cmd, KeyCmd::OpenMenu);
     EXPECT_EQ(a.menu, EditMenu::Sequence);
 }
@@ -488,7 +494,12 @@ TEST(Keymap, OldKeymapStillGetsSequenceFallbacks) {
     EXPECT_EQ(resolver.resolve(0x42, CTRL).cmd, KeyCmd::SequenceRecord);
     EXPECT_EQ(resolver.resolve(0x43, CTRL).cmd, KeyCmd::SequencePlay);
     EXPECT_EQ(resolver.resolve(0x44, CTRL).cmd, KeyCmd::SequenceClear);
-    KeyAction menu = resolver.resolve(0x45, SUPER);
+    KeyAction menu = resolver.resolve(0x45, CTRL);
     EXPECT_EQ(menu.cmd, KeyCmd::OpenMenu);
     EXPECT_EQ(menu.menu, EditMenu::Sequence);
+
+    EXPECT_EQ(resolver.resolve(0x42, SUPER).menu, EditMenu::ChordPattern);
+    EXPECT_EQ(resolver.resolve(0x43, SUPER).menu, EditMenu::RhythmPattern);
+    EXPECT_EQ(resolver.resolve(0x44, SUPER).menu, EditMenu::Drum);
+    EXPECT_EQ(resolver.resolve(0x45, SUPER).menu, EditMenu::BassPattern);
 }

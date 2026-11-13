@@ -21,11 +21,12 @@ touches the CH559 bridge, load `keybchord-ch559`.
 - `lib/core/` — portable data and logic. No Arduino/pico headers, no
   exceptions. Files include `params.*`, `presets.*`, `config.*`, `state.*`,
   `keymap*`, `macros.*`, `rhythm.*`, `bass.*`, `chordpattern.*`, `sequence.*`,
-  `chords.*`, `voicing.*`, `strum.*`, `naming.*`, `defaults.*`.
+  `pattern_limits.h`, `chords.*`, `voicing.*`, `strum.*`, `naming.*`,
+  `defaults.*`.
 - `lib/engines/` — stateful behavior driven by `update(now_us)` and
   `handleKeyEvent()`: `chord_engine`, `strum_engine`, `bass_engine`,
   `rhythm_engine`, `sequencer_engine`, `edit_engine`, `preset_engine`,
-  `display_manager`, `midi_router`.
+  `pattern_editor_engine`, `display_manager`, `midi_router`.
 - `lib/hw/` — adapters implementing `base.h` (`InputAdapter`,
   `MidiOutAdapter`, `LcdAdapter`, `StorageAdapter`). `factory.cpp` selects the
   real RP2040 adapters or the native null/stub adapters.
@@ -43,6 +44,16 @@ touches the CH559 bridge, load `keybchord-ch559`.
 - `MidiRouter` fans messages to DIN and USB MIDI and owns panic/all-notes-off.
   Engines should call the router rather than sending bytes directly.
 - The beat LED is Core 0 state; Core 1 only posts a flash request.
+- The pattern editor runs on Core 0 and records into the rhythm 16th grid. It
+  shares the sequence hi-hat guide flags but is mutually exclusive with sequence
+  recording/playback. Rhythm library reloads use the Core 1 staged handshake;
+  bass/chord reloads are direct. Pattern files share the per-kind 32 cap and the
+  combined 72 KB rhythm/bass/chord budget.
+- In the bass/rhythm editors, plain numpad pad keys are live (bass degrees or the
+  preset drum map). Chord-grid keys and direct parameter-modifying keymap
+  actions pass through to the chord engine / EditEngine; menu-open, preset,
+  sequence, and strum actions remain editor-owned. The editor reserves arrows,
+  volume in menus/value editing, Enter/Mute, Esc/Backspace, and plain numpad.
 
 ## Change workflow
 
@@ -64,6 +75,9 @@ individually rather than globbing everything.
   `RecordingMidiOutAdapter`.
 - `recording_midi_out.h` exposes emitted messages for assertions.
 - `StorageStub` backs config/preset/keymap JSON tests without hardware.
+- Pattern-editor tests cover serializers, bars/meter inference, quantize,
+  overdub/polyphony, sustain capture, grid edits, caps/budget, and library
+  reload; keep them hardware-free using the same stubs.
 - Keep tests hardware-free; native builds use `*_null.*`/`*_stub.*` adapters.
 
 ## Token discipline

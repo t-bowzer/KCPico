@@ -287,6 +287,9 @@ bool lookupMenuName(const std::string& s, EditMenu& menu) {
     if (s == "bass")   { menu = EditMenu::Bass;   return true; }
     if (s == "drum")   { menu = EditMenu::Drum;   return true; }
     if (s == "sequence") { menu = EditMenu::Sequence; return true; }
+    if (s == "chord_pattern")  { menu = EditMenu::ChordPattern;  return true; }
+    if (s == "rhythm_pattern") { menu = EditMenu::RhythmPattern; return true; }
+    if (s == "bass_pattern")   { menu = EditMenu::BassPattern;   return true; }
     return false;
 }
 
@@ -370,10 +373,11 @@ KeymapConfig KeymapConfig::defaults() {
     bind(0, HID_USAGE_F1 + 6, toggle(ParamId::BassEnable, 1, 0));   // F7
     bind(0, HID_USAGE_F1 + 7, toggle(ParamId::RhythmClock, 1, 0));  // F8
 
-    // F9-F12: menus.
+    // F9-F12: menus. F10/F11 are swapped so each pattern editor is
+    // Super + its menu key (Super+F9/F10/F12).
     bind(0, HID_USAGE_F1 + 8, openMenu(EditMenu::Chord));   // F9
-    bind(0, HID_USAGE_F1 + 9, openMenu(EditMenu::Strum));   // F10
-    bind(0, HID_USAGE_F1 + 10, openMenu(EditMenu::Rhythm)); // F11
+    bind(0, HID_USAGE_F1 + 9, openMenu(EditMenu::Rhythm));  // F10
+    bind(0, HID_USAGE_F1 + 10, openMenu(EditMenu::Strum));  // F11
     bind(0, HID_USAGE_F1 + 11, openMenu(EditMenu::Bass));   // F12
 
     // Inversions.
@@ -406,8 +410,10 @@ KeymapConfig KeymapConfig::defaults() {
     // Super combos.
     bind(KMOD_SUPER, HID_USAGE_HOME, preset(KeyCmd::PresetBankPrev));
     bind(KMOD_SUPER, HID_USAGE_END,  preset(KeyCmd::PresetBankNext));
-    bind(KMOD_SUPER, HID_USAGE_F1 + 10, openMenu(EditMenu::Drum));  // Super+F11
-    bind(KMOD_SUPER, HID_USAGE_F1 + 11, openMenu(EditMenu::Sequence)); // Super+F12
+    bind(KMOD_SUPER, HID_USAGE_F1 + 8,  openMenu(EditMenu::ChordPattern));  // Super+F9
+    bind(KMOD_SUPER, HID_USAGE_F1 + 9,  openMenu(EditMenu::RhythmPattern)); // Super+F10
+    bind(KMOD_SUPER, HID_USAGE_F1 + 10, openMenu(EditMenu::Drum));          // Super+F11
+    bind(KMOD_SUPER, HID_USAGE_F1 + 11, openMenu(EditMenu::BassPattern));   // Super+F12
 
     // Ctrl combos.
     bind(KMOD_CTRL, HID_USAGE_F1,     cycle(ParamId::ChordVoicing));
@@ -419,6 +425,7 @@ KeymapConfig KeymapConfig::defaults() {
     bind(KMOD_CTRL, HID_USAGE_F1 + 8, preset(KeyCmd::SequenceRecord));    // Ctrl+F9
     bind(KMOD_CTRL, HID_USAGE_F1 + 9, preset(KeyCmd::SequencePlay));      // Ctrl+F10
     bind(KMOD_CTRL, HID_USAGE_F1 + 10, preset(KeyCmd::SequenceClear));    // Ctrl+F11
+    bind(KMOD_CTRL, HID_USAGE_F1 + 11, openMenu(EditMenu::Sequence));     // Ctrl+F12
     bind(KMOD_CTRL, HID_USAGE_EQUALS, incp(ParamId::ChordVelocity));
     bind(KMOD_CTRL, HID_USAGE_MINUS,  decp(ParamId::ChordVelocity));
     bind(KMOD_CTRL, HID_USAGE_KP_ENTER, cycle(ParamId::StrumLayout));
@@ -771,8 +778,8 @@ R"({
     { "keys": ["F7"], "action": { "type": "toggle", "param": "bass_enable", "a": 1, "b": 0 } },
     { "keys": ["F8"], "action": { "type": "toggle", "param": "rhythm_clock", "a": 1, "b": 0 } },
     { "keys": ["F9"], "action": { "type": "open_menu", "menu": "chord" } },
-    { "keys": ["F10"], "action": { "type": "open_menu", "menu": "strum" } },
-    { "keys": ["F11"], "action": { "type": "open_menu", "menu": "rhythm" } },
+    { "keys": ["F10"], "action": { "type": "open_menu", "menu": "rhythm" } },
+    { "keys": ["F11"], "action": { "type": "open_menu", "menu": "strum" } },
     { "keys": ["F12"], "action": { "type": "open_menu", "menu": "bass" } },
     { "keys": ["PrtSc"], "action": { "type": "set", "param": "chord_inversion", "value": "first" } },
     { "keys": ["ScLk"], "action": { "type": "set", "param": "chord_inversion", "value": "second" } },
@@ -793,8 +800,10 @@ R"({
     { "keys": ["Delete"], "action": { "type": "preset_clear" } },
     { "keys": ["Super", "Home"], "action": { "type": "preset_bank_prev" } },
     { "keys": ["Super", "End"], "action": { "type": "preset_bank_next" } },
+    { "keys": ["Super", "F9"], "action": { "type": "open_menu", "menu": "chord_pattern" } },
+    { "keys": ["Super", "F10"], "action": { "type": "open_menu", "menu": "rhythm_pattern" } },
     { "keys": ["Super", "F11"], "action": { "type": "open_menu", "menu": "drum" } },
-    { "keys": ["Super", "F12"], "action": { "type": "open_menu", "menu": "sequence" } },
+    { "keys": ["Super", "F12"], "action": { "type": "open_menu", "menu": "bass_pattern" } },
     { "keys": ["Ctrl", "F1"], "action": { "type": "cycle", "param": "chord_voicing" } },
     { "keys": ["Ctrl", "F2"], "action": { "type": "cycle", "param": "chord_inversion" } },
     { "keys": ["Ctrl", "F3"], "action": { "type": "cycle", "param": "arp_mode" } },
@@ -804,6 +813,7 @@ R"({
     { "keys": ["Ctrl", "F9"], "action": { "type": "sequence_record" } },
     { "keys": ["Ctrl", "F10"], "action": { "type": "sequence_play" } },
     { "keys": ["Ctrl", "F11"], "action": { "type": "sequence_clear" } },
+    { "keys": ["Ctrl", "F12"], "action": { "type": "open_menu", "menu": "sequence" } },
     { "keys": ["Ctrl", "="], "action": { "type": "inc", "param": "chord_velocity" } },
     { "keys": ["Ctrl", "-"], "action": { "type": "dec", "param": "chord_velocity" } },
     { "keys": ["Ctrl", "KpEnter"], "action": { "type": "cycle", "param": "strum_layout" } },

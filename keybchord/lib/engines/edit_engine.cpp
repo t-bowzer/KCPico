@@ -58,6 +58,39 @@ uint8_t drumNoteValue(const StateManager& state, ParamId id) {
     }
 }
 
+bool isVoicingParam(ParamId id) {
+    switch (id) {
+        case ParamId::ChordVoicing:
+        case ParamId::ChordInversion:
+        case ParamId::ChordOctave:
+        case ParamId::ChordMinNotes:
+        case ParamId::ChordMinInterval:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool isPatternMenu(EditMenu menu) {
+    return menu == EditMenu::ChordPattern || menu == EditMenu::RhythmPattern ||
+           menu == EditMenu::BassPattern;
+}
+
+bool isPatternEditCommand(ParamId id) {
+    return id == ParamId::ChordPatternEdit ||
+           id == ParamId::RhythmPatternEdit ||
+           id == ParamId::BassPatternEdit;
+}
+
+EditMenu patternMenuForCommand(ParamId id) {
+    switch (id) {
+        case ParamId::ChordPatternEdit:  return EditMenu::ChordPattern;
+        case ParamId::RhythmPatternEdit: return EditMenu::RhythmPattern;
+        case ParamId::BassPatternEdit:   return EditMenu::BassPattern;
+        default:                         return EditMenu::None;
+    }
+}
+
 } // namespace
 
 
@@ -76,8 +109,16 @@ void EditEngine::setPatternChangedCallback(std::function<void()> cb) {
     patternChanged_ = std::move(cb);
 }
 
+void EditEngine::setVoicingChangedCallback(std::function<void()> cb) {
+    voicingChanged_ = std::move(cb);
+}
+
 void EditEngine::setAnyEditCallback(std::function<void()> cb) {
     anyEdit_ = std::move(cb);
+}
+
+void EditEngine::setPatternEditCallback(std::function<void(EditMenu)> cb) {
+    patternEdit_ = std::move(cb);
 }
 
 void EditEngine::setDrumAuditionCallback(std::function<void(uint8_t)> cb) {
@@ -151,6 +192,13 @@ void EditEngine::selectCurrentParam(uint64_t now_us) {
     ParamId id = currentParam();
     if (id == ParamId::COUNT) return;
 
+    if (isPatternEditCommand(id)) {
+        EditMenu menu = patternMenuForCommand(id);
+        exitMenu(now_us);
+        if (patternEdit_) patternEdit_(menu);
+        return;
+    }
+
     paramSelected_ = true;
     selectedParam_ = id;
     selectedOriginalValue_ = paramValueInt(state_, id);
@@ -169,6 +217,7 @@ void EditEngine::restoreParamValue(ParamId id, int value, uint64_t now_us) {
     if ((id == ParamId::ChordArpMode || id == ParamId::ChordArpRate) &&
         arpModeChanged_) arpModeChanged_();
     if (id == ParamId::RhythmPattern && patternChanged_) patternChanged_();
+    if (isVoicingParam(id) && voicingChanged_) voicingChanged_();
     if (isDrumNoteParam(id) && drumAudition_) {
         drumAudition_(drumNoteValue(state_, id));
     }
@@ -204,6 +253,7 @@ void EditEngine::applyParamStep(ParamId id, int delta, bool inMenu, uint64_t now
     if ((id == ParamId::ChordArpMode || id == ParamId::ChordArpRate) &&
         arpModeChanged_) arpModeChanged_();
     if (id == ParamId::RhythmPattern && patternChanged_) patternChanged_();
+    if (isVoicingParam(id) && voicingChanged_) voicingChanged_();
     if (isDrumNoteParam(id) && drumAudition_) {
         drumAudition_(drumNoteValue(state_, id));
     }
@@ -229,6 +279,7 @@ void EditEngine::applyParamAction(const KeyAction& a, uint16_t usage, uint8_t us
     if ((id == ParamId::ChordArpMode || id == ParamId::ChordArpRate) &&
         arpModeChanged_) arpModeChanged_();
     if (id == ParamId::RhythmPattern && patternChanged_) patternChanged_();
+    if (isVoicingParam(id) && voicingChanged_) voicingChanged_();
     if (anyEdit_) anyEdit_();
     display_.showValue(paramFullName(id), paramValueString(state_, id), inMenu, now_us);
 
@@ -246,6 +297,7 @@ void EditEngine::triggerMacro(uint8_t keyIndex, uint64_t now_us) {
     bool modeChanged = false;
     bool arpChanged = false;
     bool patternChanged = false;
+    bool voicingChanged = false;
     bool edited = false;
     uint64_t midiDelayUs = 0;
 
@@ -278,11 +330,13 @@ void EditEngine::triggerMacro(uint8_t keyIndex, uint64_t now_us) {
         if (cmd.param == ParamId::ChordArpMode ||
             cmd.param == ParamId::ChordArpRate) arpChanged = true;
         if (cmd.param == ParamId::RhythmPattern) patternChanged = true;
+        if (isVoicingParam(cmd.param)) voicingChanged = true;
     }
 
     if (modeChanged && modeChanged_) modeChanged_();
     if (arpChanged && arpModeChanged_) arpModeChanged_();
     if (patternChanged && patternChanged_) patternChanged_();
+    if (voicingChanged && voicingChanged_) voicingChanged_();
     if (edited && anyEdit_) anyEdit_();
 
     std::string name = state_.pendingMacros.nameFor(keyIndex);
@@ -449,6 +503,11 @@ bool EditEngine::handleKeyEvent(const KeyEvent& ev, uint64_t now_us) {
 
     switch (a.cmd) {
         case KeyCmd::OpenMenu:
+            if (isPatternMenu(a.menu)) {
+                exitMenu(now_us);
+                if (patternEdit_) patternEdit_(a.menu);
+                return true;
+            }
             enterOrSwitch(a.menu, now_us);
             return true;
         case KeyCmd::ClearEdit:   // Esc

@@ -92,6 +92,11 @@ public:
     std::atomic<bool> recordGuideHatsActive{false};
     std::atomic<uint32_t> recordGuideHatsStartAbs{0};
 
+    // True while the Pattern Edit mode owns the pattern engines (M17). The
+    // rhythm/bass engines suppress normal pattern playback; the editor drives
+    // preview/audition itself.
+    std::atomic<bool> patternEditorActive{false};
+
     std::vector<ActiveNote> activeNotes;
 
     int  currentBank = 0;

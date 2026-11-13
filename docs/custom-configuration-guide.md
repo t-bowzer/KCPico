@@ -32,8 +32,8 @@ keyboard and power the unit **on** — it reboots into the USB bootloader
 the enclosure.
 
 **First boot:** when the flash is empty the firmware self-provisions the whole
-layout — `config.json`, `/keymap.json`, `/presets/`, and `/rhythms/`. You do not
-need to prepare anything.
+layout — `config.json`, `/keymap.json`, `/presets/`, `/rhythms/`, `/bass/`, and
+`/chordpatterns/`. You do not need to prepare anything.
 
 ### On-disk layout
 
@@ -47,6 +47,10 @@ need to prepare anything.
 | `/bass/*.json` | Bass patterns — the 9 built-ins plus any user files you add. |
 | `/chordpatterns/*.json` | Chord patterns — the 9 built-ins plus any user files you add. |
 | `/keymap_error.log` | Written only when `/keymap.json` fails validation (see §4). |
+
+> Rhythm, bass, and chord patterns can also be created or edited on the device
+> with the **Pattern Edit** mode (see §5.10); the files it writes are ordinary
+> `userN.json` files in the same directories.
 
 ---
 
@@ -85,8 +89,8 @@ A single object. Any omitted key uses its default.
 | `led.led` | enum | — | `num_lock` | Which LED(s): `num_lock`, `caps_lock`, `scroll_lock`, or `all`. |
 | `led.flash_ms` | int | 5–500 | `40` | Beat-flash duration (ms). |
 | `startup_preset` | string | `"B#:P#"` | `"B1:P1"` | Preset loaded at boot (bank 1–5, slot 1–8). Values above B5 fall back to B1:P1. |
-| `logging.debug_log` | bool | — | `true` | Key/strum/LED debug log over USB-CDC. |
-| `logging.midi_monitor` | bool | — | `true` | Decode outgoing MIDI over USB-CDC. |
+| `logging.debug_log` | bool | — | `true` | Key/strum/LED debug log over USB-CDC; lines are dropped rather than blocking playback if the host is not draining the log. |
+| `logging.midi_monitor` | bool | — | `true` | Decode outgoing MIDI over USB-CDC; sent after the MIDI bytes and dropped on a full CDC buffer so timing is never blocked. |
 
 ---
 
@@ -180,7 +184,7 @@ sequence-settings override, saved with the preset. Omitted values default to
 | `voicing_mode` | enum | — | `root_position` | `root_position` / `smart` / `down` / `up` |
 | `chord_roll_ms` | int | −2000 … +2000 | `0` | Stagger note-ons (step 10); + up, − down; Held/Press only. |
 | `min_notes` | int | 2–6 | `3` | Pad the voicing with octave notes to at least this count. |
-| `min_interval` | int | 0–12 | `0` | Min semitones between adjacent notes; 0 = off. |
+| `min_interval` | int | 0–12 | `0` | Min semitones between adjacent notes; follows the voicing mode and inversion; 0 = off. |
 | `inversion` | enum | — | `root` | `root` / `first` / `second` / `third` |
 | `arp_mode` | enum | — | `up` | `up` / `down` / `up_down` / `alternating` / `random` |
 | `arp_rate` | enum | — | `sixteenth` | `whole` / `half` / `quarter` / `eighth` / `sixteenth` / `thirty_second` |
@@ -362,7 +366,7 @@ Fm7 with add9+add13 = `5*128 + 4*8 + 5 = 677`.
   marker does not track sequences.
 - `Ctrl+F11` clears the selected sequence (confirm with `Enter`). Clearing a
   preset also removes its sequence file.
-- `Super+F12` opens **Seq Edit** (`Slot`, `Bars`, `Settings`). `Settings`
+- `Ctrl+F12` opens **Seq Edit** (`Slot`, `Bars`, `Settings`). `Settings`
   chooses the global Recorded/Live override and is saved with the preset
   (`seq_settings`: `"recorded"` or `"live"`); per-setting Live bits are edited
   in the configurator's **Sequences** tab.
@@ -383,7 +387,7 @@ Fm7 with add9+add13 = `5*128 + 4*8 + 5 = 677`.
    the original rhythm pattern resumes.
 5. Press `Ctrl+F10` to loop it (`Play arm` / `Wait bar`, then `Seq N` /
    `play`). Press `Ctrl+F10` again to stop.
-6. Press `Super+F12` to change the slot, bar length, or the global
+6. Press `Ctrl+F12` to change the slot, bar length, or the global
    Recorded/Live setting. Use `Ctrl+F11` to clear the selected sequence.
 7. For per-setting Live mixing, open the device in the configurator and use the
    preset's **Sequences** tab.
@@ -454,13 +458,13 @@ fixed keys `Mute`, `VolumeUp`, and `VolumeDown`. `Super`+`Esc` (panic) and
 > the value from when it was selected and deselects. A selected parameter stays
 > selected indefinitely; only an unselected menu auto-exits after
 > `display.menu_timeout_ms`. `F1`–`F12` are inert inside menus (menu-open keys
-> such as `F9`–`F12` still work).
+> such as `F9`–`F12`, `Super+F11`, and `Ctrl+F12` still work).
 
 ### 4.2 Action types
 
 | `type` | Extra fields | Effect |
 |--------|--------------|--------|
-| `open_menu` | `menu` | Open an edit menu (`chord`/`strum`/`rhythm`/`bass`/`drum`/`sequence`). |
+| `open_menu` | `menu` | Open an edit menu (`chord`/`rhythm`/`strum`/`bass`/`drum`/`sequence`) or a pattern editor (`chord_pattern`/`rhythm_pattern`/`bass_pattern`). |
 | `cycle` | `param` | Advance the parameter by one (wraps). |
 | `set` | `param`, `value` | Set the parameter to an absolute value. |
 | `inc` | `param` | Step the parameter +1 (clamps; auto-repeats where applicable). |
@@ -526,10 +530,20 @@ processed until the file is fixed (remount via the boot key).
 Even a valid keymap must still cover these (else it is rejected as missing a
 required binding): an `open_menu` for each of **chord, strum, rhythm, bass,
 drum**, plus **`preset_prev`**, **`preset_next`**, and **`preset_save`**.
-The `sequence` menu and the three sequence actions are optional (the default
-keymap binds `Super+F12`, `Ctrl+F9`, `Ctrl+F10`, and `Ctrl+F11`), so existing
-v0.1 keymaps remain valid. Older keymaps that do not bind them still get those
-four combos as fallbacks. `Ctrl+1`…`Ctrl+0` sequence selection is hard-coded.
+The `sequence` menu, the three sequence actions, and the three pattern-editor
+menus (`chord_pattern`/`rhythm_pattern`/`bass_pattern`) are optional. The default
+keymap binds `Ctrl+F12` for Seq Edit and `Ctrl+F9`/`Ctrl+F10`/`Ctrl+F11` for
+sequence record/play/clear; it binds `Super+F9`/`F10`/`F12` for the chord, rhythm,
+and bass pattern editors. Existing v0.1 keymaps remain valid. Older keymaps that
+do not bind the sequence actions still get those four combos as fallbacks.
+`Ctrl+1`…`Ctrl+0` sequence selection is hard-coded.
+
+> **v0.2 default keymap change:** the shipped defaults now use
+> `F9`/`F10`/`F11`/`F12` for Chord/Rhythm/Strum/Bass menus, `Super+F11` for Drum,
+> `Ctrl+F12` for Seq Edit, and `Super+F9`/`F10`/`F12` for the pattern editors.
+> The Strum and Rhythm menu keys swapped, and Seq Edit moved from `Super+F12` to
+> `Ctrl+F12`. Custom `keymap.json` files are unaffected; add the new `open_menu`
+> bindings to use the pattern editors.
 
 ---
 
@@ -603,9 +617,15 @@ Practical rules:
 - Use a simple, unique name (e.g. `my_groove.json`). Alphabetical order among
   your files determines their slot order.
 - Keep at most ~20 user files (the firmware caps the total at **32** patterns).
+  A combined rhythm/bass/chord pattern budget of **72 KB** also applies (user
+  patterns share a 48 KB portion); the on-device editor rejects an 8 KB+ rhythm
+  file.
 - A pattern with no `tracks` is skipped.
 - You can also edit any built-in `.json` file in place to change its feel;
   deleting a built-in file re-provisions the default.
+- The device can create/edit rhythm patterns too (Pattern Edit, §5.10). It writes
+  `userN.json` with at most 8 KB per file and enforces the combined pattern
+  budget below.
 
 A ready-to-copy example lives at `examples/test_rhythm.json` (a "Test Groove"
 pattern); copy it to `/rhythms/test_rhythm.json` to verify user rhythms load.
@@ -625,7 +645,7 @@ pattern); copy it to `/rhythms/test_rhythm.json` to verify user rhythms load.
 |-------|------|-------|
 | `name` | string | Display name (shown on the LCD in the Bass menu, used by presets/keymap). |
 | `steps_per_bar` | int | Length of the `steps` array; 4 steps = 1 beat (16th-note grid, same as rhythm). |
-| `steps[]` | int array | Chord-degree codes: `-1` = rest, `0` = root, `1` = 3rd, `2` = 5th, `3` = 6th/7th. The note is resolved through the chord's interval formula, so it follows the chord type (a minor 3rd for minor chords, etc.). |
+| `steps[]` | int array | Chord-degree codes: `-1` = rest, `0` = root, `1` = 3rd, `2` = 5th, `3` = 6th/7th, `4` = root one octave up. The note is resolved through the chord's interval formula, so it follows the chord type (a minor 3rd for minor chords, etc.). |
 | `sustain_steps[]` | int array (optional) | Parallel array giving each note's length in 16th steps. `0`/absent = percussive (uses `bass.note_duration_ms`). |
 | `hold` | bool (optional) | `true` marks the special Hold pattern (root sustains while the chord is sounding, not beat-driven). |
 
@@ -665,9 +685,13 @@ Practical rules:
 - The filename must end in `.json` and must not match one of the 9 built-in
   filenames above.
 - Keep at most ~23 user files (the firmware caps the total at **32** patterns).
+  The combined pattern budget (72 KB; 48 KB user share) also applies, and the
+  on-device editor enforces a 4 KB per-file cap.
 - A pattern with an empty `steps` array is skipped.
 - You can edit any built-in `.json` in place; deleting one re-provisions the
   default.
+- The device can create/edit bass patterns too (Pattern Edit, §5.10), including
+  captured sustains.
 
 A ready-to-copy example lives at `examples/test_bass.json` (a "Test Bass" root/
 5th half-note pattern); copy it to `/bass/test_bass.json` to verify user bass
@@ -677,6 +701,10 @@ patterns load.
 > the bass pattern. A 4/4 bass pattern over a 3/4 (waltz) rhythm plays only its
 > first 12 steps, then wraps — so a walking bass naturally drops its 6th/7th on
 > the fourth beat, and `3/4 Alt` becomes root on beat 1, 5th on beat 3.
+
+> **No-drums note:** when the rhythm engine is stopped, the bass free-runs on
+> the same 16th-note grid at the preset tempo. It stays audible without drums
+> and resyncs to the shared step counter when the rhythm starts.
 
 ### 5.7 Schema (chord patterns)
 
@@ -692,7 +720,7 @@ patterns load.
 |-------|------|-------|
 | `name` | string | Display name (shown in the Chord menu / preset `chord.pattern`). |
 | `steps_per_bar` | int | Length of the `steps` array; 4 steps = 1 beat (16th-note grid). |
-| `steps[]` | int array | Chord-degree **bitmask**: `0` = rest, bit0 (`1`) = root, bit1 (`2`) = 3rd, bit2 (`4`) = 5th, bit3 (`8`) = 7th. Combine bits for multi-note steps (e.g. `7` = root+3rd+5th, `15` = all four). Degree 3 (bit3) plays the chord's 7th when present, otherwise the root an octave up on triads. |
+| `steps[]` | int array | Chord-degree **bitmask**: `0` = rest, bit0 (`1`) = root, bit1 (`2`) = 3rd, bit2 (`4`) = 5th, bit3 (`8`) = 7th. Combine bits for multi-note steps (e.g. `7` = root+3rd+5th, `15` = all four). Degree 3 (bit3) plays the chord's 7th when present, otherwise the root an octave up on triads. When the rhythm is running, chord-pattern playback is fully quantized: step 0 always waits for the next rhythm step boundary. |
 | `sustain_steps[]` | int array (optional) | Parallel array giving each step's length in 16th steps. `0`/absent = percussive (uses `chord.note_duration_ms`). |
 
 ### 5.8 The 9 built-in chord patterns
@@ -719,7 +747,65 @@ are loaded after the 9 built-ins (indices 9, 10, …), ordered alphabetically by
 filename, named by their `name` field, selected via the Chord menu / `chord.pattern`
 in a preset (or `chord_pattern` in the keymap). A preset referencing a deleted or
 renamed pattern falls back to the first pattern (Block). The firmware caps the
-total at **32** patterns, and skips any file with an empty `steps` array.
+total at **32** patterns, and skips any file with an empty `steps` array. The
+combined pattern budget (72 KB; 48 KB user share) also applies, and the on-device
+editor enforces a 4 KB per-file cap. The device can create/edit chord patterns
+too (Pattern Edit, §5.10), recording degree bitmasks and sustains.
+
+### 5.10 On-device pattern editing (Pattern Edit)
+
+Rhythm, bass, and chord patterns can be created, recorded, grid-edited, and saved
+without a PC. Each type has its own editor screen; there is no Kind selector.
+Open the editor with the **Edit Pattern** item in the Chord/Rhythm/Bass menu, or
+by default with `Super+F9` (chord), `Super+F10` (rhythm), and `Super+F12`
+(bass). These are rebindable `open_menu` actions with menu names
+`chord_pattern`/`rhythm_pattern`/`bass_pattern`.
+
+The command screen uses the standard menu navigation: Up/Down/Left/Right or
+Volume +/− scroll the list; Enter/Mute selects a value item; while selected the
+same keys change the pending value; Enter/Mute applies it and returns to the
+list, while Esc/Backspace cancels it and returns to the list. The list order is
+Pattern, New, Bars, Quantize, Grid, Record, Preview, Rename, Save, Save As,
+Delete, Clear; action items execute on Enter/Mute. Creating a pattern prompts for a name, then Bars, then `Record now?` / `Ent/Bk`.
+Declining recording leaves the new pattern selected and confirms with
+`New Pat N` / `Created` on the LCD.
+
+| Kind | Record pads (numpad) | Grid cell |
+|------|----------------------|-----------|
+| Rhythm | `1`–`9`, `0`, `.`, `/`, `*` = the 13 standard pieces | `.` rest / `x` hit / `X` accent |
+| Bass | `1`–`5` = root/3rd/5th/6th-or-7th/root+8va; `0` = rest | `.`/`R`/`3`/`5`/`7`/`8`, `-` sustained |
+| Chord | `1`–`4` = root/3rd/5th/7th (combine); `0` = clear | hex `0`–`F`, `-` sustained |
+
+- Plain numpad pad keys are live whenever the bass/rhythm/chord editor is open:
+  bass pads play root/3rd/5th/6th-or-7th/root+8va (and `0` = rest) with the
+  preset bass parameters; rhythm pads play the 13 pieces through the preset DrumMap; chord
+  `1`–`4` play root/3rd/5th/7th through the current/last chord, combining while
+  held, and `0` releases the live chord. In the chord grid, `1`–`4`/`0` keep
+  their bit-toggle editing role. Live pads also record while recording.
+  `+`/`−`/`Enter` keep their parameter actions. Chord-grid keys and direct
+  parameter-modifying keymap actions remain active; the top-row strum/macro path
+  stays disabled. The rhythm editor ignores `RhythmMute` and forces the rhythm
+  unmuted; the bass editor ignores `BassEnable` and forces the bass enabled, so
+  pads/audition always emit. The rhythm editor restores the preset's original
+  mute/enable values when it closes; the bass editor leaves the bass enabled so
+  the edited pattern plays through the normal bass engine.
+- Recording uses the sequencer's one-bar hi-hat count-in and is quantized at
+  capture time (`1/4`, `1/8`, or `1/16`); quantize is not stored in the file.
+  Enter/Mute or Esc/Backspace stops a take or preview.
+- Rhythm and chord recording are polyphonic; bass is monophonic. Recording is
+  **overdub** (untouched steps/tracks are preserved); use **Clear** for a fresh
+  take. Held bass/chord pads write `sustain_steps`.
+- New patterns inherit the live rhythm meter (16 steps/bar in 4/4, 12 in 3/4).
+  Record/preview require the live meter to match the working pattern.
+- Files are written as compact `userN.json` in the matching directory and use
+  the same schemas above. `New`/`Save As` create user files; `Save` overwrites the
+  current file (built-ins require confirmation); only user patterns can be
+  renamed or deleted. Built-in files that are deleted or corrupt are
+  re-provisioned on boot.
+- Limits: 32 total per kind; combined 72 KB all-pattern budget (48 KB user
+  share); per-file caps 8 KB rhythm, 4 KB bass, 4 KB chord. The editor rejects a
+  save that would exceed them. `bars` is inferred from
+  `steps.length / steps_per_bar`.
 
 ---
 

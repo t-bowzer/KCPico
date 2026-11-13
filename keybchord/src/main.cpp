@@ -15,6 +15,7 @@
 #include "rhythm_engine.h"
 #include "edit_engine.h"
 #include "display_manager.h"
+#include "pattern_editor_engine.h"
 #include "preset_engine.h"
 #include "sequencer_engine.h"
 #include "perf.h"
@@ -49,6 +50,7 @@ static DisplayManager* g_display = nullptr;
 static EditEngine*     g_editEngine = nullptr;
 static PresetEngine*   g_presetEngine = nullptr;
 static SequencerEngine* g_sequencer = nullptr;
+static PatternEditorEngine* g_patternEditor = nullptr;
 static MscFatFs*       g_msc = nullptr;
 static bool            g_keymapError = false;  // set when keymap.json fails validation
 
@@ -95,8 +97,17 @@ static bool     g_hotplugArmed = false;  // skip the first loop's false edge
 // kPerfLogIntervalUs.
 static PerfStats g_latencyStats;      // Core 0 loop-processing time
 static PerfStats g_keyLatencyStats;   // HID report receipt -> MIDI dispatch
+static PerfStats g_rhythmDispatchStats;  // Core 1 enqueue -> MIDI dispatch
+static PerfStats g_realtimeGapStats;     // gap between priority MIDI services
+static uint32_t  g_rhythmQueueOverflow = 0;
+static size_t    g_rhythmQueueMaxDepth = 0;
+static uint64_t  g_lastRealtimeServiceUs = 0;
+static uint64_t  g_lastDisplayUpdateUs = 0;
 static uint64_t  g_lastPerfLogUs = 0;
 static constexpr uint64_t kPerfLogIntervalUs = 5000000ULL;  // 5 s
+static constexpr uint64_t kRealtimeStallUs = 8000ULL;       // 8 ms
+static constexpr uint64_t kDisplayMinIntervalUs = 30000ULL; // ~33 Hz
+static constexpr uint64_t kDisplayGuardUs = 12000ULL;       // before next step
 
 // Grace period after the host ejects the MSC drive. This lets the SCSI command
 // complete and the host finish its removal UI before the firmware reboots.
@@ -124,12 +135,59 @@ static bool applyLedState(bool on) {
     return allOk;
 }
 
+// Highest-priority Core 0 service: drain Core 1 rhythm/clock output and send it
+// before any UI work. A large gap means Core 0 was blocked (LCD, flash, USB
+// logging): drop the stale backlog and rebase the scheduler so it resumes on
+// the current grid instead of emitting a late burst.
+static void serviceRealtimeMidi() {
+    uint64_t now = nowUs();
+    if (g_lastRealtimeServiceUs != 0) {
+        uint64_t gap = now - g_lastRealtimeServiceUs;
+        g_realtimeGapStats.record(static_cast<uint32_t>(
+            gap > 0xFFFFFFFFULL ? 0xFFFFFFFFULL : gap));
+        if (gap > kRealtimeStallUs) {
+            g_rhythmQueue.clear();
+            if (g_rhythmEngine) g_rhythmEngine->requestRebase();
+        }
+    }
+    g_lastRealtimeServiceUs = now;
+
+    size_t depth = g_rhythmQueue.size();
+    if (depth > g_rhythmQueueMaxDepth) g_rhythmQueueMaxDepth = depth;
+
+    bool sent = false;
+    QueuedMidi queued;
+    while (g_rhythmQueue.pop(queued)) {
+        if (queued.queued_us != 0) {
+            uint64_t latency = now - queued.queued_us;
+            g_rhythmDispatchStats.record(static_cast<uint32_t>(
+                latency > 0xFFFFFFFFULL ? 0xFFFFFFFFULL : latency));
+        }
+        if (g_router) g_router->sendRaw(queued.msg);
+        sent = true;
+    }
+    if (sent && g_router) g_router->flush();
+    g_rhythmQueueOverflow += g_rhythmQueue.takeOverflowCount();
+}
+
+// Keep LCD I2C work away from due rhythm/playback output.
+static bool displayUpdateAllowed(uint64_t now) {
+    if (now - g_lastDisplayUpdateUs < kDisplayMinIntervalUs) return false;
+    if (!g_rhythmQueue.empty()) return false;
+    uint64_t nextStep = g_state.rhythmClock.nextStepUs.load();
+    if (nextStep > now && nextStep - now < kDisplayGuardUs) return false;
+    return true;
+}
+
 // Esc (main menu) and keyboard hot-plug disconnect: release chord + strum +
 // bass notes only — the rhythm and beat LED are left untouched.
 static void cancelChordStrum() {
     if (g_chordEngine) g_chordEngine->allNotesOff();
     if (g_strumEngine) g_strumEngine->allNotesOff();
     if (g_bassEngine)  g_bassEngine->allNotesOff();
+    // A cancelled chord must not leave the free-running bass playing the old
+    // root (the rhythm may still be stopped). The next chord press re-selects.
+    g_state.selectedChordValid = false;
     g_state.allNotesOff();
 }
 
@@ -139,6 +197,7 @@ static void cancelChordStrum() {
 // the next beat — the master clock keeps running).
 static void handlePanic() {
     if (g_sequencer) g_sequencer->stopAll(true);
+    if (g_patternEditor) g_patternEditor->stopAll(nowUs());
     cancelChordStrum();
     g_state.pendingRhythm.enabled = false;   // drums stop and stay stopped
     if (g_router) g_router->panic();         // CC120 + CC123 on all 16 channels
@@ -310,6 +369,7 @@ void setup() {
     g_editEngine->setModeChangedCallback([]() { g_chordEngine->onModeChanged(); });
     g_editEngine->setArpModeChangedCallback([]() { g_chordEngine->onArpModeChanged(); });
     g_editEngine->setPatternChangedCallback([]() { g_rhythmEngine->onPatternChanged(); });
+    g_editEngine->setVoicingChangedCallback([]() { g_chordEngine->onVoicingChanged(); });
     g_editEngine->setPatternProvider(
         [](int idx) -> const RhythmPattern* { return g_rhythmEngine->patternAt(idx); });
     g_editEngine->setMidiSendCallback([](const std::vector<uint8_t>& bytes) {
@@ -329,6 +389,27 @@ void setup() {
     g_presetEngine = new PresetEngine(g_state, *g_adapters.storage, *g_display);
     g_presetEngine->setModeChangedCallback([]() { g_chordEngine->onModeChanged(); });
     g_editEngine->setAnyEditCallback([]() { g_presetEngine->recomputeDirty(); });
+
+    g_patternEditor = new PatternEditorEngine(
+        g_state, *g_adapters.storage, *g_display, *g_router,
+        *g_rhythmEngine, *g_bassEngine, *g_chordEngine);
+    g_patternEditor->setModifiedCallback([]() {
+        if (g_presetEngine) g_presetEngine->recomputeDirty();
+    });
+    g_patternEditor->setWriteAllowedCallback([]() {
+        return !(g_msc && g_msc->driveEnabled());
+    });
+    g_editEngine->setPatternEditCallback([](EditMenu menu) {
+        if (g_msc && g_msc->driveEnabled()) {
+            if (g_display) {
+                g_display->showValue("USB drive active", "Pattern edit off",
+                                     false, nowUs());
+            }
+            return;
+        }
+        if (g_sequencer) g_sequencer->stopAll(true);
+        if (g_patternEditor) g_patternEditor->open(menu, nowUs());
+    });
 
     g_sequencer = new SequencerEngine(g_state, *g_adapters.storage,
                                       *g_chordEngine, *g_display);
@@ -404,6 +485,8 @@ void setup() {
 void loop() {
     if (!g_adapters.input) return;
 
+    uint64_t loop_start_us = nowUs();
+    serviceRealtimeMidi();
     uint64_t now_us = nowUs();
 
     // MSC eject: the host has finished writing/removing the drive. Reboot after
@@ -431,6 +514,7 @@ void loop() {
     // not process any input until the file is fixed and the device rebooted.
     if (g_keymapError) {
         if (g_display) g_display->update(now_us);
+        serviceRealtimeMidi();
         delay(1);
 #if defined(ARDUINO_ARCH_RP2040)
         rp2040.wdt_reset();
@@ -445,6 +529,7 @@ void loop() {
         if (!inputConnected && g_wasConnected) {
             logWarn("Keyboard disconnected: releasing notes");
             if (g_sequencer) g_sequencer->stopAll(true);
+            if (g_patternEditor) g_patternEditor->stopAll(now_us);
             cancelChordStrum();
             g_ledDirty = false;
         } else if (inputConnected && !g_wasConnected) {
@@ -454,8 +539,18 @@ void loop() {
     g_hotplugArmed = true;
     g_wasConnected = inputConnected;
 
+    // Playback runs before key/UI dispatch so a menu operation cannot delay
+    // sequence/bass/pattern output that is already due.
+    g_sequencer->update(nowUs());
+    g_chordEngine->update(nowUs());
+    g_strumEngine->update(nowUs());
+    g_bassEngine->update(nowUs());
+    if (g_patternEditor) g_patternEditor->update(nowUs());
+    serviceRealtimeMidi();
+
     auto events = g_adapters.input->poll();
     for (const auto& ev : events) {
+        serviceRealtimeMidi();
         logKeyEvent(ev.hid_usage, ev.pressed, ev.modifiers, ev.usage_page);
 
         if (ev.pressed) {
@@ -489,6 +584,7 @@ void loop() {
             if (t == KeyCmd::ClearEdit &&
                 g_state.editMenu == EditMenu::None &&
                 !g_state.cursorActive &&
+                !(g_patternEditor && g_patternEditor->active()) &&
                 !g_presetEngine->promptActive() &&
                 !g_presetEngine->nameEditing()) {
                 cancelChordStrum();
@@ -501,6 +597,7 @@ void loop() {
             if (ev.hid_usage == 0x2A /* Backspace */ &&
                 g_state.editMenu == EditMenu::None &&
                 !g_state.cursorActive &&
+                !(g_patternEditor && g_patternEditor->active()) &&
                 !g_presetEngine->promptActive() &&
                 !g_presetEngine->nameEditing()) {
                 g_chordEngine->resetVoicing();
@@ -513,6 +610,7 @@ void loop() {
             // While the Mass Storage drive is presented the host owns the
             // filesystem: suppress preset save/clear to avoid FAT corruption.
             if (g_msc && g_msc->driveEnabled() &&
+                !(g_patternEditor && g_patternEditor->active()) &&
                 (t == KeyCmd::PresetSave || t == KeyCmd::PresetClear)) {
                 logWarn("Preset save/clear disabled while MSC drive is active");
                 if (g_display) {
@@ -521,6 +619,22 @@ void loop() {
                 }
                 continue;
             }
+        }
+
+        // M17 pattern editor owns the keyboard while open. Chord-grid keys
+        // fall through to the chord engine so the instrument stays playable.
+        if (g_patternEditor && g_patternEditor->active()) {
+            if (g_patternEditor->handleKeyEvent(ev, now_us)) {
+                continue;
+            }
+            // Chord keys and direct parameter actions are forwarded while the
+            // editor is open. EditEngine handles parameter actions; chord keys
+            // fall through to the chord engine. Strum is intentionally skipped.
+            if (g_editEngine->handleKeyEvent(ev, now_us)) {
+                continue;
+            }
+            g_chordEngine->handleKeyEvent(ev, now_us);
+            continue;
         }
 
         // M14 sequence controls are global performance shortcuts. They are
@@ -569,10 +683,11 @@ void loop() {
         }
     }
 
+    now_us = nowUs();
+
     // Beat LED (FR-R8): Core 1 posts a flash request; Core 0 owns the on/off
     // state — deterministic off after led_flash_ms, retried until the report
-    // is queued so a dropped SET_REPORT can't leave the LED stuck on. Handle
-    // this before the LCD/engine updates so the flash is not delayed by them.
+    // is queued so a dropped SET_REPORT can't leave the LED stuck on.
     if (g_state.ledIndicator.flash) {
         g_state.ledIndicator.flash = false;
         g_ledOn = true;
@@ -588,13 +703,11 @@ void loop() {
             g_ledDirty = false;   // retry on the next loop if not queued
         }
     }
+    serviceRealtimeMidi();
 
-    g_sequencer->update(nowUs());
-    g_chordEngine->update(nowUs());
-    g_strumEngine->update(nowUs());
-    g_bassEngine->update(nowUs());
-    g_presetEngine->update(nowUs());
-    g_editEngine->update(nowUs());
+    // UI-only engines and display are lower priority than playback.
+    g_presetEngine->update(now_us);
+    g_editEngine->update(now_us);
 
     // Drum audition note-off (one-shot).
     if (g_auditionNote != 0xFF && nowUs() >= g_auditionOffAtUs) {
@@ -602,25 +715,20 @@ void loop() {
         g_auditionNote = 0xFF;
     }
 
-    // Render the LCD idle/edit/prompt frame from the live state.
-    if (g_display) {
-        g_display->update(nowUs());
-    }
+    serviceRealtimeMidi();
 
-    // Drain rhythm MIDI events produced on Core 1 (single-threaded UART write).
-    MidiMessage msg;
-    while (g_rhythmQueue.pop(msg)) {
-        g_router->sendRaw(msg);
+    // Render the LCD only when it will not sit in front of due playback data.
+    uint64_t display_now = nowUs();
+    if (g_display && displayUpdateAllowed(display_now)) {
+        g_display->update(display_now);
+        g_lastDisplayUpdateUs = display_now;
     }
-
-    // Push any queued MIDI bytes out of the UART FIFO before the next poll so a
-    // burst of note-offs (e.g. a rapid strum sweep) is never left stranded.
-    g_router->flush();
+    serviceRealtimeMidi();
 
     // NFR-1/NFR-2 instrumentation: summarize Core 0 loop time, per-event
-    // key-to-MIDI latency, and Core 1 clock jitter over CDC every 5 s.
+    // key-to-MIDI latency, rhythm dispatch latency, and Core 1 clock jitter.
     uint64_t end_us = nowUs();
-    g_latencyStats.record(static_cast<uint32_t>(end_us - now_us));
+    g_latencyStats.record(static_cast<uint32_t>(end_us - loop_start_us));
     if (end_us - g_lastPerfLogUs >= kPerfLogIntervalUs) {
         g_lastPerfLogUs = end_us;
         logPerf("core0-loop-us", g_latencyStats.count(), g_latencyStats.minUs(),
@@ -631,6 +739,23 @@ void loop() {
                 g_keyLatencyStats.minUs(), g_keyLatencyStats.maxUs(),
                 g_keyLatencyStats.avgUs());
         g_keyLatencyStats.reset();
+
+        logPerf("rhythm-dispatch-us", g_rhythmDispatchStats.count(),
+                g_rhythmDispatchStats.minUs(), g_rhythmDispatchStats.maxUs(),
+                g_rhythmDispatchStats.avgUs());
+        g_rhythmDispatchStats.reset();
+
+        logPerf("realtime-gap-us", g_realtimeGapStats.count(),
+                g_realtimeGapStats.minUs(), g_realtimeGapStats.maxUs(),
+                g_realtimeGapStats.avgUs());
+        g_realtimeGapStats.reset();
+
+        size_t depth = g_rhythmQueue.size();
+        logPerf("rhythm-queue", g_rhythmQueueOverflow, 0,
+                static_cast<uint32_t>(g_rhythmQueueMaxDepth),
+                static_cast<uint32_t>(depth));
+        g_rhythmQueueOverflow = 0;
+        g_rhythmQueueMaxDepth = 0;
 
         PerfStats jitter;
         if (g_rhythmEngine) g_rhythmEngine->jitterStats(jitter, true);

@@ -129,7 +129,7 @@ def synthesize_bass_bar(bass, tempo_bpm: float, root_midi: int = 48):
     """
     if _np is None:
         return None
-    blueprint = {0: 0, 1: 4, 2: 7, 3: 9}  # degree -> semitone offset
+    blueprint = {0: 0, 1: 4, 2: 7, 3: 9, 4: 12}  # degree -> semitone offset
     steps = max(bass.steps_per_bar, 1)
     step_s = _step_duration_seconds(tempo_bpm)
     bar = _np.zeros(int(steps * step_s * SAMPLE_RATE) + SAMPLE_RATE // 8,

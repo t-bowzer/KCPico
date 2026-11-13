@@ -26,6 +26,7 @@ constexpr int8_t BASS_DEGREE_ROOT           = 0;
 constexpr int8_t BASS_DEGREE_THIRD          = 1;
 constexpr int8_t BASS_DEGREE_FIFTH          = 2;
 constexpr int8_t BASS_DEGREE_SIXTH_SEVENTH  = 3;
+constexpr int8_t BASS_DEGREE_ROOT_OCTAVE    = 4;  // root one octave higher
 
 
 struct BassPattern {
@@ -49,7 +50,11 @@ struct BassLibrary {
 // `out` untouched on malformed input or when the pattern has no note data.
 bool parseBassPattern(const std::string& json, BassPattern& out);
 
-// Semitone offset above the chord root for a chord-degree code (0..3), per
+// Serializes a bass pattern to JSON. Compact is the on-device user-pattern
+// form; pretty is available for configurator-style files and tests.
+std::string serializeBassPattern(const BassPattern& p, bool pretty = false);
+
+// Semitone offset above the chord root for a chord-degree code (0..4), per
 // chord type (reuses the spec 6.8 walking blueprint). Returns -1 for an
 // invalid/out-of-range degree.
 int bassDegreeOffset(ChordType type, int degree);

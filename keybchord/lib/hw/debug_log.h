@@ -27,6 +27,16 @@
 inline bool g_debugLogEnabled   = true;
 inline bool g_midiMonitorEnabled = true;
 
+#if KB_LOG_ON
+// Never let diagnostic output block the real-time MIDI/rhythm path. If the
+// USB-CDC FIFO does not have room for a whole line, drop it.
+inline bool logSpace(size_t need) {
+    return Serial.availableForWrite() >= static_cast<int>(need);
+}
+#else
+inline bool logSpace(size_t) { return false; }
+#endif
+
 inline void logInit() {
 #if KB_LOG_ON
     Serial.begin(115200);
@@ -38,7 +48,7 @@ inline void logInit() {
 inline void logKeyEvent(uint16_t usage, bool pressed, uint8_t mods,
                         uint8_t page = hid_usage::PAGE_KEYBOARD) {
 #if KB_LOG_ON
-    if (!g_debugLogEnabled) return;
+    if (!g_debugLogEnabled || !logSpace(160)) return;
     unsigned long t = millis();
     Serial.print("[");
     Serial.print(t);
@@ -55,7 +65,7 @@ inline void logKeyEvent(uint16_t usage, bool pressed, uint8_t mods,
 
 inline void logMidiOut(uint8_t status, uint8_t data1, uint8_t data2) {
 #if KB_LOG_ON
-    if (!g_midiMonitorEnabled) return;
+    if (!g_midiMonitorEnabled || !logSpace(160)) return;
     unsigned long t = millis();
     Serial.print("[");
     Serial.print(t);
@@ -85,7 +95,7 @@ inline void logMidiOut(uint8_t status, uint8_t data1, uint8_t data2) {
 
 inline void logMidiOutBytes(const uint8_t* data, size_t length) {
 #if KB_LOG_ON
-    if (!g_midiMonitorEnabled || !data) return;
+    if (!g_midiMonitorEnabled || !data || !logSpace(160)) return;
     unsigned long t = millis();
     Serial.print("[");
     Serial.print(t);
@@ -103,7 +113,7 @@ inline void logMidiOutBytes(const uint8_t* data, size_t length) {
 
 inline void logStrumPlay(uint8_t idx, uint8_t note, uint8_t channel, int16_t duration_ms) {
 #if KB_LOG_ON
-    if (!g_debugLogEnabled) return;
+    if (!g_debugLogEnabled || !logSpace(160)) return;
     unsigned long t = millis();
     Serial.print("[");
     Serial.print(t);
@@ -120,7 +130,7 @@ inline void logStrumPlay(uint8_t idx, uint8_t note, uint8_t channel, int16_t dur
 
 inline void logStrumEdit(const char* param, int16_t value) {
 #if KB_LOG_ON
-    if (!g_debugLogEnabled) return;
+    if (!g_debugLogEnabled || !logSpace(160)) return;
     unsigned long t = millis();
     Serial.print("[");
     Serial.print(t);
@@ -133,7 +143,7 @@ inline void logStrumEdit(const char* param, int16_t value) {
 
 inline void logLed(uint8_t usage, bool on, bool ok) {
 #if KB_LOG_ON
-    if (!g_debugLogEnabled) return;
+    if (!g_debugLogEnabled || !logSpace(160)) return;
     unsigned long t = millis();
     Serial.print("[");
     Serial.print(t);
@@ -148,7 +158,7 @@ inline void logLed(uint8_t usage, bool on, bool ok) {
 
 inline void logLedComplete(uint8_t dev_addr, uint16_t len) {
 #if KB_LOG_ON
-    if (!g_debugLogEnabled) return;
+    if (!g_debugLogEnabled || !logSpace(160)) return;
     unsigned long t = millis();
     Serial.print("[");
     Serial.print(t);
@@ -162,7 +172,7 @@ inline void logLedComplete(uint8_t dev_addr, uint16_t len) {
 inline void logPerf(const char* label, uint32_t count, uint32_t minUs,
                     uint32_t maxUs, uint32_t avgUs) {
 #if KB_LOG_ON
-    if (!g_debugLogEnabled) return;
+    if (!g_debugLogEnabled || !logSpace(120)) return;
     Serial.print("[PERF] ");
     Serial.print(label);
     Serial.print(" n=");
@@ -179,7 +189,7 @@ inline void logPerf(const char* label, uint32_t count, uint32_t minUs,
 
 inline void logInfo(const char* msg) {
 #if KB_LOG_ON
-    if (!g_debugLogEnabled) return;
+    if (!g_debugLogEnabled || !logSpace(80)) return;
     Serial.print("[INFO] ");
     Serial.println(msg);
 #endif
@@ -187,7 +197,7 @@ inline void logInfo(const char* msg) {
 
 inline void logWarn(const char* msg) {
 #if KB_LOG_ON
-    if (!g_debugLogEnabled) return;
+    if (!g_debugLogEnabled || !logSpace(80)) return;
     Serial.print("[WARN] ");
     Serial.println(msg);
 #endif
@@ -195,7 +205,7 @@ inline void logWarn(const char* msg) {
 
 inline void logError(const char* msg) {
 #if KB_LOG_ON
-    if (!g_debugLogEnabled) return;
+    if (!g_debugLogEnabled || !logSpace(80)) return;
     Serial.print("[ERROR] ");
     Serial.println(msg);
 #endif

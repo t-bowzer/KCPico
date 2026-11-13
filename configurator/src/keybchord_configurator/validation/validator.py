@@ -12,10 +12,15 @@ Two layers:
 
 from __future__ import annotations
 
+import json
 from typing import Any, Optional
 
-from ..models.bass import BASS_NAMES, BASS_DEGREE_REST
-from ..models.chordpattern import CHORD_MASK_SEVENTH, CHORD_PATTERN_NAMES
+from ..models.bass import BASS_DEGREE_REST, BASS_FILES, BASS_NAMES
+from ..models.chordpattern import (
+    CHORD_MASK_SEVENTH,
+    CHORD_PATTERN_FILES,
+    CHORD_PATTERN_NAMES,
+)
 from ..models.bounds import (
     BASE_ROOT_MIDI_MAX,
     BASE_ROOT_MIDI_MIN,
@@ -45,6 +50,11 @@ from ..models.bounds import (
     MAX_BASS_PATTERNS,
     MAX_CHORD_PATTERNS,
     MAX_RHYTHMS,
+    ALL_PATTERN_BUDGET_BYTES,
+    USER_PATTERN_BUDGET_BYTES,
+    RHYTHM_FILE_MAX_BYTES,
+    BASS_FILE_MAX_BYTES,
+    CHORD_FILE_MAX_BYTES,
     MAX_SEQUENCE_EVENTS,
     NOTE_DURATION_MAX,
     NOTE_DURATION_MIN,
@@ -109,7 +119,7 @@ from ..models.macro import (
 )
 from ..models.midi import MAX_MIDI_BYTES, MAX_MIDI_DELAY_MS
 from ..models.preset import DRUM_PIECES
-from ..models.rhythm import RHYTHM_NAMES
+from ..models.rhythm import RHYTHM_FILES, RHYTHM_NAMES
 from ..models.sequence import parse_chord_id
 from .errors import ValidationResult
 
@@ -763,6 +773,52 @@ def _validate_preset_slot(result: ValidationResult, where: str, slot: dict,
 
 # --- patterns -------------------------------------------------------------
 
+def validate_pattern_library(rhythms: list[tuple[str, Any]],
+                             bass: list[tuple[str, Any]],
+                             chordpatterns: list[tuple[str, Any]]
+                             ) -> ValidationResult:
+    """Validate per-kind caps and the combined rhythm/bass/chord budget.
+
+    Sizes use compact JSON, matching the files the firmware writes on device and
+    the configurator now writes for pattern libraries.
+    """
+    result = ValidationResult()
+    groups = (
+        ("rhythm", rhythms, MAX_RHYTHMS, RHYTHM_FILE_MAX_BYTES,
+         RHYTHM_FILES),
+        ("bass", bass, MAX_BASS_PATTERNS, BASS_FILE_MAX_BYTES, BASS_FILES),
+        ("chord", chordpatterns, MAX_CHORD_PATTERNS, CHORD_FILE_MAX_BYTES,
+         CHORD_PATTERN_FILES),
+    )
+    all_bytes = 0
+    user_bytes = 0
+    for label, entries, max_count, file_cap, builtin_files in groups:
+        if len(entries) > max_count:
+            result.add_error(
+                f"{label} patterns: {len(entries)} files (max {max_count})")
+        for filename, data in entries:
+            try:
+                size = len(json.dumps(data, separators=(",", ":"),
+                                      ensure_ascii=False))
+            except (TypeError, ValueError):
+                continue
+            all_bytes += size
+            if filename not in builtin_files:
+                user_bytes += size
+            if size > file_cap:
+                result.add_error(
+                    f"{label} '{filename}': file is {size} bytes "
+                    f"(max {file_cap})")
+    if all_bytes > ALL_PATTERN_BUDGET_BYTES:
+        result.add_error(
+            f"pattern library: {all_bytes} bytes "
+            f"(max {ALL_PATTERN_BUDGET_BYTES})")
+    if user_bytes > USER_PATTERN_BUDGET_BYTES:
+        result.add_error(
+            f"user patterns: {user_bytes} bytes "
+            f"(max {USER_PATTERN_BUDGET_BYTES})")
+    return result
+
 def validate_rhythm(data: Any, *, filename: str = "") -> ValidationResult:
     result = ValidationResult()
     where = f"rhythm '{filename}'" if filename else "rhythm"
@@ -854,9 +910,9 @@ def validate_bass(data: Any, *, filename: str = "") -> ValidationResult:
         return result
 
     for v in step_data:
-        if not _is_int(v) or v < BASS_DEGREE_REST or v > 3:
+        if not _is_int(v) or v < BASS_DEGREE_REST or v > 4:
             result.add_warning(f"{where}: 'steps' values must be integers "
-                               f"-1..3 (non-integers become -1, out-of-range "
+                               f"-1..4 (non-integers become -1, out-of-range "
                                f"values are clamped)")
             break
 

@@ -15,7 +15,7 @@ const ParamId kChordParams[] = {
     ParamId::ChordDuration, ParamId::ChordVelocity, ParamId::ChordPan,
     ParamId::ChordRoll, ParamId::ChordMinNotes, ParamId::ChordMinInterval,
     ParamId::ChordInversion, ParamId::ChordArpMode, ParamId::ChordArpRate,
-    ParamId::ChordPattern,
+    ParamId::ChordPattern, ParamId::ChordPatternEdit,
 };
 
 const ParamId kStrumParams[] = {
@@ -27,12 +27,13 @@ const ParamId kStrumParams[] = {
 const ParamId kRhythmParams[] = {
     ParamId::RhythmTempo, ParamId::RhythmSwing, ParamId::RhythmPattern,
     ParamId::RhythmMute, ParamId::RhythmEnable, ParamId::RhythmClock,
-    ParamId::RhythmLed,
+    ParamId::RhythmLed, ParamId::RhythmPatternEdit,
 };
 
 const ParamId kBassParams[] = {
     ParamId::BassEnable, ParamId::BassOctave, ParamId::BassDuration,
     ParamId::BassVelocity, ParamId::BassChannel, ParamId::BassPattern,
+    ParamId::BassPatternEdit,
 };
 
 const ParamId kSequenceParams[] = {
@@ -56,7 +57,7 @@ const ParamId kDrumParams[] = {
 
 const char* const kTitles[] = {
     "", "Chord Edit", "Strum Edit", "Rhythm Edit", "Bass Edit", "Drum Edit",
-    "Seq Edit",
+    "Seq Edit", "Chord Pattern", "Rhythm Pattern", "Bass Pattern",
 };
 
 const char* const kShortName[] = {
@@ -74,6 +75,7 @@ const char* const kShortName[] = {
     "Conga Hi", "Conga Hi Vel", "Clave", "Clave Vel",
     "Shaker", "Shaker Vel",
     "Slot", "Bars", "Settings",
+    "Edit Pattern", "Edit Pattern", "Edit Pattern",
 };
 
 const char* const kFullName[] = {
@@ -94,6 +96,7 @@ const char* const kFullName[] = {
     "Conga Hi Note", "Conga Hi Vel", "Clave Note", "Clave Vel",
     "Shaker Note", "Shaker Vel",
     "Sequence Slot", "Sequence Bars", "Sequence Settings",
+    "Edit Chord Pattern", "Edit Rhythm Pattern", "Edit Bass Pattern",
 };
 
 const char* const kPcNames[12] = {
@@ -294,6 +297,11 @@ std::string paramValueString(const StateManager& state, ParamId id) {
             return std::to_string(state.sequencer.bars);
         case ParamId::SeqSettings:
             return state.sequencer.useRecorded ? "Recorded" : "Live";
+
+        case ParamId::ChordPatternEdit:
+        case ParamId::RhythmPatternEdit:
+        case ParamId::BassPatternEdit:
+            return "Open";
 
         default: return "";
     }

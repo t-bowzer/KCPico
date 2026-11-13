@@ -105,7 +105,7 @@ TEST_F(PresetEngineTest, SuperHomeEndMoveBank) {
 }
 
 TEST_F(PresetEngineTest, HomeLeavesEditMenu) {
-    route(key(0x44, true));   // F11 -> Rhythm Edit
+    route(key(0x43, true));   // F10 -> Rhythm Edit
     EXPECT_EQ(state_.editMenu, EditMenu::Rhythm);
 
     route(key(HOME, true));   // Home -> cursor mode, leaves edit menu
@@ -117,7 +117,7 @@ TEST_F(PresetEngineTest, MenuToggleLeavesCursorMode) {
     route(key(HOME, true));
     EXPECT_TRUE(state_.cursorActive);
 
-    route(key(0x44, true));   // F11 -> Rhythm Edit
+    route(key(0x43, true));   // F10 -> Rhythm Edit
     EXPECT_FALSE(state_.cursorActive);
     EXPECT_EQ(state_.editMenu, EditMenu::Rhythm);
 }
@@ -514,10 +514,10 @@ TEST_F(PresetEngineTest, ConsumerVolumeAndMuteRouteThroughMainAndMenu) {
     EXPECT_EQ(state_.pendingRhythm.tempo, 120);
 
     // Menu browsing: volume scrolls; Mute selects.
-    route(key(0x44, true));   // F11 -> Rhythm (Tempo)
+    route(key(0x43, true));   // F10 -> Rhythm (Tempo)
     route(key(hid_usage::CONSUMER_VOLUME_DOWN, true, 0,
               hid_usage::PAGE_CONSUMER));
-    EXPECT_EQ(state_.editParam, 6);   // wrapped to Beat LED
+    EXPECT_EQ(state_.editParam, 7);   // wrapped to Edit Pattern
     route(key(hid_usage::CONSUMER_VOLUME_UP, true, 0,
               hid_usage::PAGE_CONSUMER));
     EXPECT_EQ(state_.editParam, 0);   // back to Tempo

@@ -64,6 +64,11 @@ struct RhythmLibrary {
 // leaves `out` untouched on malformed input.
 bool parseRhythmPattern(const std::string& json, RhythmPattern& out);
 
+// Serializes a rhythm pattern to JSON (spec section 7.2). Compact is the
+// on-device user-pattern form; pretty is available for configurator-style files
+// and tests.
+std::string serializeRhythmPattern(const RhythmPattern& p, bool pretty = false);
+
 // Base 16th-note step duration (us) for a tempo in BPM (integer division).
 uint32_t stepUs(uint16_t bpm);
 

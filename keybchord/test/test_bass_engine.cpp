@@ -7,6 +7,7 @@
 #include "chord_engine.h"
 #include "midi_router.h"
 #include "recording_midi_out.h"
+#include "rhythm.h"
 #include "state.h"
 #include "storage_stub.h"
 
@@ -113,10 +114,52 @@ TEST_F(BassEngineTest, WaltzChopsToThreeBeats) {
     EXPECT_EQ(lastNoteOn(3), 48);
 }
 
-// Bass is silent while the rhythm is not running (FR-B4).
-TEST_F(BassEngineTest, SilentWhenRhythmStopped) {
+// Bass free-runs at the preset tempo when the rhythm is stopped, so the bass is
+// audible without drums. The first step starts one 16th after entering the
+// stopped state to avoid an extra note right at a running->stopped transition.
+TEST_F(BassEngineTest, FreeRunsWhenRhythmStopped) {
     state_.rhythmClock.running = false;
+    const uint64_t step = stepUs(state_.pendingRhythm.tempo);
+
     bass_->update(0);
+    EXPECT_EQ(lastNoteOn(3), -1);
+
+    bass_->update(step);                 // step 0 -> root
+    EXPECT_EQ(lastNoteOn(3), 48);
+
+    uint64_t now = step;
+    for (int i = 0; i < 4; i++) {        // steps 1..4 -> beat 2 third
+        now += step;
+        bass_->update(now);
+    }
+    EXPECT_EQ(lastNoteOn(3), 52);
+}
+
+// Starting the rhythm resyncs to the shared step counter without replaying the
+// free-run position or double-triggering.
+TEST_F(BassEngineTest, RhythmStartResyncsFreeRun) {
+    state_.rhythmClock.running = false;
+    const uint64_t step = stepUs(state_.pendingRhythm.tempo);
+    bass_->update(step);                 // free-run root
+
+    midi_.clear();
+    state_.rhythmClock.running = true;
+    state_.rhythmClock.stepsPerBar = 16;
+    state_.rhythmClock.stepAbs = 5;      // already mid-bar; resync only
+    bass_->update(step + 1);
+    EXPECT_EQ(lastNoteOn(3), -1);
+
+    state_.rhythmClock.stepAbs = 9;      // step 8 -> fifth
+    bass_->update(step + 2);
+    EXPECT_EQ(lastNoteOn(3), 55);
+}
+
+TEST_F(BassEngineTest, FreeRunStopsWhenDisabled) {
+    state_.rhythmClock.running = false;
+    state_.pendingBass.enabled = false;
+    const uint64_t step = stepUs(state_.pendingRhythm.tempo);
+
+    bass_->update(step);
     EXPECT_EQ(lastNoteOn(3), -1);
 }
 

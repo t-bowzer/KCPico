@@ -47,6 +47,16 @@ void RhythmEngine::setPattern(const RhythmPattern& p, int index) {
     patterns_[index] = p;
 }
 
+void RhythmEngine::stagePatterns(std::vector<RhythmPattern> patterns) {
+    // Tiny spinlock: the save/reload path is infrequent and Core 1 only takes
+    // it when a swap is actually pending. No std::mutex on the embedded core.
+    while (patternsBusy_.exchange(true, std::memory_order_acquire)) {
+    }
+    pendingPatterns_ = std::move(patterns);
+    patternsPending_.store(true, std::memory_order_release);
+    patternsBusy_.store(false, std::memory_order_release);
+}
+
 const RhythmPattern* RhythmEngine::currentPattern() const {
     int idx = state_.pendingRhythm.pattern;
     if (idx < 0 || idx >= static_cast<int>(patterns_.size())) return nullptr;
@@ -54,8 +64,14 @@ const RhythmPattern* RhythmEngine::currentPattern() const {
 }
 
 const RhythmPattern* RhythmEngine::patternAt(int index) const {
-    if (index < 0 || index >= static_cast<int>(patterns_.size())) return nullptr;
-    return &patterns_[index];
+    while (patternsBusy_.exchange(true, std::memory_order_acquire)) {
+    }
+    const RhythmPattern* out = nullptr;
+    if (index >= 0 && index < static_cast<int>(patterns_.size())) {
+        out = &patterns_[index];
+    }
+    patternsBusy_.store(false, std::memory_order_release);
+    return out;
 }
 
 void RhythmEngine::onPatternChanged() {
@@ -116,11 +132,11 @@ void RhythmEngine::advanceClock(uint64_t now_us) {
                 clockTickIndex_ % 24 == 0) {
                 // Explicit resync: reset the slave's beat counter exactly on
                 // the LED's beat boundary, then continue the clock stream.
-                out_.push(midi::makeSystem(midi::SYSTEM_START));
+                out_.push(midi::makeSystem(midi::SYSTEM_START), now_us);
                 clockResyncPending_ = false;
             }
             if (clockOutActive_) {
-                out_.push(midi::makeSystem(midi::SYSTEM_CLOCK));
+                out_.push(midi::makeSystem(midi::SYSTEM_CLOCK), now_us);
             }
         }
         // Beat boundary every 24 ticks: the beat LED follows the master clock.
@@ -142,6 +158,24 @@ void RhythmEngine::advanceClock(uint64_t now_us) {
 }
 
 void RhythmEngine::update(uint64_t now_us) {
+    const bool rebase = rebasePending_.exchange(false);
+
+    // Apply a pattern-library replacement staged by Core 0 (pattern editor).
+    if (patternsPending_.load(std::memory_order_acquire)) {
+        while (patternsBusy_.exchange(true, std::memory_order_acquire)) {
+        }
+        if (patternsPending_.load(std::memory_order_acquire)) {
+            patterns_ = std::move(pendingPatterns_);
+            pendingPatterns_.clear();
+            patternsPending_.store(false, std::memory_order_release);
+            if (!patterns_.empty() &&
+                state_.pendingRhythm.pattern >= patterns_.size()) {
+                state_.pendingRhythm.pattern = 0;
+            }
+        }
+        patternsBusy_.store(false, std::memory_order_release);
+    }
+
     // 1. Master clock first: it is never preempted or skipped.
     advanceClock(now_us);
 
@@ -164,13 +198,37 @@ void RhythmEngine::update(uint64_t now_us) {
     if (!running_) return;
 
     const RhythmPattern* pat = currentPattern();
-    if (!pat) return;
+    if (!pat) {
+        // A stale preset index must not freeze the clock snapshot: recover to the
+        // first loaded pattern so Core 0 can keep recording/previewing.
+        if (!patterns_.empty()) {
+            state_.pendingRhythm.pattern = 0;
+            pat = currentPattern();
+        }
+        if (!pat) {
+            stop();
+            return;
+        }
+    }
 
     // Steps are exactly CLOCK_TICKS_PER_STEP (=6) clock ticks, so the drums stay
     // phase-locked to the clock (using stepUs() directly would drift by the
     // integer-division remainder each step).
     uint32_t base = clockTickUs(rp.tempo) * CLOCK_TICKS_PER_STEP;
     int spb = pat->steps_per_bar;
+    if (spb <= 0) spb = 16;
+
+    if (rebase) {
+        // A UI/storage stall already delayed output; skip missed steps instead
+        // of firing a catch-up burst, keeping the clock phase intact.
+        while (stepDeadlineUs_ <= now_us) {
+            step_ = (step_ + 1) % static_cast<uint32_t>(spb);
+            stepAbs_++;
+            if (step_ == 0) barStartUs_ += static_cast<uint64_t>(spb) * base;
+            stepDeadlineUs_ = barStartUs_ +
+                stepOffsetUs(static_cast<int>(step_), base, rp.swing);
+        }
+    }
 
     // Fire every step whose deadline has passed, then schedule the next.
     while (stepDeadlineUs_ <= now_us) {
@@ -232,10 +290,13 @@ void RhythmEngine::fireStep(uint64_t now_us) {
             stepAbs_ >= state_.recordGuideHatsStartAbs.load() &&
             step_ % RHYTHM_STEPS_PER_BEAT == 0) {
             uint8_t vel = (step_ == 0) ? 110 : 90;
-            out_.push(midi::makeNoteOn(rp.channel, rp.drums.hihat, vel));
+            out_.push(midi::makeNoteOn(rp.channel, rp.drums.hihat, vel), now_us);
         }
         return;
     }
+
+    // Pattern editor owns preview/audition; suppress the normal pattern.
+    if (state_.patternEditorActive.load()) return;
 
     const RhythmPattern* pat = currentPattern();
     if (!pat) return;
@@ -246,7 +307,7 @@ void RhythmEngine::fireStep(uint64_t now_us) {
             uint8_t note = mapDrumNote(e.note, rp.drums);
             uint8_t vel  = mapDrumVelocity(e.note, rp.drums, e.velocity);
             if (vel == 0) continue;  // piece muted via the "off" velocity override
-            out_.push(midi::makeNoteOn(rp.channel, note, vel));
+            out_.push(midi::makeNoteOn(rp.channel, note, vel), now_us);
         }
     }
 }

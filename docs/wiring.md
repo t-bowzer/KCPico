@@ -18,8 +18,8 @@ pin functions and power specs, see Spec §2.2.
 | Pico pin | Signal | Routes to |
 |---|---|---|
 | `VBUS` (40) | 5 V | keyboard USB-A receptacle `VBUS` (pin 1) |
-| `3V3 OUT` (36) | 3.3 V rail | CH559 `VIN5` (41) + `VDD33` (42); LCD `VCC`; programming header `3V3`; MIDI source (`DIN 4` / `TRS ring`) via **33 Ω**; BOOT pull-up via **10 kΩ** |
-| `GND` (3, 8, …) | ground | CH559 `GND` (18); keyboard `GND` (pin 4); LCD `GND`; programming header `GND`; MIDI `GND` (`DIN 2` / `TRS sleeve`); RESET switch |
+| `3V3 OUT` (36) | 3.3 V rail | CH559 `VIN5` (41) + `VDD33` (42); LCD `VCC`; MIDI source (`DIN 4` / `TRS ring`) via **33 Ω**. The programming header's `3V3` pin is **intentionally NC** on the v0.2 PCB (the CH559 is already powered from this rail). |
+| `GND` (3, 8, …) | ground | CH559 `GND` (18); keyboard `GND` (pin 4); LCD `GND`; programming header `GND`; MIDI `GND` (`DIN 2` / `TRS sleeve`); BOOT switch |
 | `GP0` (1) | UART0 TX | CH559 `RXD1` (27) |
 | `GP1` (2) | UART0 RX | CH559 `TXD1` (28) |
 | `GP4` (6) | I2C0 SDA | LCD/PCF8574 `SDA` |
@@ -34,12 +34,13 @@ pin functions and power specs, see Spec §2.2.
 | `TXD1` (28) | UART TX | Pico `GP1` (RX) |
 | `HP` (29) | host D+ | USB-A `D+` (pin 3) via **22 Ω** |
 | `HM` (30) | host D− | USB-A `D−` (pin 2) via **22 Ω** |
-| `DP` (31) | device D+ | programming header `DP`; BOOT button via **10 kΩ** to `3V3` |
+| `DP` (31) | device D+ | programming header `DP` |
 | `DM` (32) | device D− | programming header `DM` |
 | `VIN5` (41) | 3.3 V | Pico `3V3 OUT`; **0.1 µF** decoupling to `GND` |
 | `VDD33` (42) | 3.3 V | Pico `3V3 OUT`; **0.1 µF** decoupling to `GND` |
 | `GND` (18) | ground | Pico `GND` |
-| `RST` (3) | reset | RESET button → `GND` |
+| `P4.6/XI/SCS` (16) | BOOT | BOOT switch → `GND` (hold at power-up) |
+| `RST` (3) | reset | no board reset button; power-cycle to reset |
 
 ### USB-A receptacle (keyboard host)
 
@@ -57,7 +58,7 @@ pin functions and power specs, see Spec §2.2.
 | `DP` | CH559 `DP` (31) |
 | `DM` | CH559 `DM` (32) |
 | `GND` | Pico `GND` |
-| `3V3` | Pico `3V3 OUT` (reference only) |
+| `3V3` | **NC on the v0.2 PCB** (optional power reference only) |
 
 ### DIN-5 MIDI OUT
 
@@ -136,7 +137,7 @@ digraph KeybChord {
         C_VIN [label="0.1µF"];
         C_VDD [label="0.1µF"];
         CGN [label="GND (18)"];
-        CRST [label="RST (3)"];
+        CP46 [label="P4.6 (16)"];
     }
 
     subgraph cluster_kbd {
@@ -152,14 +153,12 @@ digraph KeybChord {
         PDP [label="DP"];
         PDM [label="DM"];
         PGN [label="GND"];
-        PV3 [label="3V3"];
+        PV3 [label="3V3 (NC)"];
     }
 
     BOOT [label="BOOT button"];
-    RESET [label="RESET button"];
     R_HP [label="22Ω"];
     R_HM [label="22Ω"];
-    R_BOOT [label="10kΩ"];
 
     subgraph cluster_midi {
         label="MIDI OUT (DIN-5 + TRS, parallel)";
@@ -208,14 +207,12 @@ digraph KeybChord {
     CV5 -> C_VIN -> GND;
     CVD -> C_VDD -> GND;
     V33 -> LVCC;
-    V33 -> PV3;
     V33 -> R33;
     R33 -> MSRC;
     MSRC -> DIN4;
     MSRC -> RING;
-    V33 -> R_BOOT;
-    R_BOOT -> BOOT;
-    BOOT -> CDP;
+    CP46 -> BOOT;
+    BOOT -> GND;
 
     GND -> CGN;
     GND -> KGN;
@@ -223,8 +220,6 @@ digraph KeybChord {
     GND -> PGN;
     GND -> DIN2;
     GND -> SLEEVE;
-    GND -> RESET;
-    RESET -> CRST;
 }
 ```
 
@@ -240,12 +235,13 @@ digraph KeybChord {
   The CH559 **HP** (pin 29) / **HM** (pin 30) run to the receptacle through **22 Ω** series
   resistors (the only series elements; the keyboard supplies device-side pull-ups). `DP`
   (pin 31) / `DM` (pin 32) go to a **4-pin programming header** for flashing the CH559 via
-  its USB bootloader. **Power:** `VIN5` (pin 41) and `VDD33` (pin 42) both to `3V3(OUT)`
-  (0.1 µF decoupling; at a <3.6 V supply the internal LDO is bypassed), `GND` (pin 18) to
-  ground. Runs off its **internal oscillator** (no crystal). `RST` is pin 3.
-  **Programming aids (drawn):** a **BOOT** tactile button pulls `DP` up to `3V3` through a
-  **10 kΩ** resistor (hold it during reset to enter the USB bootloader), and a **RESET**
-  tactile button grounds `RST` (pin 3) to reset the CH559.
+  its USB bootloader; the header's `3V3` pin is intentionally **NC** on the v0.2 PCB.
+  **Power:** `VIN5` (pin 41) and `VDD33` (pin 42) both to `3V3(OUT)` (0.1 µF decoupling;
+  at a <3.6 V supply the internal LDO is bypassed), `GND` (pin 18) to ground. Runs off its
+  **internal oscillator** (no crystal). `RST` is pin 3 (no board reset button).
+  **Programming aid (drawn):** a single **BOOT** tactile button pulls `P4.6/XI/SCS`
+  (pin 16) to `GND`. Hold it while powering the board on to enter the CH559 USB
+  bootloader (the firmware checks `P4.6` low); release it after the bootloader enumerates.
 - **DIN MIDI OUT (3.3V loop):** driven directly from the 3.3V `GP8` TX pin —
   **10 ohm** in series with `GP8` to DIN pin 5, **33 ohm** from `3V3(OUT)` to DIN pin 4,
   GND to DIN pin 2. Standards-compliant per the MIDI 1.0 Electrical Spec update (2014).
@@ -283,10 +279,9 @@ D-, GND** are needed from the PC — the board self-powers at 3.3 V, so do **not
 the PC's 5 V `VBUS` into the board.
 
 **Board-side connector (recommended):** a **4-pin 0.1" (2.54 mm) male header** — `DP`
-(pin 31), `DM` (pin 32), `GND`, and `3V3` (the 4th pin is optional, used only as a power
-reference). Through-hole and trivial to hand-solder. The header's `GND`/`3V3` are the
-Pico's ground and `3V3(OUT)` (the same rail that powers the CH559); the `3V3` pin is a
-reference only — do not feed power into it and never connect the PC's 5 V `VBUS`.
+(pin 31), `DM` (pin 32), `GND`, and `3V3`. Through-hole and trivial to hand-solder. On
+the v0.2 PCB the `3V3` pin is **intentionally not connected**; the header only needs
+`DP`/`DM`/`GND`. Never connect the PC's 5 V `VBUS`.
 
 **Cable/programmer:** a **USB-A male plug breakout** (a small board with a USB-A plug and
 labelled `VBUS`/`D+`/`D-`/`GND` pads). Solder a 4-pin female dupont/JST-XH pigtail to it —
@@ -294,11 +289,12 @@ labelled `VBUS`/`D+`/`D-`/`GND` pads). Solder a 4-pin female dupont/JST-XH pigta
 into the PC. Avoid a raw USB-A↔A cable (host-to-host hazard); a labelled breakout or a cut
 cable is the safe route.
 
-**Bootloader entry (first flash):** CH55x enters its USB bootloader by pulling **D+ (DP)
-high through ~10 kΩ** during reset. So also place two tactile buttons (or two shortable
-pads) on the board: **BOOT** (10 kΩ `DP`→3V3) and **RESET** (pin 3). After the first
-flash, `ch55xtool`/ch55xduino re-enters the bootloader over USB automatically, so the
-buttons/pads are mainly for initial programming.
+**Bootloader entry (first flash):** hold the on-board **BOOT** button (`P4.6/XI/SCS`,
+pin 16 → `GND`) while powering the board on. The CH559 firmware checks `P4.6` low at
+startup and enters its USB bootloader. Release the button once the bootloader enumerates.
+There is no board RESET button on v0.2; power-cycle the board to reset the CH559. After
+the first flash, `ch55xtool`/ch55xduino re-enters the bootloader over USB automatically,
+so the button is mainly for initial programming.
 
 **Software:**
 - [`ch55xtool`](https://github.com/MarsTechHAN/ch552tool) — Python, cross-platform:
@@ -322,14 +318,13 @@ buttons/pads are mainly for initial programming.
   [Adafruit 1951 — Premium Female/Female Jumper Wires, 20×3"](https://www.adafruit.com/product/1951)
   or [Adafruit 266 — 40×6"](https://www.adafruit.com/product/266). (JST-XH pigtails are an
   alternative from Digi-Key/LCSC.)
-- **Tactile switches:** 2× 6×6 mm tactile pushbutton (BOOT/RESET) — e.g.
+- **Tactile switch:** 1× 6×6 mm tactile pushbutton (BOOT) — e.g.
   [Adafruit 367 — Tactile Switch Buttons](https://www.adafruit.com/product/367) or any
   Digi-Key/LCSC equivalent.
-- **Passives (board):** 1× 10 kΩ resistor (BOOT pull-up) and 2× 0.1 µF capacitors
-  (`VIN5`/`VDD33` decoupling) — generic parts.
+- **Passives (board):** 2× 0.1 µF capacitors (`VIN5`/`VDD33` decoupling) — generic parts.
 
-**Procedure:** hold **BOOT**, tap **RESET**, release **BOOT** → the CH559 enumerates as a
-USB bootloader device on the PC → run `ch55xtool -f <firmware>.bin` → done.
+**Procedure:** hold **BOOT**, apply power, release **BOOT** once the CH559 enumerates as
+a USB bootloader device on the PC → run `ch55xtool -f <firmware>.bin` → done.
 
 ## Regenerating the PNG
 

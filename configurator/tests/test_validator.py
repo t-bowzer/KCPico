@@ -14,6 +14,7 @@ from keybchord_configurator.validation.validator import (
     validate_chord_pattern,
     validate_config,
     validate_keymap,
+    validate_pattern_library,
     validate_preset_bank,
     validate_rhythm,
     validate_sequence_file,
@@ -378,3 +379,27 @@ def test_sequence_validation_warns_on_duplicates_and_ranges():
     assert any("duplicate step" in w for w in result.warnings)
     assert any("recorded[0]" in w for w in result.warnings)
     assert any("'live'" in w for w in result.warnings)
+
+
+def test_pattern_library_caps_and_file_sizes():
+    base = {"name": "X", "steps_per_bar": 16, "steps": [0] * 16}
+
+    too_many = [(f"user{i}.json", base) for i in range(33)]
+    result = validate_pattern_library(too_many, [], [])
+    assert any("rhythm patterns" in e for e in result.errors)
+
+    too_big = {"name": "X" * 9000, "steps_per_bar": 16, "steps": [0] * 16}
+    result = validate_pattern_library([("user1.json", too_big)], [], [])
+    assert any("file is" in e for e in result.errors)
+
+
+def test_pattern_library_budget_limits():
+    big_name = "X" * 2900
+    entries = [
+        (f"user{i}.json",
+         {"name": big_name, "steps_per_bar": 16, "steps": [0] * 16})
+        for i in range(20)
+    ]
+    result = validate_pattern_library(entries, [], [])
+    assert any("user patterns" in e or "pattern library" in e
+               for e in result.errors)

@@ -85,6 +85,132 @@ std::vector<int> tightestSpread(const std::vector<int>& pcs, int bassIdx,
     return best;
 }
 
+int pcIndex(const std::vector<int>& pcs, int pc) {
+    pc = ((pc % 12) + 12) % 12;
+    for (int i = 0; i < static_cast<int>(pcs.size()); i++) {
+        if (pcs[i] == pc) return i;
+    }
+    return 0;
+}
+
+// Minimum-interval spread guided by the voicing mode. The tightest ascending
+// spread is rebuilt from a bass selected by root position / smart / up / down
+// instead of always starting at the root. `pinnedBassIdx` is >= 0 when a manual
+// inversion fixes the bass pitch class; `pinnedBassNote` is its exact root-
+// position octave (used by root-position mode and as a fallback).
+std::vector<int> voiceSpread(const std::vector<int>& pcs,
+                             int root,
+                             uint8_t low,
+                             uint8_t high,
+                             int octave,
+                             const VoicingConfig& cfg,
+                             const std::vector<uint8_t>& previous,
+                             int pinnedBassIdx,
+                             int pinnedBassNote) {
+    const int n = static_cast<int>(pcs.size());
+    const int minInterval = cfg.min_interval;
+    const bool pinned = pinnedBassIdx >= 0;
+    const int rootIdx = pcIndex(pcs, root);
+
+    auto rootSpread = [&]() {
+        if (pinned) return tightestSpread(pcs, pinnedBassIdx, pinnedBassNote, minInterval);
+        return tightestSpread(pcs, rootIdx, root, minInterval);
+    };
+
+    if (cfg.voicing_mode == VoicingMode::RootPosition) return rootSpread();
+
+    std::vector<int> bassIdxs;
+    if (pinned) {
+        bassIdxs.push_back(pinnedBassIdx);
+    } else {
+        for (int i = 0; i < n; i++) bassIdxs.push_back(i);
+    }
+
+    auto smartSpread = [&]() {
+        if (previous.empty() || static_cast<int>(previous.size()) != n)
+            return rootSpread();
+
+        const int center = clampRootOctave(static_cast<int>(low + high) / 2 + 12 * octave);
+        long bestScore = -1;
+        std::vector<int> best;
+        for (int k = -2; k <= 2; k++) {
+            int target = center + 12 * k;
+            for (int idx : bassIdxs) {
+                int bassNote = nearestPc(pcs[idx], target);
+                std::vector<int> cand = tightestSpread(pcs, idx, bassNote, minInterval);
+                long score = 0;
+                for (int j = 0; j < n; j++)
+                    score += std::abs(cand[j] - static_cast<int>(previous[j]));
+                if (bestScore < 0 || score < bestScore) {
+                    bestScore = score;
+                    best = cand;
+                }
+            }
+        }
+        return best.empty() ? rootSpread() : best;
+    };
+
+    if (cfg.voicing_mode == VoicingMode::Smart) return smartSpread();
+    if (previous.empty()) return rootSpread();
+
+    const int dir = (cfg.voicing_mode == VoicingMode::Up) ? +1 : -1;
+    const bool sameSize = static_cast<int>(previous.size()) == n;
+    const int previousBass = static_cast<int>(previous[0]);
+
+    long bestScore = -1;
+    std::vector<int> bestNotes;
+    bool found = false;
+
+    for (int octShift = -3; octShift <= 3; octShift++) {
+        int anchor = previousBass + 12 * octShift;
+        for (int idx : bassIdxs) {
+            int bassNote = nearestPc(pcs[idx], anchor);
+            std::vector<int> cand = tightestSpread(pcs, idx, bassNote, minInterval);
+
+            long score = 0;
+            if (sameSize) {
+                bool ok = true;
+                bool strict = false;
+                for (int j = 0; j < n; j++) {
+                    if (dir < 0) {
+                        if (cand[j] > static_cast<int>(previous[j])) ok = false;
+                        if (cand[j] < static_cast<int>(previous[j])) strict = true;
+                    } else {
+                        if (cand[j] < static_cast<int>(previous[j])) ok = false;
+                        if (cand[j] > static_cast<int>(previous[j])) strict = true;
+                    }
+                }
+                if (!ok || !strict) continue;
+                for (int j = 0; j < n; j++)
+                    score += std::abs(cand[j] - static_cast<int>(previous[j]));
+            } else {
+                if (dir < 0) {
+                    if (cand[0] >= previousBass) continue;
+                } else {
+                    if (cand[0] <= previousBass) continue;
+                }
+                score = std::abs(cand[0] - previousBass);
+                for (int note : cand) {
+                    int nearest = INT_MAX;
+                    for (uint8_t p : previous) {
+                        nearest = std::min(nearest, std::abs(note - static_cast<int>(p)));
+                    }
+                    score += nearest;
+                }
+            }
+
+            if (!found || score < bestScore) {
+                found = true;
+                bestScore = score;
+                bestNotes = cand;
+            }
+        }
+    }
+
+    if (found) return bestNotes;
+    return smartSpread();
+}
+
 } // namespace
 
 
@@ -161,9 +287,15 @@ std::vector<uint8_t> voiceDirectional(const ResolvedChord& chord,
     std::vector<int> tones = chordPitchClasses(chord);
     int n = static_cast<int>(tones.size());
 
-    if (previous.empty() || static_cast<int>(previous.size()) != n) {
+    if (previous.empty()) {
         return voiceRootPosition(chord, base_root_midi, octave, low, high);
     }
+
+    // When the chord's cardinality changes (e.g. a triad followed by a 7th),
+    // there is no note-wise correspondence. Fall back to direction by bass note
+    // so Up/Down still move instead of silently snapping to root position.
+    const bool sameSize = static_cast<int>(previous.size()) == n;
+    const int previousBass = static_cast<int>(previous[0]);
 
     // Anchor on the previous voicing's lowest note and walk a few octaves each
     // way so the voicing can keep stepping in the requested direction.
@@ -172,7 +304,7 @@ std::vector<uint8_t> voiceDirectional(const ResolvedChord& chord,
     bool found = false;
 
     for (int octShift = -3; octShift <= 3; octShift++) {
-        int anchor = static_cast<int>(previous[0]) + 12 * octShift;
+        int anchor = previousBass + 12 * octShift;
         for (int r = 0; r < n; r++) {
             std::vector<int> notes(n);
             notes[0] = nearestPc(tones[r], anchor);
@@ -183,23 +315,41 @@ std::vector<uint8_t> voiceDirectional(const ResolvedChord& chord,
                 notes[j] = base;
             }
 
-            bool ok = true;
-            bool strict = false;
-            for (int j = 0; j < n; j++) {
+            long score = 0;
+            if (sameSize) {
+                bool ok = true;
+                bool strict = false;
+                for (int j = 0; j < n; j++) {
+                    if (dir < 0) {
+                        if (notes[j] > static_cast<int>(previous[j])) ok = false;
+                        if (notes[j] < static_cast<int>(previous[j])) strict = true;
+                    } else {
+                        if (notes[j] < static_cast<int>(previous[j])) ok = false;
+                        if (notes[j] > static_cast<int>(previous[j])) strict = true;
+                    }
+                }
+                if (!ok || !strict) continue;
+                for (int j = 0; j < n; j++) {
+                    score += std::abs(notes[j] - static_cast<int>(previous[j]));
+                }
+            } else {
+                // Bass must cross the previous bass. Prefer the closest bass and
+                // then the candidate nearest any previous note.
                 if (dir < 0) {
-                    if (notes[j] > static_cast<int>(previous[j])) ok = false;
-                    if (notes[j] < static_cast<int>(previous[j])) strict = true;
+                    if (notes[0] >= previousBass) continue;
                 } else {
-                    if (notes[j] < static_cast<int>(previous[j])) ok = false;
-                    if (notes[j] > static_cast<int>(previous[j])) strict = true;
+                    if (notes[0] <= previousBass) continue;
+                }
+                score = std::abs(notes[0] - previousBass);
+                for (int note : notes) {
+                    int nearest = INT_MAX;
+                    for (uint8_t p : previous) {
+                        nearest = std::min(nearest, std::abs(note - static_cast<int>(p)));
+                    }
+                    score += nearest;
                 }
             }
-            if (!ok || !strict) continue;
 
-            long score = 0;
-            for (int j = 0; j < n; j++) {
-                score += std::abs(notes[j] - static_cast<int>(previous[j]));
-            }
             if (!found || score < bestScore) {
                 found = true;
                 bestScore = score;
@@ -266,13 +416,17 @@ std::vector<uint8_t> voiceChord(const ResolvedChord& chord,
 
     if (cfg.min_interval > 0) {
         // Minimum-interval spread (VR-7): rebuild as the tightest ascending
-        // configuration starting at the (possibly inverted) bass.
-        int bassPc = ((chord.rootPc + bassInterval) % 12 + 12) % 12;
-        int bassPcIdx = 0;
-        for (int i = 0; i < n; i++) {
-            if (pcs[i] == bassPc) { bassPcIdx = i; break; }
+        // configuration, letting the voicing mode pick the bass/octave. A
+        // manual inversion pins the bass pitch class.
+        int pinnedBassIdx = -1;
+        int pinnedBassNote = root;
+        if (cfg.inversion != InversionMode::Root) {
+            int bassPc = ((chord.rootPc + bassInterval) % 12 + 12) % 12;
+            pinnedBassIdx = pcIndex(pcs, bassPc);
+            pinnedBassNote = bassNote;
         }
-        notes = tightestSpread(pcs, bassPcIdx, bassNote, cfg.min_interval);
+        notes = voiceSpread(pcs, root, low, high, octave, cfg, previous,
+                            pinnedBassIdx, pinnedBassNote);
     } else {
         std::vector<uint8_t> base;
         if (cfg.voicing_mode == VoicingMode::Smart) {

@@ -440,6 +440,50 @@ TEST_F(ChordEngineTest, ResetVoicingReturnsToRootPosition) {
     EXPECT_FALSE(state_.isNoteActive(1, 69));
 }
 
+// A mapped voicing edit updates pending params and notifies the engine. The
+// next live trigger must use the new mode (FR-C9: the sounding chord is
+// untouched, but the next trigger re-snapshots).
+TEST_F(ChordEngineTest, VoicingUpAppliesOnNextTrigger) {
+    press(0x17, 0);    // C major root {60,64,67}
+    release(0x17, 0);  // Held latches
+
+    state_.pendingChord.voicing_mode = VoicingMode::Up;
+    engine_->onVoicingChanged();
+
+    midi_.clear();
+    press(0x1C, 0);    // G major -> nearest voicing above C
+    EXPECT_EQ(noteOnNotes(), (std::vector<uint8_t>{62, 67, 71}));
+}
+
+// Even when the next trigger resolves to the same chord through a non-forced
+// path, a pending voicing change forces a re-trigger so the new mode is heard.
+TEST_F(ChordEngineTest, VoicingChangeForcesSameChordReTrigger) {
+    press(0x17, 0);    // C major root
+    release(0x17, 0);
+
+    state_.pendingChord.voicing_mode = VoicingMode::Down;
+    engine_->onVoicingChanged();
+    midi_.clear();
+
+    press(0x17, 0);    // same chord; fresh presses already force a trigger
+    EXPECT_EQ(noteOnNotes(), (std::vector<uint8_t>{55, 60, 64}));
+}
+
+// The voice-leading reference is the unpadded chord core. With min_notes above
+// the triad size, Up/Down must still move instead of falling back to root.
+TEST_F(ChordEngineTest, DirectionalVoicingIgnoresMinNotesPadding) {
+    state_.pendingChord.min_notes = 4;
+    press(0x17, 0);    // C major {60,64,67,72}
+    release(0x17, 0);
+
+    state_.pendingChord.voicing_mode = VoicingMode::Down;
+    engine_->onVoicingChanged();
+    midi_.clear();
+
+    press(0x1C, 0);    // G major; previous core is C {60,64,67}
+    EXPECT_EQ(noteOnNotes(), (std::vector<uint8_t>{59, 62, 67, 71}));
+}
+
 // --- Chord patterns (M13) --------------------------------------------------
 
 namespace {
@@ -596,4 +640,72 @@ TEST_F(ChordEngineTest, PatternBlockSustainsBar) {
     EXPECT_TRUE(state_.isNoteActive(1, 60));
     EXPECT_TRUE(state_.isNoteActive(1, 64));
     EXPECT_TRUE(state_.isNoteActive(1, 67));
+}
+
+TEST_F(ChordEngineTest, InvalidPatternIndexRecovers) {
+    engine_->setPatterns({albertiPattern()});
+    state_.pendingChord.play_mode = PlayMode::Pattern;
+    state_.pendingChord.pattern = 9;  // out of range
+    state_.rhythmClock.running = true;
+    state_.rhythmClock.stepsPerBar = 16;
+    state_.rhythmClock.stepAbs = 0;
+
+    press(0x17, 0);  // C major -> recovered pattern step 0 = root 60
+    EXPECT_EQ(state_.pendingChord.pattern, 0);
+    EXPECT_TRUE(state_.isNoteActive(1, 60));
+}
+
+TEST_F(ChordEngineTest, ZeroStepsPerBarDoesNotStallPattern) {
+    ChordPattern broken = albertiPattern();
+    broken.steps_per_bar = 0;
+    engine_->setPatterns({broken});
+    state_.pendingChord.play_mode = PlayMode::Pattern;
+    state_.pendingChord.pattern = 0;
+    state_.rhythmClock.running = true;
+    state_.rhythmClock.stepsPerBar = 16;
+    state_.rhythmClock.stepAbs = 0;
+
+    press(0x17, 0);
+    EXPECT_TRUE(state_.isNoteActive(1, 60));
+
+    for (uint32_t s = 1; s <= 4; s++) {
+        state_.rhythmClock.stepAbs = s;
+        engine_->update(0);
+    }
+    EXPECT_TRUE(state_.isNoteActive(1, 67));  // step 4 = 5th, despite bad meter
+}
+
+TEST_F(ChordEngineTest, PatternStartWaitsForNearRhythmStep) {
+    engine_->setPatterns({albertiPattern()});
+    state_.pendingChord.play_mode = PlayMode::Pattern;
+    state_.pendingChord.pattern = 0;
+    state_.rhythmClock.running = true;
+    state_.rhythmClock.stepsPerBar = 16;
+    state_.rhythmClock.stepAbs = 5;
+    state_.rhythmClock.nextStepUs = 20000;
+
+    press(0x17, 0);  // begins at 15 ms, 5 ms before the rhythm step
+    EXPECT_EQ(midi_.noteOnCount(), 0);
+
+    engine_->update(20000);
+    EXPECT_TRUE(state_.isNoteActive(1, 60));
+}
+
+TEST_F(ChordEngineTest, PatternStartAlwaysWaitsForNextRhythmStep) {
+    engine_->setPatterns({albertiPattern()});
+    state_.pendingChord.play_mode = PlayMode::Pattern;
+    state_.pendingChord.pattern = 0;
+    state_.rhythmClock.running = true;
+    state_.rhythmClock.stepsPerBar = 16;
+    state_.rhythmClock.stepAbs = 5;
+    state_.rhythmClock.nextStepUs = 100000;
+
+    press(0x17, 0);  // begins at 15 ms; still waits for step 100 ms away
+    EXPECT_EQ(midi_.noteOnCount(), 0);
+
+    engine_->update(99999);
+    EXPECT_EQ(midi_.noteOnCount(), 0);
+
+    engine_->update(100000);
+    EXPECT_TRUE(state_.isNoteActive(1, 60));
 }

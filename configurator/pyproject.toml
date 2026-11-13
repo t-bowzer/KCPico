@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "keybchord-configurator"
-version = "0.1.0"
+version = "0.2.0"
 description = "GUI configurator for the KeybChord Pico (presets, rhythms, bass, keymap, backup)"
 readme = "README.md"
 license = { text = "MIT" }

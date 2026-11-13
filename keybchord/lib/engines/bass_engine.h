@@ -44,6 +44,15 @@ private:
 
     uint32_t lastStepAbs_ = 0;
 
+    // Free-run fallback used when the rhythm engine is stopped: the bass keeps
+    // stepping at the preset tempo so it is audible without drums. When the
+    // rhythm starts, playback resyncs to the shared 16th-note step counter.
+    bool     freeRunActive_ = false;
+    bool     lastRunning_ = true;   // assume running until the first update
+    uint32_t freeRunStep_ = 0;
+    uint64_t freeRunNextUs_ = 0;
+    uint16_t freeRunTempo_ = 0;
+
     bool     noteActive_ = false;
     uint8_t  note_ = 0;
     uint64_t offDeadlineUs_ = 0;

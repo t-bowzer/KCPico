@@ -40,6 +40,7 @@ from ..validation.validator import (
     validate_chord_pattern,
     validate_config,
     validate_keymap,
+    validate_pattern_library,
     validate_preset_bank,
     validate_rhythm,
     validate_sequence_file,
@@ -80,6 +81,19 @@ def _collect_chord_pattern_names(directory: Path) -> list[str]:
         pattern = ChordPattern.from_dict(data)
         names.append(pattern.name or path.stem)
     return names
+
+
+def _pattern_entries(root: Path, subdir: str) -> list[tuple[str, object]]:
+    entries: list[tuple[str, object]] = []
+    directory = root / subdir
+    if not directory.exists():
+        return entries
+    for path in sorted(directory.glob("*.json")):
+        try:
+            entries.append((path.name, json.loads(path.read_text(encoding="utf-8"))))
+        except (json.JSONDecodeError, OSError):
+            continue
+    return entries
 
 
 def validate_directory(directory: str | Path) -> list[tuple[str, object]]:
@@ -131,6 +145,11 @@ def validate_directory(directory: str | Path) -> list[tuple[str, object]]:
         for path in sorted(directory_path.glob("*.json")):
             add(f"{subdir}/{path.name}", path, validator, filename=path.name)
 
+    results.append(("pattern library", validate_pattern_library(
+        _pattern_entries(root, RHYTHMS_DIR),
+        _pattern_entries(root, BASS_DIR),
+        _pattern_entries(root, CHORD_PATTERNS_DIR),
+    )))
     return results
 
 
@@ -166,6 +185,11 @@ def validate_tree(tree: ConfigTree) -> list[tuple[str, object]]:
     for filename, pattern in tree.chordpatterns:
         results.append((f"{CHORD_PATTERNS_DIR}/{filename}",
                         validate_chord_pattern(pattern.to_dict(), filename=filename)))
+    results.append(("pattern library", validate_pattern_library(
+        [(filename, pattern.to_dict()) for filename, pattern in tree.rhythms],
+        [(filename, pattern.to_dict()) for filename, pattern in tree.bass],
+        [(filename, pattern.to_dict()) for filename, pattern in tree.chordpatterns],
+    )))
     return results
 
 

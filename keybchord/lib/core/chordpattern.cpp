@@ -51,7 +51,7 @@ bool parseChordPattern(const std::string& json, ChordPattern& out) {
         p.name = doc["name"].as<std::string>();
     }
     if (doc.containsKey("steps_per_bar") && doc["steps_per_bar"].is<int>()) {
-        p.steps_per_bar = doc["steps_per_bar"].as<int>();
+        p.steps_per_bar = clamp<int>(doc["steps_per_bar"].as<int>(), 4, 64);
     }
     if (doc.containsKey("steps") && doc["steps"].is<JsonArray>()) {
         for (JsonVariant v : doc["steps"].as<JsonArray>()) {
@@ -72,6 +72,26 @@ bool parseChordPattern(const std::string& json, ChordPattern& out) {
 
     out = p;
     return true;
+}
+
+std::string serializeChordPattern(const ChordPattern& p, bool pretty) {
+    JsonDocument doc;
+    doc["name"] = p.name;
+    doc["steps_per_bar"] = p.steps_per_bar;
+    JsonArray steps = doc["steps"].to<JsonArray>();
+    for (uint8_t v : p.steps) steps.add(static_cast<int>(v));
+    if (!p.sustain_steps.empty()) {
+        JsonArray sustain = doc["sustain_steps"].to<JsonArray>();
+        for (uint8_t v : p.sustain_steps) sustain.add(static_cast<int>(v));
+    }
+
+    std::string out;
+    if (pretty) {
+        serializeJsonPretty(doc, out);
+    } else {
+        serializeJson(doc, out);
+    }
+    return out;
 }
 
 std::vector<int> chordPatternOffsets(ChordType type, uint8_t mask) {

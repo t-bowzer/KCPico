@@ -37,13 +37,16 @@ std::string PresetEngine::locationString(int bank, int slot) const {
 }
 
 void PresetEngine::recomputeDirty() {
-    PresetSlot stored = loadPresetOrDefault(storage_, state_.currentBank,
-                                            state_.currentSlot);
+    if (!storedSlotValid_) {
+        storedSlot_ = loadPresetOrDefault(storage_, state_.currentBank,
+                                          state_.currentSlot);
+        storedSlotValid_ = true;
+    }
     PresetSlot cur = makePreset(state_.pendingChord, state_.pendingStrum,
-                                state_.pendingBass, state_.pendingRhythm, stored.name,
-                                state_.pendingMacros,
+                                state_.pendingBass, state_.pendingRhythm,
+                                storedSlot_.name, state_.pendingMacros,
                                 state_.sequencer.useRecorded);
-    state_.dirty = !cur.sameParams(stored);
+    state_.dirty = !cur.sameParams(storedSlot_);
 }
 
 void PresetEngine::enterCursor() {
@@ -104,6 +107,8 @@ void PresetEngine::loadCursor(uint64_t now_us) {
     state_.editMenu     = EditMenu::None;
     state_.editParam    = 0;
     state_.currentPresetName = stored.name;
+    storedSlot_ = stored;
+    storedSlotValid_ = true;
 
     // Mirror edit behavior: a mode change releases a latched held chord.
     if (oldMode != stored.chord.play_mode && modeChanged_) modeChanged_();
@@ -141,12 +146,16 @@ void PresetEngine::confirmPrompt(uint64_t now_us) {
     int slot = state_.currentSlot;
 
     if (op == PendingOp::Save) {
-        PresetSlot existing = loadPresetOrDefault(storage_, bank, slot);
+        PresetSlot existing = storedSlotValid_
+            ? storedSlot_
+            : loadPresetOrDefault(storage_, bank, slot);
         PresetSlot out = makePreset(state_.pendingChord, state_.pendingStrum,
                                     state_.pendingBass, state_.pendingRhythm,
                                     existing.name, state_.pendingMacros,
                                     state_.sequencer.useRecorded);
         savePreset(storage_, bank, slot, out);
+        storedSlot_ = out;
+        storedSlotValid_ = true;
         state_.dirty = false;
         state_.currentPresetName = existing.name;
         beginNameEdit();   // continue into the preset-naming text entry
@@ -158,7 +167,9 @@ void PresetEngine::confirmPrompt(uint64_t now_us) {
         state_.pendingRhythm = RhythmParams::defaults();
         state_.pendingMacros = MacroConfig::defaults();
         state_.sequencer.useRecorded = true;
-        savePreset(storage_, bank, slot, PresetSlot::defaults());
+        storedSlot_ = PresetSlot::defaults();
+        storedSlotValid_ = true;
+        savePreset(storage_, bank, slot, storedSlot_);
         state_.dirty = false;
         if (oldMode != state_.pendingChord.play_mode && modeChanged_) {
             modeChanged_();
@@ -185,8 +196,9 @@ std::string PresetEngine::nameEditText() const {
 
 void PresetEngine::beginNameEdit() {
     nameEditing_ = true;
-    PresetSlot existing =
-        loadPresetOrDefault(storage_, state_.currentBank, state_.currentSlot);
+    PresetSlot existing = storedSlotValid_
+        ? storedSlot_
+        : loadPresetOrDefault(storage_, state_.currentBank, state_.currentSlot);
     nameBuffer_ = (existing.name.empty() || existing.name == "Default")
                       ? "" : existing.name;
     display_.showNameEdit(nameEditText());
@@ -195,9 +207,13 @@ void PresetEngine::beginNameEdit() {
 void PresetEngine::commitName() {
     int bank = state_.currentBank;
     int slot = state_.currentSlot;
-    PresetSlot stored = loadPresetOrDefault(storage_, bank, slot);
+    PresetSlot stored = storedSlotValid_
+        ? storedSlot_
+        : loadPresetOrDefault(storage_, bank, slot);
     stored.name = nameBuffer_.empty() ? "Default" : nameBuffer_;
     savePreset(storage_, bank, slot, stored);
+    storedSlot_ = stored;
+    storedSlotValid_ = true;
     state_.currentPresetName = stored.name;
     nameEditing_ = false;
     display_.cancel();
@@ -256,6 +272,8 @@ void PresetEngine::loadStartupPreset() {
     state_.pendingMacros = stored.macros;
     state_.sequencer.useRecorded = stored.seq_use_recorded;
     state_.currentPresetName = stored.name;
+    storedSlot_ = stored;
+    storedSlotValid_ = true;
     state_.dirty = false;
 }
 

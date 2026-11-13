@@ -42,7 +42,7 @@ bool parseRhythmPattern(const std::string& json, RhythmPattern& out) {
         p.short_name = doc["short_name"].as<std::string>();
     }
     if (doc.containsKey("steps_per_bar") && doc["steps_per_bar"].is<int>()) {
-        p.steps_per_bar = doc["steps_per_bar"].as<int>();
+        p.steps_per_bar = clamp<int>(doc["steps_per_bar"].as<int>(), 4, 64);
     }
     if (doc.containsKey("swing") && doc["swing"].is<int>()) {
         p.swing = static_cast<int8_t>(
@@ -71,6 +71,30 @@ bool parseRhythmPattern(const std::string& json, RhythmPattern& out) {
 
     out = p;
     return true;
+}
+
+std::string serializeRhythmPattern(const RhythmPattern& p, bool pretty) {
+    JsonDocument doc;
+    doc["name"] = p.name;
+    doc["steps_per_bar"] = p.steps_per_bar;
+    doc["swing"] = static_cast<int>(p.swing);
+    JsonArray tracks = doc["tracks"].to<JsonArray>();
+    for (const auto& t : p.tracks) {
+        JsonObject to = tracks.add<JsonObject>();
+        to["note"] = static_cast<int>(t.note);
+        to["name"] = t.name;
+        JsonArray pattern = to["pattern"].to<JsonArray>();
+        for (uint8_t v : t.pattern) pattern.add(static_cast<int>(v));
+    }
+    if (!p.short_name.empty()) doc["short_name"] = p.short_name;
+
+    std::string out;
+    if (pretty) {
+        serializeJsonPretty(doc, out);
+    } else {
+        serializeJson(doc, out);
+    }
+    return out;
 }
 
 uint32_t stepUs(uint16_t bpm) {

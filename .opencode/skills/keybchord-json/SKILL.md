@@ -17,9 +17,9 @@ The spec (`docs/KeybChord_Pico_Spec.md` sections 7-9) adds design detail.
 | `/keymap.json` | `{"bindings": [...]}`. A bad keymap halts the firmware. |
 | `/presets/bank1.json` … `bank5.json` | Array of exactly 8 preset objects. |
 | `/sequences/bNpM.json` | All 10 sequence slots for one preset. |
-| `/rhythms/*.json` | 12 built-ins plus user files. |
-| `/bass/*.json` | 9 built-ins plus user files. |
-| `/chordpatterns/*.json` | 9 built-ins plus user files. |
+| `/rhythms/*.json` | 12 built-ins plus user files (`userN.json` on-device). |
+| `/bass/*.json` | 9 built-ins plus user files (`userN.json` on-device). |
+| `/chordpatterns/*.json` | 9 built-ins plus user files (`userN.json` on-device). |
 
 Firmware parsers: `config.cpp`, `presets.cpp`, `keymap_config.cpp`,
 `sequence.cpp`, `rhythm.cpp`, `bass.cpp`, `chordpattern.cpp`, `macros.cpp`.
@@ -91,6 +91,10 @@ each with a GM note (0-127) and `<piece>_vel` (0 = auto, 1-127 fixed,
   `drum_mute`, `preset_prev`, `preset_next`, `preset_bank_prev`,
   `preset_bank_next`, `preset_load`, `preset_save`, `preset_clear`,
   `tap_tempo`, `sequence_record`, `sequence_play`, `sequence_clear`.
+- `open_menu` menu names: `chord`, `rhythm`, `strum`, `bass`, `drum`,
+  `sequence`, plus the pattern editors `chord_pattern`, `rhythm_pattern`,
+  `bass_pattern`. Defaults: `F9`=chord, `F10`=rhythm, `F11`=strum, `F12`=bass,
+  `Super+F11`=drum, `Ctrl+F12`=sequence, `Super+F9/F10/F12`=pattern editors.
 - Required coverage: `open_menu` for chord/strum/rhythm/bass/drum, plus
   `preset_prev`, `preset_next`, and `preset_save`.
 - Keymap uses short enum names: `press`, `root`, `chord`, `arp_hold`, etc.
@@ -116,6 +120,11 @@ Chord pattern: `name`, `steps_per_bar`, `steps[]` as bitmask `1` root,
 Counts and caps: rhythm 12 built-ins, bass 9, chord patterns 9; each total is
 capped at 32. Built-ins keep low indices; user files are appended in
 alphabetical filename order. A pattern with no tracks/steps is skipped.
+On-device Pattern Edit writes compact `userN.json` with the same schema (no new
+fields; `bars` is inferred from `steps.length / steps_per_bar`). Pattern files share a
+combined 72 KB budget (48 KB user share), with per-file caps of 8 KB rhythm,
+4 KB bass, and 4 KB chord. Built-ins may be overwritten; user patterns may be
+renamed/deleted on device.
 
 ## Sequences (`/sequences/bNpM.json`)
 
@@ -138,7 +147,7 @@ alphabetical filename order. A pattern with no tracks/steps is skipped.
 - `chord_id = root_pc * 128 + chord_type * 8 + extension_mask`; extension bits
   add9=1, add11=2, add13=4. Chord types: 0 major, 1 minor, 2 dom7, 3 maj7,
   4 min7, 5 dim, 6 dim7, 7 aug, 8 sus4, 9 sus2, 10 min7b5.
-- Sequences are compact JSON on purpose for the flash budget; do not pretty-print.
+- Sequences and pattern libraries are compact JSON on purpose for the flash budget; do not pretty-print them. The configurator save path also writes patterns compactly.
 
 ## Macros (inside a preset)
 

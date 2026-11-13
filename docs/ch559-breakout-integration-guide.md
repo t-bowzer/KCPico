@@ -280,8 +280,11 @@ The RP2040 firmware and the CH559 firmware are **unchanged** when moving to the
 bare chip (same UART1, same baud, same protocol). Only the board changes: power
 `VIN5`/`VDD33` both from `3V3(OUT)` (0.1 µF decoupling), take the keyboard's
 VBUS from Pico `VBUS` directly, add the 22 Ω series resistors on `HP`/`HM`, and
-add a 4-pin `DP`/`DM`/`GND`/`3V3` programming header. See
-`hardware-test-plan-ch559.md` §8 and `docs/wiring.md`.
+add a 4-pin `DP`/`DM`/`GND`/`3V3` programming header (the `3V3` pin is
+intentionally NC on the v0.2 PCB). Fit a single **BOOT** button from
+`P4.6/XI/SCS` (pin 16) to GND; hold it at power-up for bootloader entry. No
+RESET button or DP pull-up is fitted. See `hardware-test-plan-ch559.md` §8 and
+`docs/wiring.md`.
 
 ---
 

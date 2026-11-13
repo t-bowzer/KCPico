@@ -51,6 +51,9 @@ before `ParamId::COUNT` is usually safer.
 - Extend `parseValue()` and the `ValueName` table for enum spellings.
 - If a default binding should ship, update `KeymapConfig::defaults()` and
   `keymapDefaultJson()`.
+- For a new `open_menu` target, add the `EditMenu` value, the
+  `lookupMenuName()` entry, defaults/validation, and the configurator
+  `EDIT_MENU_JSON` / keymap editor / validator mirror.
 - `macros.cpp` reuses the keymap parameter names; it only needs a separate
   change for drum pieces or special value handling.
 

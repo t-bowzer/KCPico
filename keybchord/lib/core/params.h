@@ -90,6 +90,9 @@ enum class EditMenu : uint8_t {
     Bass,
     Drum,
     Sequence,
+    ChordPattern,
+    RhythmPattern,
+    BassPattern,
     COUNT
 };
 
@@ -166,6 +169,10 @@ enum class ParamId : uint8_t {
     SeqSlot,
     SeqBars,
     SeqSettings,
+    // Pattern editor command entries (M17; menu-only, not keymap params)
+    ChordPatternEdit,
+    RhythmPatternEdit,
+    BassPatternEdit,
     COUNT
 };
 

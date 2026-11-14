@@ -164,7 +164,8 @@ straight to the device — use the cross-platform
 - [Sequencer hardware test plan](hardware-test-plan-sequencer.md) — step-by-step verification.
 - [Pattern editor hardware test plan](hardware-test-plan-pattern-editor.md) — step-by-step verification.
 - [v0.1.0 roadmap](docs/v0.1.0-roadmap.md) — milestones and acceptance coverage.
-- [v0.2.0 roadmap](docs/v0.2.0-roadmap.md) — current development plan.
+- [v0.3.0 roadmap](docs/v0.3.0-roadmap.md) — current development plan.
+- [v0.2.0 roadmap](docs/v0.2.0-roadmap.md) — archived v0.2 plan.
 
 ## Development
 
